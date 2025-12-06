@@ -1,0 +1,161 @@
+{% extends "core/base.html" %}
+{% block title %}Reelioo | Global Feedback Loop{% endblock %}
+
+{% block content %}
+
+<style>
+    .glass-input {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        transition: all 0.2s;
+    }
+    .glass-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        outline: none;
+        background: rgba(15, 23, 42, 0.9);
+    }
+    .rating-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #94a3b8;
+        transition: all 0.2s;
+    }
+    .rating-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+    .rating-btn.selected {
+        background: #3b82f6;
+        border-color: #3b82f6;
+        color: white;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+</style>
+
+<div class="max-w-3xl mx-auto py-12 px-4">
+    
+    <div class="text-center mb-10">
+        <h1 class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-3">
+            Improving The Algo
+        </h1>
+        <p class="text-slate-400 text-sm max-w-lg mx-auto">
+            Your feedback directly tunes the Reelioo V2 Quant Engine. 
+            Report hallucinations, latency, or winning signals to help us calibrate the models.
+        </p>
+    </div>
+
+    <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 relative overflow-hidden">
+        
+        <!-- Decoration -->
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+
+        <form id="feedbackForm" onsubmit="submitFeedback(event)">
+            
+            <!-- Context -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Market Context</label>
+                    <select id="fb-market" class="w-full glass-input rounded-xl px-4 py-3 text-sm font-bold">
+                        <option value="EQUITY">Equity (NSE/BSE)</option>
+                        <option value="FUTURES">Futures (NFO)</option>
+                        <option value="OPTIONS">Options (NFO)</option>
+                        <option value="CRYPTO">Crypto (WazirX)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Symbol (Optional)</label>
+                    <input type="text" id="fb-symbol" placeholder="e.g. RELIANCE or BTCINR" class="w-full glass-input rounded-xl px-4 py-3 text-sm font-bold placeholder-slate-600">
+                </div>
+            </div>
+
+            <!-- Ratings -->
+            <div class="mb-8">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 block">Model Accuracy Rating</label>
+                <div class="flex gap-2" id="acc-rating-group">
+                    <button type="button" onclick="setRating('acc', 1)" class="rating-btn flex-1 py-3 rounded-lg text-sm font-bold">1</button>
+                    <button type="button" onclick="setRating('acc', 2)" class="rating-btn flex-1 py-3 rounded-lg text-sm font-bold">2</button>
+                    <button type="button" onclick="setRating('acc', 3)" class="rating-btn flex-1 py-3 rounded-lg text-sm font-bold">3</button>
+                    <button type="button" onclick="setRating('acc', 4)" class="rating-btn flex-1 py-3 rounded-lg text-sm font-bold">4</button>
+                    <button type="button" onclick="setRating('acc', 5)" class="rating-btn flex-1 py-3 rounded-lg text-sm font-bold">5</button>
+                </div>
+                <input type="hidden" id="fb-acc-rating" value="0">
+            </div>
+
+            <!-- Flags -->
+            <div class="mb-8">
+                <label class="flex items-center gap-3 p-4 bg-slate-950/50 rounded-xl border border-white/5 cursor-pointer hover:border-red-500/50 transition group">
+                    <input type="checkbox" id="fb-hallucination" class="w-5 h-5 rounded border-slate-700 bg-slate-900 text-red-500 focus:ring-red-500/20">
+                    <div>
+                        <p class="text-sm font-bold text-slate-300 group-hover:text-white transition">Report Hallucination / Bad Data</p>
+                        <p class="text-xs text-slate-500">Check this if the signal price or ticker was completely wrong.</p>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Comment -->
+            <div class="mb-8">
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Detailed Observation</label>
+                <textarea id="fb-comment" rows="4" placeholder="Describe the issue or result..." class="w-full glass-input rounded-xl px-4 py-3 text-sm placeholder-slate-600"></textarea>
+            </div>
+
+            <button type="submit" id="fb-submit" class="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition transform active:scale-[0.98]">
+                SUBMIT FEEDBACK
+            </button>
+
+        </form>
+    </div>
+</div>
+
+<script>
+    function setRating(type, val) {
+        // Update hidden input
+        document.getElementById(`fb-${type}-rating`).value = val;
+        
+        // Update UI
+        const btns = document.querySelectorAll(`#${type}-rating-group .rating-btn`);
+        btns.forEach((b, idx) => {
+            if (idx + 1 === val) b.classList.add('selected');
+            else b.classList.remove('selected');
+        });
+    }
+
+    async function submitFeedback(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('fb-submit');
+        const originalText = btn.innerText;
+        btn.innerText = "SENDING...";
+        btn.disabled = true;
+
+        const payload = {
+            market: document.getElementById('fb-market').value,
+            symbol: document.getElementById('fb-symbol').value,
+            accuracy_rating: document.getElementById('fb-acc-rating').value,
+            hallucination_flag: document.getElementById('fb-hallucination').checked,
+            comment: document.getElementById('fb-comment').value
+        };
+
+        try {
+            const res = await fetch('/api/feedback/submit/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                btn.innerText = "THANK YOU!";
+                btn.classList.add('bg-emerald-600');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } else {
+                throw new Error("Submission failed");
+            }
+        } catch (err) {
+            alert("Error sending feedback.");
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+</script>
+
+{% endblock %}

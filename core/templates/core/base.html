@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}Reelioo V2 | Global Quant Terminal{% endblock %}</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Fonts: Inter (UI) & JetBrains Mono (Data) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #020617; /* Slate 950 */
+            color: #f8fafc;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Premium Gradients */
+        .text-gradient-gold {
+            background: linear-gradient(to right, #fbbf24, #d97706);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        .text-gradient-blue {
+            background: linear-gradient(to right, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative w-full">
+
+    <!-- GLOBAL BACKGROUND FX -->
+    <div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
+        <div class="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/5 rounded-full blur-[120px]"></div>
+        <!-- Subtle Grid Pattern -->
+        <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav class="border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-b from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition">
+                    <i data-lucide="infinity" class="text-white w-5 h-5"></i>
+                </div>
+                <span class="text-lg font-bold tracking-tight text-white group-hover:text-blue-400 transition">
+                    Reelioo
+                </span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8">
+                <a href="/" class="text-sm font-medium text-slate-400 hover:text-white transition">Terminal</a>
+                <a href="/feedback_page/" class="text-sm font-medium text-slate-400 hover:text-white transition">Help Us Improve</a>
+                <a href="/about-reelioo/" class="text-sm font-medium text-slate-400 hover:text-white transition">Methodology</a>
+            </div>
+
+            <!-- Mobile Menu -->
+            <button class="md:hidden text-slate-400 p-2">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow relative z-10 w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-white/5 bg-[#020617] py-10 mt-12">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p class="text-[10px] text-slate-600 uppercase tracking-widest">
+                &copy; 2025 Reelioo Quant Systems.
+            </p>
+            <div class="flex gap-6">
+                <a href="#" class="text-xs text-slate-500 hover:text-white transition">Terms</a>
+                <a href="#" class="text-xs text-slate-500 hover:text-white transition">Privacy</a>
+                <a href="#" class="text-xs text-slate-500 hover:text-white transition">API Status</a>
+            </div>
+        </div>
+    </footer>
+    
+    <script>
+        if (window.lucide) lucide.createIcons();
+    </script>
+</body>
+</html>
