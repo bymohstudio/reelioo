@@ -78,23 +78,20 @@ WSGI_APPLICATION = 'reelioo.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-
-import dj_database_url
-
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
+if os.getenv("DATABASE_URL"):
+    # Only use Postgres if DATABASE_URL is set
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(os.getenv("DATABASE_URL"))
+    }
+else:
+    # Default = SQLite (safe for Railway)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -130,10 +127,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_URL = 'static/'
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# ADD THIS LINE: This tells Django where to put collected files
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Keep this (where your current static files live)
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 SMARTAPI_INSTRUMENTS_PATH = BASE_DIR / "instruments.csv"
 
