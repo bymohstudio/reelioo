@@ -2,164 +2,211 @@
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 from dataclasses import asdict
 import traceback
-import json
 
-from .models import Prediction, Feedback
 from .services.marketdata_service import MarketService
-from .services.ai_commentary_service import AICommentary
-from .services.search_service import search_symbols
-
-# Import Engines (Indian Market Context)
-from .quant.equity_engine import EquityQuantEngine
-from .quant.crypto_engine import CryptoQuantEngine
-from .quant.futures_engine import FuturesQuantEngine
-from .quant.options_engine import OptionsQuantEngine
+from .quant.quant_engine import run_quant
 from .backtest.backtest_engine import BacktestEngine
+from .services.market_universe import get_enabled_markets
+from .services.search_service import search_symbols
+from .models import Feedback
+
+
+# --- HELPER: GENERATE RICH AI COMMENTARY ---
+def generate_quant_commentary(result) -> str:
+    """
+    Generates a 'Rich Text' HTML Desk Note with visual pills and structure.
+    """
+    score = result.score
+    direction = result.direction
+    vol = result.volatility_regime
+    market = result.market_type
+
+    # 1. Sentiment Pill
+    if score >= 55:
+        badge_cls = "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
+        sentiment = "BULLISH BIAS"
+    elif score <= 45:
+        badge_cls = "bg-red-500/20 text-red-400 border-red-500/50"
+        sentiment = "BEARISH BIAS"
+    else:
+        badge_cls = "bg-slate-500/20 text-slate-400 border-slate-500/50"
+        sentiment = "NEUTRAL / CHOP"
+
+    # Base Badge
+    html = f"""<div class='flex flex-wrap gap-2 mb-3'>
+                <span class='px-2 py-1 rounded text-[10px] font-bold border {badge_cls}'>{sentiment}</span>"""
+
+    # 2. Add Context Pills (The "Why")
+    if vol == "HIGH":
+        html += "<span class='px-2 py-1 rounded text-[10px] font-bold border bg-purple-500/20 text-purple-400 border-purple-500/50'>HIGH VOLATILITY</span>"
+
+    trend = result.trend_score
+    if abs(trend) > 50:
+        html += "<span class='px-2 py-1 rounded text-[10px] font-bold border bg-blue-500/20 text-blue-400 border-blue-500/50'>STRONG TREND</span>"
+
+    html += "</div>"  # Close badges
+
+    # 3. Narrative Text
+    html += f"<p class='leading-relaxed text-slate-300'><strong>Analysis:</strong> The Quant model detects a {direction.lower()} structure with <strong>{score:.1f}% confidence</strong>. "
+
+    if market == "OPTIONS":
+        strategy = result.extras.get("opt_strategy", "WAIT")
+        theta = result.extras.get("theta_risk", "MODERATE")
+        html += f"Implied Volatility conditions ({vol}) favor a <strong>{strategy}</strong> approach. "
+        html += f"<span class='block mt-2 text-xs text-slate-500'>* Theta Risk: {theta}</span>"
+
+    elif market == "CRYPTO":
+        phase = result.extras.get("market_phase", "NORMAL")
+        html += f"Asset is currently in a <strong>{phase}</strong> phase. "
+        if "SQUEEZE" in phase:
+            html += "Expect explosive expansion soon."
+        else:
+            html += "Trade the range edges."
+
+    elif market == "FUTURES":
+        velocity = result.extras.get("velocity", "NORMAL")
+        html += f"Trend Velocity is <strong>{velocity}</strong>. "
+        if velocity == "HIGH VELOCITY":
+            html += "Momentum is aggressive; avoid fading the move."
+        else:
+            html += "Price action is grinding; patience required."
+
+    elif market == "EQUITY":
+        html += "Price action aligns with Institutional Flows. "
+        if vol == "LOW":
+            html += "Low volatility supports larger position sizing with tight stops."
+        else:
+            html += "Defensive sizing recommended due to noise."
+
+    html += "</p>"
+    return html
+
 
 class AnalyzeMarketView(APIView):
     """
-    Unified Router for Indian Markets (SmartAPI) and Crypto (WazirX).
-    Expects: symbol, token, exchange, market_type, trade_style.
+    Institutional Grade: Fetches Data -> Runs Quant -> Generates Commentary -> Returns JSON.
     """
+
     def post(self, request):
         try:
             # 1. Extract Params
-            symbol = request.data.get("symbol")
-            token = request.data.get("token")         # Critical for SmartAPI
-            exchange = request.data.get("exchange")   # Critical for SmartAPI
-            trade_style = request.data.get("trade_style", "SWING")
-            market_type = request.data.get("market_type", "EQUITY").upper()
-            
-            if not symbol: 
-                return Response({"error": "Symbol is required"}, status=400)
-            
-            # For Equity/Futures/Options, Token is mandatory (unless it's Crypto)
-            if market_type != "CRYPTO" and not token:
-                return Response({"error": "Token missing. Please select from search dropdown."}, status=400)
+            data = request.data
+            symbol = data.get("symbol")
 
-            # 2. Fetch Data
-            # Pack symbol info for the MarketService adapter
+            if not symbol:
+                return Response({"error": "Symbol is required"}, status=400)
+
+            # 2. FETCH DATA
             symbol_info = {
                 "symbol": symbol,
-                "token": token,
-                "exchange": exchange
+                "token": data.get("token"),
+                "exchange": data.get("exchange")
             }
-            
-            df = MarketService.get_historical_data(symbol_info, market_type, trade_style)
-            
-            if df.empty: 
-                return Response({
-                    "error": f"No data found for {symbol}. Market might be closed or token expired. Please check your SmartAPI credentials."
-                }, status=404)
 
-            # 3. Select Engine
-            if market_type == "FUTURES":
-                result = FuturesQuantEngine.run(df, symbol, trade_style)
-                ai_html = AICommentary.generate_futures_commentary(symbol, result.__dict__)
-            elif market_type == "OPTIONS":
-                result = OptionsQuantEngine.run(df, symbol, trade_style)
-                ai_html = AICommentary.generate_options_commentary(symbol, result.__dict__)
-            elif market_type == "CRYPTO":
-                result = CryptoQuantEngine.run(df, symbol, trade_style)
-                ai_html = AICommentary.generate_crypto_commentary(symbol, result.__dict__)
-            else:
-                # Default to Equity (NSE/BSE)
-                result = EquityQuantEngine.run(df, symbol, trade_style)
-                ai_html = AICommentary.generate_equity_commentary(symbol, result.__dict__)
-                
-            # 4. Prepare Response
-            data = asdict(result)
-            data["ai_comment"] = ai_html
-            
-            # 5. Save Prediction (Fire and forget)
-            self.save_prediction(data, market_type)
-            
-            return Response(data)
-            
+            # Fetch generic underlying data for analysis
+            # Options/Futures logic handles the specifics internally
+            df = MarketService.get_historical_data(
+                symbol_info=symbol_info,
+                market_type=data.get("market_type", "EQUITY"),
+                trade_style=data.get("trade_style", "SWING")
+            )
+
+            if df is None or df.empty:
+                # If fail, try fetching index directly for NIFTY/BANKNIFTY options
+                if data.get("market_type") == "OPTIONS" and "NIFTY" in symbol:
+                    idx_symbol = "NIFTY" if "BANK" not in symbol else "BANKNIFTY"
+                    df = MarketService.get_historical_data(
+                        {"symbol": idx_symbol}, "FUTURES", data.get("trade_style")
+                    )
+
+            if df is None or df.empty:
+                return Response({"error": f"Data unavailable for {symbol}. Try a major liquid symbol."}, status=404)
+
+            # 3. RUN QUANT ENGINE
+            result = run_quant(
+                data.get("market_type", "EQUITY"),
+                df,
+                symbol,
+                data.get("trade_style", "SWING")
+            )
+
+            # 4. ENRICH RESPONSE
+            response_data = asdict(result)
+            response_data["ai_comment"] = generate_quant_commentary(result)
+
+            return Response(response_data)
+
         except Exception as e:
             traceback.print_exc()
-            return Response({"error": str(e)}, status=500)
+            return Response({"error": f"Engine Error: {str(e)}"}, status=500)
 
-    def save_prediction(self, data, market_type):
-        try:
-            Prediction.objects.create(
-                symbol=data.get("symbol"),
-                market=market_type,
-                trade_type=data.get("time_frame", "SWING"),
-                model_probability=data.get("score", 0),
-                predicted_direction=data.get("direction", "FLAT"),
-                entry_price=data.get("entry", 0),
-                target_price=data.get("target", 0),
-                stop_loss_price=data.get("stop", 0)
-            )
-        except Exception as e:
-            print(f"DB Save Error: {e}") 
 
 class BacktestView(APIView):
-    """
-    Backtest runner. Updated to accept Token/Exchange for Indian markets.
-    """
     def post(self, request):
         try:
-            symbol = request.data.get("symbol")
-            token = request.data.get("token")
-            exchange = request.data.get("exchange")
-            market_type = request.data.get("market_type", "EQUITY").upper()
-            trade_style = request.data.get("trade_style", "SWING")
-            
-            if not symbol: return Response({"error": "Symbol required"}, status=400)
+            data = request.data
+            symbol = data.get("symbol")
+            market_type = data.get("market_type", "EQUITY")
+            trade_style = data.get("trade_style", "SWING")
 
-            # Pack info
-            symbol_info = {"symbol": symbol, "token": token, "exchange": exchange}
-
-            # Fetch Long Term Data for Backtest
-            df = MarketService.get_historical_data(symbol_info, market_type, "LONG_TERM")
-            
-            if len(df) < 50:
-                return Response({"error": "Insufficient history for backtest (need >50 candles)"}, status=400)
-
-            # Select Engine Class
-            engine_map = {
-                "CRYPTO": CryptoQuantEngine, 
-                "FUTURES": FuturesQuantEngine,
-                "OPTIONS": OptionsQuantEngine, 
-                "EQUITY": EquityQuantEngine
+            symbol_info = {
+                "symbol": symbol,
+                "token": data.get("token"),
+                "exchange": data.get("exchange")
             }
-            engine_cls = engine_map.get(market_type, EquityQuantEngine)
-            
-            # Run Simulation
+
+            # Fetch MORE data for backtest (365 days default in service)
+            df = MarketService.get_historical_data(
+                symbol_info=symbol_info,
+                market_type=market_type,
+                trade_style=trade_style
+            )
+
+            if df is None or len(df) < 50:
+                return Response({"error": "Insufficient historical data for backtest (Need 50+ candles)"}, status=400)
+
+            from .quant.quant_engine import get_engine_cls
+            engine_cls = get_engine_cls(market_type)
+
+            # Run Event-Driven Backtest
             bt_engine = BacktestEngine(engine_cls, df, symbol, trade_style)
-            results = bt_engine.run(start_idx=50)
-            
+            # Use smaller start_idx if data is short
+            warmup = 50 if len(df) > 100 else 20
+            results = bt_engine.run(start_idx=warmup)
+
             return Response(asdict(results))
         except Exception as e:
             traceback.print_exc()
-            return Response({"error": str(e)}, status=500)
+            return Response({"error": f"Backtest Failed: {str(e)}"}, status=500)
+
+
+class MarketUniverseView(APIView):
+    def get(self, request):
+        markets = get_enabled_markets()
+        return Response({"markets": markets})
+
 
 class SearchSymbolView(APIView):
     def get(self, request):
         q = request.GET.get("q", "")
         market_type = request.GET.get("market_type", "EQUITY")
-        # Uses the new CSV-based search service
         results = search_symbols(q, market_type)
         return Response(results)
+
 
 class SubmitFeedbackView(APIView):
     def post(self, request):
         try:
             data = request.data
             Feedback.objects.create(
-                market=data.get("market", "GLOBAL"),
+                accuracy_rating=data.get("accuracy_rating", 0),
+                hallucination_report=data.get("hallucination_report", False),
+                comments=data.get("comments", ""),
                 symbol=data.get("symbol", ""),
-                accuracy_rating=int(data.get("accuracy_rating", 0)),
-                ux_rating=int(data.get("ux_rating", 0)),
-                speed_rating=int(data.get("speed_rating", 0)),
-                comment=data.get("comment", ""),
-                hallucination_report=data.get("hallucination_flag", False)
+                market=data.get("market", "")
             )
-            return Response({"status": "success"})
+            return Response({"status": "ok"})
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            return Response({"error": str(e)}, status=500)

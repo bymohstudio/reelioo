@@ -11,6 +11,9 @@ def about_reelioo(request):
 def feedback_page(request):
     return render(request, "core/feedback_page.html")
 
+def why_reelioo(request):
+    return render(request, "core/why_reelioo.html")
+
 
 def dashboard(request):
     """

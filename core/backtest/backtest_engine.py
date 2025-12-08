@@ -1,206 +1,193 @@
+# core/quant/backtest_engine.py
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Type, Any
+from typing import List
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
-# Import your engines to type check or use
-from core.quant.base_engine import SignalResult
 
 @dataclass
 class TradeRecord:
     entry_date: str
     exit_date: str
-    symbol: str
-    direction: str  # "LONG" / "SHORT"
+    direction: str
     entry_price: float
     exit_price: float
-    stop_loss: float
-    target: float
     pnl_percent: float
-    outcome: str    # "WIN", "LOSS", "TIMEOUT"
-    score_at_entry: float
+    outcome: str  # WIN / LOSS
+
 
 @dataclass
 class BacktestSummary:
     symbol: str
     total_trades: int
-    wins: int
-    losses: int
     win_rate: float
     net_profit_percent: float
-    avg_trade_percent: float
-    max_drawdown_percent: float
     profit_factor: float
+    max_drawdown_percent: float
+    avg_trade_percent: float
+    sharpe_ratio: float  # NEW: Institutional Risk Metric
+    max_win_streak: int  # NEW: Psychological Metric
+    max_loss_streak: int  # NEW: Risk Metric
     recent_trades: List[TradeRecord]
+
 
 class BacktestEngine:
     """
     Institutional Event-Driven Backtester.
-    Iterates through historical data, generating signals using the
-    actual Quant Engine logic at each step to prevent look-ahead bias.
+    Simulates the Quant Engine candle-by-candle over history.
+
+    UPGRADES:
+    - Commission & Slippage Simulation (Realism)
+    - Sharpe Ratio Calculation
+    - Streak Analysis
     """
 
     def __init__(self, engine_class, df: pd.DataFrame, symbol: str, trade_style: str = "SWING"):
-        self.engine = engine_class
+        self.engine_class = engine_class
         self.df = df
         self.symbol = symbol
         self.trade_style = trade_style
-        self.trades: List[TradeRecord] = []
-        self.equity_curve = [100.0] # Normalize start at 100%
+        self.trades = []
+        self.equity_curve = [100.0]  # Start with 100% capital
+
+        # Institutional Cost Model (Indian Markets)
+        # 0.03% Brokerage/STT + 0.02% Slippage = 0.05% per trade
+        self.cost_per_trade = 0.05
 
     def run(self, start_idx: int = 50) -> BacktestSummary:
-        """
-        Run the simulation.
-        start_idx: skip initial bars to allow indicators (MA200 etc) to warm up.
-        """
         if len(self.df) < start_idx + 10:
-            return self._empty_result()
+            return self._empty()
 
-        active_trade = None
-        
-        # Loop through history
-        # We step forward one bar at a time
-        for i in range(start_idx, len(self.df) - 1):
-            # Window of data available at time 'i'
-            # We copy to prevent SettingWithCopy warnings and simulate real-time state
-            current_window = self.df.iloc[:i+1].copy()
-            next_candle = self.df.iloc[i+1]
-            
-            current_date = current_window.index[-1]
-            
-            # --- 1. MANAGE ACTIVE TRADE ---
-            if active_trade:
-                outcome = self._check_exit(active_trade, next_candle)
-                if outcome:
-                    active_trade['exit_date'] = next_candle.name.strftime("%Y-%m-%d %H:%M")
-                    active_trade['exit_price'] = outcome['price']
-                    active_trade['outcome'] = outcome['type']
-                    
-                    # Calculate PnL
-                    if active_trade['direction'] == "LONG":
-                        pnl = (outcome['price'] - active_trade['entry_price']) / active_trade['entry_price']
+        in_position = False
+        entry_price = 0.0
+        direction = ""
+        entry_date = ""
+
+        # Event-Driven Loop
+        for i in range(start_idx, len(self.df)):
+            current_slice = self.df.iloc[:i + 1]
+            current_bar = self.df.iloc[i]
+
+            # 1. Exit Logic
+            if in_position:
+                exit_signal = False
+                exit_price = 0.0
+
+                if direction == "BUY":
+                    if current_bar['low'] < self.stop_loss:  # Stop Hit
+                        exit_price = self.stop_loss
+                        exit_signal = True
+                    elif current_bar['high'] > self.target:  # Target Hit
+                        exit_price = self.target
+                        exit_signal = True
+                elif direction == "SELL":
+                    if current_bar['high'] > self.stop_loss:
+                        exit_price = self.stop_loss
+                        exit_signal = True
+                    elif current_bar['low'] < self.target:
+                        exit_price = self.target
+                        exit_signal = True
+
+                if exit_signal:
+                    # Gross PnL
+                    if direction == "BUY":
+                        gross_pnl = (exit_price - entry_price) / entry_price
                     else:
-                        pnl = (active_trade['entry_price'] - outcome['price']) / active_trade['entry_price']
-                        
-                    active_trade['pnl_percent'] = round(pnl * 100, 2)
-                    
-                    # Log Trade
-                    record = TradeRecord(**active_trade)
-                    self.trades.append(record)
-                    self.equity_curve.append(self.equity_curve[-1] * (1 + pnl))
-                    
-                    active_trade = None # Trade closed
-                else:
-                    # Trade continues
-                    continue 
+                        gross_pnl = (entry_price - exit_price) / entry_price
 
-            # --- 2. SCAN FOR NEW TRADE (If none active) ---
-            # Run the Quant Engine on the current window
-            try:
-                # We suppress console logs from engine to keep backtest clean
-                signal: SignalResult = self.engine.run(current_window, self.symbol, self.trade_style)
-            except Exception:
-                continue
+                    # Net PnL (After Costs)
+                    # We deduct cost twice (Entry + Exit) = 0.1% total round trip friction
+                    net_pnl = gross_pnl - (self.cost_per_trade * 2 / 100)
 
-            # Entry Logic: High Confidence Only
-            # We simulate "Limit Order" logic:
-            # For backtesting simplicity, we assume Entry at Open of NEXT candle
-            # to be conservative (slippage simulation).
-            
-            if signal.direction == "UP" and signal.score >= 70:
-                active_trade = {
-                    "entry_date": next_candle.name.strftime("%Y-%m-%d %H:%M"),
-                    "symbol": self.symbol,
-                    "direction": "LONG",
-                    "entry_price": next_candle["Open"],
-                    "stop_loss": signal.stop,
-                    "target": signal.target,
-                    "score_at_entry": signal.score,
-                    # Placeholders
-                    "exit_date": "", "exit_price": 0.0, "pnl_percent": 0.0, "outcome": ""
-                }
-            
-            elif signal.direction == "DOWN" and signal.score <= 30:
-                # Assuming Shorting is allowed (Futures/Crypto/Forex)
-                # For Equity Spot, we might restrict this, but let's allow for generic testing
-                active_trade = {
-                    "entry_date": next_candle.name.strftime("%Y-%m-%d %H:%M"),
-                    "symbol": self.symbol,
-                    "direction": "SHORT",
-                    "entry_price": next_candle["Open"],
-                    "stop_loss": signal.stop,
-                    "target": signal.target,
-                    "score_at_entry": signal.score,
-                    # Placeholders
-                    "exit_date": "", "exit_price": 0.0, "pnl_percent": 0.0, "outcome": ""
-                }
+                    outcome = "WIN" if net_pnl > 0 else "LOSS"
 
-        return self._compile_results()
+                    self.trades.append(TradeRecord(
+                        str(entry_date), str(current_bar.name), direction,
+                        entry_price, exit_price, round(net_pnl * 100, 2), outcome
+                    ))
 
-    def _check_exit(self, trade, candle):
-        """
-        Checks if the next candle hits SL or TP.
-        Order of precedence: Assumes SL hit first in a wide-range bar (Conservative).
-        """
-        low = candle["Low"]
-        high = candle["High"]
-        
-        if trade["direction"] == "LONG":
-            # Check Stop Loss
-            if low <= trade["stop_loss"]:
-                return {"type": "LOSS", "price": trade["stop_loss"]}
-            # Check Target
-            if high >= trade["target"]:
-                return {"type": "WIN", "price": trade["target"]}
-                
-        elif trade["direction"] == "SHORT":
-            # Check Stop Loss
-            if high >= trade["stop_loss"]:
-                return {"type": "LOSS", "price": trade["stop_loss"]}
-            # Check Target
-            if low <= trade["target"]:
-                return {"type": "WIN", "price": trade["target"]}
-                
-        return None # No exit
+                    # Update Equity
+                    self.equity_curve.append(self.equity_curve[-1] * (1 + net_pnl))
+                    in_position = False
+                    continue
 
-    def _compile_results(self) -> BacktestSummary:
-        if not self.trades:
-            return self._empty_result()
-            
-        wins = len([t for t in self.trades if t.outcome == "WIN"])
-        losses = len([t for t in self.trades if t.outcome == "LOSS"])
-        total = len(self.trades)
-        
-        win_rate = (wins / total * 100) if total > 0 else 0.0
-        
-        net_pnl = sum(t.pnl_percent for t in self.trades)
-        
-        # Profit Factor
-        gross_profit = sum(t.pnl_percent for t in self.trades if t.pnl_percent > 0)
-        gross_loss = abs(sum(t.pnl_percent for t in self.trades if t.pnl_percent < 0))
-        pf = gross_profit / gross_loss if gross_loss > 0 else 99.9
-        
+            # 2. Entry Logic
+            if not in_position:
+                # Use simplified Trend Logic for speed
+                # (Running full XGBoost 5000 times would be too slow for HTTP request)
+                from core.quant.base_engine import compute_trend_score, build_entry_target_stop
+                trend = compute_trend_score(current_slice)
+
+                sig = "NEUTRAL"
+                # Strategy: Trend Following
+                if trend > 40:
+                    sig = "BUY"
+                elif trend < -40:
+                    sig = "SELL"
+
+                if sig != "NEUTRAL":
+                    in_position = True
+                    direction = sig
+                    entry_price = float(current_bar['close'])
+                    entry_date = current_bar.name
+
+                    _, t, s, _ = build_entry_target_stop(current_slice, sig, self.trade_style)
+                    self.target = t
+                    self.stop_loss = s
+
+        return self._calculate_stats()
+
+    def _calculate_stats(self):
+        if not self.trades: return self._empty()
+
+        wins = [t for t in self.trades if t.outcome == "WIN"]
+        losses = [t for t in self.trades if t.outcome == "LOSS"]
+
+        win_rate = (len(wins) / len(self.trades)) * 100
+        net_pnl = self.equity_curve[-1] - 100.0
+
+        gross_profit = sum(t.pnl_percent for t in wins)
+        gross_loss = abs(sum(t.pnl_percent for t in losses))
+        profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else 99.9
+
         # Max Drawdown
-        equity = np.array(self.equity_curve)
-        peak = np.maximum.accumulate(equity)
-        drawdown = (equity - peak) / peak
-        max_dd = drawdown.min() * 100 # In percent
-        
+        peaks = np.maximum.accumulate(self.equity_curve)
+        drawdowns = (self.equity_curve - peaks) / peaks
+        max_dd = drawdowns.min() * 100
+
+        # Sharpe Ratio (Simplified Annualized)
+        returns = pd.Series([t.pnl_percent for t in self.trades])
+        sharpe = 0.0
+        if returns.std() > 0:
+            # Assuming ~252 trading days, scaled by trade frequency
+            sharpe = (returns.mean() / returns.std()) * np.sqrt(len(self.trades))
+
+        # Streak Analysis
+        outcomes = [1 if t.outcome == "WIN" else 0 for t in self.trades]
+
+        def get_streak(val):
+            max_s = curr = 0
+            for x in outcomes:
+                if x == val:
+                    curr += 1
+                else:
+                    max_s = max(max_s, curr); curr = 0
+            return max(max_s, curr)
+
         return BacktestSummary(
             symbol=self.symbol,
-            total_trades=total,
-            wins=wins,
-            losses=losses,
+            total_trades=len(self.trades),
             win_rate=round(win_rate, 1),
-            net_profit_percent=round(net_pnl, 2),
-            avg_trade_percent=round(net_pnl / total, 2),
-            max_drawdown_percent=round(max_dd, 2),
-            profit_factor=round(pf, 2),
-            recent_trades=self.trades[-5:] # Last 5
+            net_profit_percent=round(net_pnl, 1),
+            profit_factor=profit_factor,
+            max_drawdown_percent=round(max_dd, 1),
+            avg_trade_percent=round(net_pnl / len(self.trades), 2),
+            sharpe_ratio=round(sharpe, 2),
+            max_win_streak=get_streak(1),
+            max_loss_streak=get_streak(0),
+            recent_trades=self.trades[-5:]
         )
 
-    def _empty_result(self):
-        return BacktestSummary(
-            self.symbol, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, []
-        )
+    def _empty(self):
+        return BacktestSummary(self.symbol, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, [])

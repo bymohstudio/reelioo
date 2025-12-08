@@ -1,110 +1,71 @@
+# core/quant/futures_engine.py
+
 from __future__ import annotations
-from typing import Dict, Any
 import numpy as np
 import pandas as pd
-
 from .base_engine import (
-    SignalResult, STYLE_CONFIG, _safe_last, _pick_style,
-    compute_basic_ohlc_aliases, compute_atr, compute_rsi,
-    expected_bars_to_target, format_time_window, Direction
+    QuantResult, compute_basic_ohlc_aliases, add_core_indicators,
+    compute_trend_score, detect_volatility_regime, determine_signal_quality,
+    clamp_score, build_entry_target_stop
 )
+from .indicators import compute_all_indicators
+from .ml_bridge import predict_directional_edge
+
 
 class FuturesQuantEngine:
-    MODEL_VERSION = "futures_global_v2.0"
+    """
+    Institutional Futures Engine (NIFTY/BANKNIFTY).
+    Focuses on Momentum Velocity and Trend Strength.
+    """
+    MARKET_TYPE = "FUTURES"
 
     @classmethod
-    def _prepare(cls, df: pd.DataFrame) -> pd.DataFrame:
-        df = compute_basic_ohlc_aliases(df)
-        close = df["Close"]
-        df["ma21"] = close.rolling(21).mean()
-        df["ma55"] = close.rolling(55).mean()
-        df["atr10"] = compute_atr(df, 10)
-        df["rsi7"] = compute_rsi(close, 7) # Faster RSI for futures
-        return df
+    def run(cls, raw_df: pd.DataFrame, symbol: str, trade_style: str = "INTRADAY") -> QuantResult:
+        df = compute_basic_ohlc_aliases(raw_df)
+        if df.empty or len(df) < 80: return cls._empty_result(symbol, trade_style)
 
-    @classmethod
-    def _leverage_risk_score(cls, df: pd.DataFrame) -> float:
-        # Measures volatility relative to price. High vol = High leverage risk.
-        c = _safe_last(df["Close"])
-        atr = _safe_last(df["atr10"])
-        atr_pct = atr / c if c > 0 else 0.0
-        
-        score = 80.0
-        if atr_pct > 0.02: score -= 20 # 2% daily move is huge for index futures
-        if atr_pct > 0.04: score -= 30
-        return float(np.clip(score, 10, 100))
+        df = add_core_indicators(df)
+        ml_features = compute_all_indicators(df)
 
-    @classmethod
-    def run(cls, df: pd.DataFrame, symbol: str, trade_style: str | None = None) -> SignalResult:
-        if df is None or df.empty: raise ValueError("Empty Data")
-        
-        style = _pick_style(trade_style)
-        df = cls._prepare(df)
-        close = _safe_last(df["Close"])
-        
-        # Trend
-        m21 = _safe_last(df["ma21"])
-        m55 = _safe_last(df["ma55"])
-        if close > m21 > m55: trend = 85.0
-        elif close < m21 < m55: trend = 15.0
-        else: trend = 50.0
-        
-        # Momentum
-        rsi = _safe_last(df["rsi7"])
-        if 40 < rsi < 60: mom = 50.0
-        elif rsi >= 60: mom = 75.0
-        elif rsi <= 40: mom = 25.0
-        else: mom = 50.0
-        
-        lev = cls._leverage_risk_score(df)
-        
-        comp = float(np.clip(trend * 0.4 + mom * 0.4 + lev * 0.2, 0, 100))
-        
-        if comp >= 70: direction, label = "UP", "LONG BIAS"
-        elif comp <= 30: direction, label = "DOWN", "SHORT BIAS"
-        else: direction, label = "FLAT", "NEUTRAL"
-        
-        # Targets
-        atr = _safe_last(df["atr10"], close*0.01)
-        cfg = STYLE_CONFIG[style]
-        
-        if direction == "UP":
-            entry = close
-            target = close + (atr * cfg["target_atr"])
-            stop = close - (atr * cfg["stop_atr"])
-        elif direction == "DOWN":
-            entry = close
-            target = close - (atr * cfg["target_atr"])
-            stop = close + (atr * cfg["stop_atr"])
+        raw_prob = 50.0
+        try:
+            raw_prob = float(predict_directional_edge(cls.MARKET_TYPE, symbol, trade_style, ml_features))
+        except:
+            pass
+        ml_edge = clamp_score(raw_prob)
+
+        trend_score = compute_trend_score(df)
+        vol_regime = detect_volatility_regime(df)
+
+        # 3. Institutional Futures Logic
+        # Calculate "Velocity" (Rate of Change)
+        velocity = "NEUTRAL"
+        roc = df['close'].pct_change(3).iloc[-1] * 100
+        if abs(roc) > 1.5:
+            velocity = "HIGH VELOCITY"
+        elif abs(roc) > 0.5:
+            velocity = "MODERATE"
         else:
-            entry, target, stop = close, close, close
+            velocity = "GRINDING"
 
-        dist = abs(target - entry)
-        bars, hrs = expected_bars_to_target(dist, atr, cfg["bar_hours"])
-        
-        factors = {
-            "trend_score": round(trend, 1),
-            "momentum_score": round(mom, 1),
-            "leverage_risk_score": round(lev, 1),
-            "composite_score": round(comp, 1)
-        }
-        
-        return SignalResult(
-            symbol=symbol.upper(),
-            market="FUTURES",
-            style=style,
-            model_version=cls.MODEL_VERSION,
-            score=factors["composite_score"],
-            direction=direction,
-            label=label,
-            entry=round(entry, 2),
-            target=round(target, 2),
-            stop=round(stop, 2),
-            support=round(df.tail(30)["Low"].min(), 2),
-            resistance=round(df.tail(30)["High"].max(), 2),
-            time_frame=format_time_window(hrs),
-            expected_bars_to_target=bars,
-            expected_time_to_target_hours=hrs,
-            factors=factors,
-            meta={}
+        final_score = clamp_score(0.7 * ml_edge + 0.3 * (50 + trend_score / 2))
+
+        direction = "BUY" if ml_edge >= 52 else "SELL" if ml_edge <= 48 else "NEUTRAL"
+        entry, target, stop, rr = build_entry_target_stop(df, direction, trade_style)
+
+        return QuantResult(
+            symbol=symbol, market_type=cls.MARKET_TYPE, time_frame=trade_style,
+            direction=direction, score=final_score, ml_edge=ml_edge,
+            raw_prob=ml_edge / 100, trend_score=trend_score, volatility_regime=vol_regime,
+            signal_quality=determine_signal_quality(final_score, ml_edge),
+            entry=entry, target=target, stop=stop, risk_reward=rr,
+            extras={
+                "velocity": velocity,
+                "contract_type": "NEAR MONTH",
+                "risk_profile": "High Leverage"
+            }
         )
+
+    @staticmethod
+    def _empty_result(symbol, style):
+        return QuantResult(symbol, "FUTURES", style, "NEUTRAL", 0, 0, 0.5, 0, "UNKNOWN", "C", 0, 0, 0, 0)

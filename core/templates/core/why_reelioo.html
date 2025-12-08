@@ -1,0 +1,167 @@
+{% extends "core/base.html" %}
+{% block title %}Why Reelioo | The Quant Advantage{% endblock %}
+
+{% block content %}
+
+<style>
+    .font-tech { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
+    .glass-card {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        transition: all 0.3s ease;
+    }
+    .glass-card:hover {
+        border-color: rgba(59, 130, 246, 0.4);
+        background: rgba(15, 23, 42, 0.8);
+        transform: translateY(-4px);
+    }
+    .grad-text {
+        background: linear-gradient(to right, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        color: transparent;
+    }
+</style>
+
+<div class="max-w-7xl mx-auto pt-20 pb-32 px-6 font-tech">
+
+    <!-- HERO -->
+    <div class="text-center mb-32">
+        <div class="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-bold uppercase tracking-widest mb-8">
+            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            Retail Education Series
+        </div>
+        <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-8 tracking-tight leading-[1.1]">
+            Stop Guessing.<br>
+            <span class="grad-text">Start Computing.</span>
+        </h1>
+        <p class="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed font-light">
+            90% of retail traders fail because they fight <strong>High-Frequency Algorithms</strong> with subjective lines on a chart. Reelioo equips you with the same mathematical weaponry used by institutional desks.
+        </p>
+    </div>
+
+    <!-- SECTION 1: THE PROBLEM -->
+    <div class="grid md:grid-cols-2 gap-16 items-center mb-40">
+        <div>
+            <h2 class="text-3xl font-bold text-white mb-6">The "Technical Analysis" Trap</h2>
+            <div class="h-1 w-24 bg-red-500 mb-8 rounded-full"></div>
+            <p class="text-slate-400 leading-relaxed mb-6">
+                You draw a support line at 24,000. Another trader draws it at 24,050. Who is right?
+                <strong>Subjectivity kills consistency.</strong>
+            </p>
+            <p class="text-slate-400 leading-relaxed">
+                Institutions don't guess. They use <strong>Quantitative Models</strong> that process Volatility, Theta Decay, and Momentum Velocity in real-time. Reelioo democratizes this technology.
+            </p>
+        </div>
+        <div class="space-y-4">
+            <div class="glass-card p-6 border-l-4 border-l-red-500/50 flex items-start gap-4">
+                <i data-lucide="x-circle" class="w-6 h-6 text-red-400 shrink-0"></i>
+                <div>
+                    <h3 class="text-white font-bold text-sm">Subjective Bias</h3>
+                    <p class="text-xs text-slate-500 mt-1">"I feel the market looks bullish." (Markets don't care about feelings).</p>
+                </div>
+            </div>
+            <div class="glass-card p-6 border-l-4 border-l-red-500/50 flex items-start gap-4">
+                <i data-lucide="x-circle" class="w-6 h-6 text-red-400 shrink-0"></i>
+                <div>
+                    <h3 class="text-white font-bold text-sm">Lagging Indicators</h3>
+                    <p class="text-xs text-slate-500 mt-1">RSI and MACD tell you what <em>already</em> happened, not what comes next.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: THE SOLUTION (QUANT + ML) -->
+    <div class="mb-40 text-center">
+        <h2 class="text-4xl font-black text-white mb-16">The Quant Advantage</h2>
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="glass-card p-10 text-center group">
+                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-blue-500/50 transition">
+                    <i data-lucide="binary" class="w-8 h-8 text-blue-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-4">Data, Not Lines</h3>
+                <p class="text-sm text-slate-400">We analyze raw data arrays (Price, Volume, Volatility) to find statistical anomalies invisible to the naked eye.</p>
+            </div>
+            <div class="glass-card p-10 text-center group">
+                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-purple-500/50 transition">
+                    <i data-lucide="brain-circuit" class="w-8 h-8 text-purple-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-4">22-Factor ML Engine</h3>
+                <p class="text-sm text-slate-400">Our Gradient Boosting model tracks 22 features simultaneously—including Volume Z-Scores and Trend Velocity.</p>
+            </div>
+            <div class="glass-card p-10 text-center group">
+                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-emerald-500/50 transition">
+                    <i data-lucide="shield-check" class="w-8 h-8 text-emerald-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-4">Dynamic Risk</h3>
+                <p class="text-sm text-slate-400">Stops widen in high volatility to prevent shakeouts and tighten in low volatility to protect capital.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 3: BACKTESTING EXPLAINED -->
+    <div class="bg-[#0b1121] border border-white/5 rounded-3xl p-8 md:p-16 mb-40 relative overflow-hidden">
+        <div class="absolute -right-20 -top-20 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px]"></div>
+
+        <div class="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+            <div>
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="px-3 py-1 rounded bg-blue-500/20 border border-blue-500/30 text-[10px] font-bold text-blue-300 uppercase tracking-widest">The Truth Serum</span>
+                </div>
+                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">What is "Backtesting"?</h2>
+                <p class="text-sm text-slate-400 leading-relaxed mb-6">
+                    Imagine if you could travel back in time and trade the last 365 days with a specific strategy. Would you have made money? Or lost it all?
+                    <br><br>
+                    <strong>Backtesting is that Time Machine.</strong> It simulates trading the strategy on historical data to validate if the logic actually works <em>before</em> you risk a single Rupee.
+                </p>
+
+                <h4 class="text-white font-bold mb-4 mt-8">Why Reelioo's Backtest is Different:</h4>
+                <ul class="space-y-3">
+                    <li class="flex items-center gap-3 text-sm text-slate-300">
+                        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                        <span><strong>Event-Driven:</strong> We replay history candle-by-candle. No cheating.</span>
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-slate-300">
+                        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                        <span><strong>Slippage & Costs:</strong> We deduct brokerage & slippage. Real profits are harder than paper profits.</span>
+                    </li>
+                    <li class="flex items-center gap-3 text-sm text-slate-300">
+                        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                        <span><strong>Drawdown Check:</strong> We measure the "Pain Period" (Max Loss) you would have endured.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="glass-card p-8">
+                <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                    <span class="text-xs font-mono text-slate-400 uppercase">Strategy Report Card</span>
+                    <span class="text-xs font-mono text-emerald-400 font-bold">PASSED</span>
+                </div>
+                <div class="space-y-4 font-mono text-xs">
+                    <div class="flex justify-between"><span class="text-slate-500">Total Trades</span><span class="text-white">142</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">Win Rate</span><span class="text-blue-400">58.4%</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">Net Profit</span><span class="text-emerald-400">+124.5%</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">Max Drawdown</span><span class="text-red-400">-12.5%</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">Profit Factor</span><span class="text-orange-400">1.82</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center">
+        <h2 class="text-3xl font-bold text-white mb-6">Ready to trade with an Edge?</h2>
+        <a href="/" class="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-1">
+            <span>Launch Terminal</span>
+            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        </a>
+    </div>
+
+</div>
+
+<script>
+    lucide.createIcons();
+</script>
+
+{% endblock %}

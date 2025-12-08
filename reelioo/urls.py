@@ -25,5 +25,6 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("feedback_page/", views.feedback_page, name="feedback_page"),
     path("about-reelioo/", views.about_reelioo, name="about_reelioo"),
+    path("why-reelioo/", views.why_reelioo, name="why-reelioo"),
     path("api/", include("core.api_urls")),
 ]

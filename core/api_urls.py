@@ -7,6 +7,7 @@ urlpatterns = [
     path("analyze/backtest/", api_views.BacktestView.as_view(), name="analyze_backtest"),
     
     # Utils
+    path("markets/", api_views.MarketUniverseView.as_view(), name="market_universe"),
     path("search-symbol/", api_views.SearchSymbolView.as_view(), name="search_symbol"),
     
     # Feedback

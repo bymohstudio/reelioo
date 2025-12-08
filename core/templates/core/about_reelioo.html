@@ -22,6 +22,10 @@
         border-radius: 16px;
         position: relative;
         overflow: hidden;
+        transition: border-color 0.3s ease;
+    }
+    .research-card:hover {
+        border-color: rgba(59, 130, 246, 0.3);
     }
     .research-card::before {
         content: '';
@@ -35,174 +39,126 @@
     .abstract-box {
         background: #0f172a;
         border-left: 2px solid #64748b;
-        padding: 2rem;
-        color: #cbd5e1;
+        padding: 24px;
         font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem;
-        line-height: 1.8;
-        border-radius: 0 12px 12px 0;
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.6;
     }
 </style>
 
-<div class="max-w-4xl mx-auto pt-16 pb-24 px-6">
+<div class="max-w-5xl mx-auto pt-16 pb-24 px-6 font-tech">
 
     <!-- HEADER -->
-    <div class="mb-16 border-b border-white/10 pb-8">
-        <p class="text-[10px] font-bold text-blue-500 uppercase tracking-[0.3em] mb-4">Reelioo Technical Paper #2025-01</p>
-        <h1 class="text-4xl md:text-6xl font-black text-white mb-6 leading-tight tracking-tight font-tech">
-            Algorithmic Alpha Synthesis:<br>
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-slate-400 to-slate-600">Quantifying Market Structure in High-Beta Regimes.</span>
-        </h1>
-        <div class="flex items-center gap-6 text-xs text-slate-500 font-mono">
-            <span>By: Reelioo Quant Desk</span>
-            <span>•</span>
-            <span>Architecture: Vector-Weighted</span>
-            <span>•</span>
-            <span>Status: <span class="text-emerald-500">Production</span></span>
+    <div class="mb-16">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="h-px w-8 bg-blue-500"></div>
+            <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400">System Architecture v2.0</span>
         </div>
+        <h1 class="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight leading-tight">
+            Hybrid Quantitative <br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Machine Learning Engine</span>
+        </h1>
+        <p class="text-lg text-slate-400 max-w-3xl leading-relaxed">
+            Reelioo addresses market stochasticity by fusing deterministic technical structure with probabilistic machine learning models.
+        </p>
     </div>
 
     <!-- ABSTRACT -->
-    <div class="mb-16">
-        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Abstract</h3>
-        <div class="abstract-box shadow-lg">
-            Retail technical analysis is often plagued by "signal noise"—the inability to distinguish between stochastic volatility and genuine structural shifts. Reelioo introduces a framework: <strong>Multi-Factor Vector Synthesis (MFVS)</strong>. By mathematically normalizing disjointed market inputs—Price Velocity, Temporal Trend Alignment, and Volatility Expansion—into a singular probabilistic score, the engine strips away emotional bias to reveal the raw statistical edge hidden within Indian Equities and Crypto assets.
-        </div>
+    <div class="abstract-box mb-16 rounded-r-xl">
+        <strong class="text-white">ABSTRACT:</strong> The Reelioo V2 engine operates on a dual-layer architecture.
+        Layer 1 (Deterministic) utilizes a proprietary Quant Engine to define market structure, volatility regimes, and trend persistence.
+        Layer 2 (Probabilistic) employs a Gradient Boosting Machine (XGBoost) trained on 365 days of OHLCV data to detect non-linear patterns invisible to standard indicators.
+        The final "Confidence Score" is a weighted ensemble of these two layers, providing a statistical expectancy rather than a binary signal.
     </div>
 
-    <!-- MAIN CONTENT -->
-    <div class="space-y-16">
+    <!-- CORE PILLARS -->
+    <div class="grid md:grid-cols-2 gap-8 mb-20">
 
-        <!-- SECTION 1: THE CORE PHILOSOPHY -->
-        <section>
-            <div class="flex items-center gap-4 mb-6">
-                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center border border-white/5 text-slate-400 font-bold text-sm">01</div>
-                <h2 class="text-2xl text-white font-bold tracking-tight">The Signal-to-Noise Problem</h2>
+        <!-- Pillar 1: ML -->
+        <div class="research-card p-8">
+            <div class="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 border border-blue-500/20">
+                <i data-lucide="brain-circuit" class="w-6 h-6 text-blue-400"></i>
             </div>
-            <div class="prose prose-invert prose-slate max-w-none text-justify-inter leading-relaxed text-slate-300 font-light">
-                <p>
-                    Markets are non-stationary systems. A breakout strategy that works in a low-volatility accumulation phase often fails catastrophically during a high-volatility distribution phase. Traditional oscillators fail because they treat all price action as equal.
-                </p>
-                <p class="mt-4">
-                    The Reelioo Engine solves this via <strong>Regime Classification</strong>. Before generating a buy or sell signal, the algorithm first calculates the "State of the Market." Is the asset trending or mean-reverting? Is the volatility expanding or contracting? By answering these questions mathematically, we filter out up to 80% of false positives that trap retail traders.
-                </p>
+            <h3 class="text-xl font-bold text-white mb-3">Gradient Boosting Overlay</h3>
+            <p class="text-sm text-slate-400 leading-relaxed text-justify-inter">
+                Traditional algorithms rely on static "if-then" rules. Reelioo utilizes a dynamic <strong>Machine Learning Model </strong> that ingests a vector of 22 normalized features—including Volume Z-Scores, Wick Rejections, and Relative Strength. It calculates the raw probability of price direction based on historical pattern recognition, allowing the system to adapt to evolving market conditions.
+            </p>
+        </div>
+
+        <!-- Pillar 2: Quant -->
+        <div class="research-card p-8">
+            <div class="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-6 border border-purple-500/20">
+                <i data-lucide="layers" class="w-6 h-6 text-purple-400"></i>
             </div>
-        </section>
-
-        <!-- SECTION 2: ARCHITECTURE VISUAL -->
-        <section class="research-card p-8 md:p-12">
-            <div class="flex items-center justify-between mb-12">
-                <h2 class="text-xl text-white font-bold tracking-tight">The MFVS Architecture</h2>
-                <span class="px-2 py-1 rounded bg-blue-500/10 text-blue-400 text-[10px] font-mono border border-blue-500/20">Fig 1.1</span>
-            </div>
-            
-            <div class="grid md:grid-cols-3 gap-8 relative z-10">
-                <!-- Step 1 -->
-                <div class="bg-slate-900/50 p-6 border border-white/5 rounded-2xl text-center group hover:border-blue-500/30 transition duration-500">
-                    <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition border border-white/5">
-                        <i data-lucide="database" class="w-5 h-5 text-indigo-400"></i>
-                    </div>
-                    <h4 class="text-white text-sm font-bold mb-2 uppercase tracking-wide">1. Ingestion</h4>
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        Raw OHLCV data is ingested and normalized into volatility-adjusted units (ATR Multiples).
-                    </p>
-                </div>
-
-                <!-- Connector Line (Desktop) -->
-                <div class="hidden md:block absolute top-1/2 left-[32%] w-[6%] h-[1px] bg-gradient-to-r from-transparent via-slate-700 to-transparent"></div>
-
-                <!-- Step 2 -->
-                <div class="bg-slate-900/80 p-6 border border-blue-500/20 rounded-2xl text-center group hover:border-blue-500/40 transition duration-500 relative shadow-2xl shadow-blue-900/20">
-                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 text-[9px] font-bold text-white rounded-full shadow-lg shadow-blue-500/50 tracking-wider">
-                        QUANT ENGINE
-                    </div>
-                    <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition border border-white/5">
-                        <i data-lucide="cpu" class="w-5 h-5 text-blue-400"></i>
-                    </div>
-                    <h4 class="text-white text-sm font-bold mb-2 uppercase tracking-wide">2. Vector Synthesis</h4>
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        Disjointed metrics are weighted and fused into a single probabilistic confidence vector.
-                    </p>
-                </div>
-
-                <!-- Connector Line (Desktop) -->
-                <div class="hidden md:block absolute top-1/2 right-[32%] w-[6%] h-[1px] bg-gradient-to-r from-transparent via-slate-700 to-transparent"></div>
-
-                <!-- Step 3 -->
-                <div class="bg-slate-900/50 p-6 border border-white/5 rounded-2xl text-center group hover:border-blue-500/30 transition duration-500">
-                    <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition border border-white/5">
-                        <i data-lucide="crosshair" class="w-5 h-5 text-emerald-400"></i>
-                    </div>
-                    <h4 class="text-white text-sm font-bold mb-2 uppercase tracking-wide">3. Execution</h4>
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        High-probability setups trigger dynamic Entry, Target, and Invalidation zones.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- SECTION 3: DEEP DIVE METRICS -->
-        <section>
-            <div class="flex items-center gap-4 mb-6">
-                <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center border border-white/5 text-slate-400 font-bold text-sm">02</div>
-                <h2 class="text-2xl text-white font-bold tracking-tight">Key Methodological Components</h2>
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-6">
-                <!-- Metric 1: Moving Averages Rebranded -->
-                <div class="p-6 border border-white/5 rounded-2xl bg-slate-900/20 hover:border-blue-500/30 transition duration-300">
-                    <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2 uppercase tracking-wide">
-                        <i data-lucide="git-merge" class="w-4 h-4 text-blue-500"></i>
-                        Temporal Vector Alignment
-                    </h3>
-                    <p class="text-xs text-slate-400 leading-relaxed text-justify">
-                        Price is not 2D; it exists across multiple time horizons simultaneously. Our engine analyzes the <strong>Short, Medium, and Long-term vectors</strong> (Structural Moving Averages). Only when these vectors align in perfect geometric sequence do we assign a high "Trend Score." This filters out weak, choppy markets where retail traders often get stopped out.
-                    </p>
-                </div>
-
-                <!-- Metric 2: RSI Rebranded -->
-                <div class="p-6 border border-white/5 rounded-2xl bg-slate-900/20 hover:border-purple-500/30 transition duration-300">
-                    <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2 uppercase tracking-wide">
-                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-purple-500"></i>
-                        Oscillatory Momentum Decay
-                    </h3>
-                    <p class="text-xs text-slate-400 leading-relaxed text-justify">
-                        Momentum precedes price. We utilize advanced oscillators to measure the internal velocity of price action. By identifying zones of <strong>Momentum Exhaustion</strong> vs. <strong>Momentum Acceleration</strong>, the model can predict reversals or breakouts before they are visually apparent on the price chart.
-                    </p>
-                </div>
-
-                <!-- Metric 3: ATR Rebranded -->
-                <div class="p-6 border border-white/5 rounded-2xl bg-slate-900/20 hover:border-emerald-500/30 transition duration-300">
-                    <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2 uppercase tracking-wide">
-                        <i data-lucide="activity" class="w-4 h-4 text-emerald-500"></i>
-                        Stochastic Volatility Normalization
-                    </h3>
-                    <p class="text-xs text-slate-400 leading-relaxed text-justify">
-                        Fixed stop-losses are a recipe for disaster. Reelioo employs <strong>Dynamic Volatility Bands</strong> based on the asset's Average True Range (ATR). This ensures your risk parameters "breathe" with the market—tightening in quiet regimes and expanding during high-impact events to prevent premature stop-outs.
-                    </p>
-                </div>
-
-                <!-- Metric 4: Scoring Rebranded -->
-                <div class="p-6 border border-white/5 rounded-2xl bg-slate-900/20 hover:border-orange-500/30 transition duration-300">
-                    <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2 uppercase tracking-wide">
-                        <i data-lucide="scale" class="w-4 h-4 text-orange-500"></i>
-                        Probabilistic Weighted Synthesis
-                    </h3>
-                    <p class="text-xs text-slate-400 leading-relaxed text-justify">
-                        The final output is not a guess; it is a calculated probability. The engine aggregates all sub-factors—Trend, Momentum, and Volatility—assigning weights based on the current market regime. The result is a single <strong>Confidence Score (0-100)</strong>, giving you an institutional-grade assessment of the trade's statistical expectancy.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- FOOTER NOTE -->
-        <div class="mt-16 pt-8 border-t border-white/5 text-center">
-            <p class="text-[10px] text-slate-600 font-mono uppercase tracking-widest">
-                Confidential Proprietary Algorithm • © 2025 Reelioo Systems
+            <h3 class="text-xl font-bold text-white mb-3">Deterministic Quant Layer</h3>
+            <p class="text-sm text-slate-400 leading-relaxed text-justify-inter">
+                While ML handles prediction, the Quant Engine handles structure. It computes a proprietary <strong>Trend Score (-100 to +100)</strong> based on exponential moving average slopes and price location relative to key pivots. It strictly categorizes the market into <strong>Volatility Regimes</strong> using ATR ratios, ensuring that strategies are only deployed in their optimal environment (e.g., Credit Spreads in High Volatility).
             </p>
         </div>
 
     </div>
+
+    <!-- THE ALGORITHM FLOW -->
+    <section class="mb-20">
+        <h2 class="text-2xl font-bold text-white mb-8 border-b border-white/5 pb-4">The Synthesis Pipeline</h2>
+
+        <div class="space-y-6">
+            <!-- Step 1 -->
+            <div class="flex gap-6 group">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition">01</div>
+                <div>
+                    <h4 class="text-white font-bold mb-2">Feature Extraction</h4>
+                    <p class="text-sm text-slate-400">Raw market data (Open, High, Low, Close, Volume) is ingested and transformed into a normalized feature matrix, removing price-scale bias.</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="flex gap-6 group">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition">02</div>
+                <div>
+                    <h4 class="text-white font-bold mb-2">Dual-Engine Processing</h4>
+                    <p class="text-sm text-slate-400">
+                        The <strong>Quant Engine</strong> calculates Trend Strength and Volatility. Simultaneously, the <strong>ML Model</strong> outputs a raw directional probability (0.0 to 1.0).
+                    </p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="flex gap-6 group">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition">03</div>
+                <div>
+                    <h4 class="text-white font-bold mb-2">Probabilistic Weighted Synthesis</h4>
+                    <p class="text-sm text-slate-400">
+                        The final "Confidence Score" is derived via a weighted ensemble: <code>Score = α(ML_Probability) + β(Trend_Score)</code>. This ensures the signal is driven by predictive edge but validated by current momentum.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="flex gap-6 group">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition">04</div>
+                <div>
+                    <h4 class="text-white font-bold mb-2">Cognitive Output</h4>
+                    <p class="text-sm text-slate-400">
+                        The raw numbers are translated into actionable intelligence: Entry Zones, Targets, Dynamic Stop-Losses, and an Institutional "Desk Note" explaining the structure.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER NOTE -->
+    <div class="mt-16 pt-8 border-t border-white/5 text-center">
+        <p class="text-[10px] text-slate-600 font-mono uppercase tracking-widest">
+            Confidential Proprietary Algorithm • © 2025 Reelioo Systems
+        </p>
+    </div>
+
 </div>
+
+<script>
+    lucide.createIcons();
+</script>
 
 {% endblock %}
