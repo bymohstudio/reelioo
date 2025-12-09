@@ -1,113 +1,111 @@
+# core/quant/ml_bridge.py
+
+from __future__ import annotations
 import os
+import logging
 import numpy as np
-import xgboost as xgb
-from typing import Optional, Dict, Any
+import pandas as pd
 
-# ---------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
+# Import FEATURES to know what to align against
+try:
+    from .ml_training.feature_engineering import FEATURES
+except ImportError:
+    FEATURES = ["close_over_ma20", "rsi_14"]  # Fallback
 
-MODEL_MAP = {
-    "EQUITY": "equity_edge.json",
-    "FUTURES": "futures_edge.json",
-    "OPTIONS": "options_edge.json",
-    "CRYPTO": "crypto_edge.json",
-}
+log = logging.getLogger(__name__)
 
-_loaded_models: Dict[str, xgb.Booster] = {}
+_LOADED_MODELS = {}
 
 
-def _load_model_safe(market_type: str) -> Optional[xgb.Booster]:
-    market_type = (market_type or "").upper()
-    if market_type in _loaded_models:
-        return _loaded_models[market_type]
+def _get_model_path(market: str):
+    base = os.path.join(os.getcwd(), "core", "quant", "ml_models")
+    return os.path.join(base, f"{market.lower()}_edge.json")
 
-    filename = MODEL_MAP.get(market_type)
-    if not filename:
-        return None
 
-    path = os.path.join(MODEL_DIR, filename)
-    if not os.path.exists(path):
-        print(f"[ML WARNING] Model file missing: {filename}")
-        return None
+def _load_model(market: str):
+    if market in _LOADED_MODELS: return _LOADED_MODELS[market]
+    path = _get_model_path(market)
+    if not os.path.exists(path): return None
+    if xgb:
+        try:
+            booster = xgb.Booster()
+            booster.load_model(path)
+            _LOADED_MODELS[market] = booster
+            return booster
+        except Exception as e:
+            log.error(f"Model Load Error: {e}")
+            return None
+    return None
 
+
+def _heuristic_predict(data) -> float:
+    # Basic logic if ML fails
+    score = 50.0
     try:
-        booster = xgb.Booster()
-        booster.load_model(path)
-        _loaded_models[market_type] = booster
-        return booster
-    except Exception as e:
-        print(f"[ML ERROR] Could not load {filename}: {e}")
-        return None
-
-
-def _align_features_safe(feature_row: Dict[str, Any], booster: xgb.Booster) -> xgb.DMatrix:
-    """
-    AUTO-FIXER: Aligns input data to match Model requirements exactly.
-    """
-    # 1. Ask the model what features it needs
-    expected_features = booster.feature_names
-
-    # Fallback if model has no saved feature names
-    if not expected_features:
-        data = np.array([list(feature_row.values())], dtype=np.float32)
-        return xgb.DMatrix(data, feature_names=list(feature_row.keys()))
-
-    # 2. Build the exact vector the model wants
-    aligned_vector = []
-    missing_count = 0
-
-    for name in expected_features:
-        # If we have the feature, use it. If not, fill with 0.0
-        if name in feature_row:
-            val = float(feature_row[name])
+        # data could be dict or df
+        if isinstance(data, pd.DataFrame):
+            last = data.iloc[-1]
         else:
-            val = 0.0
-            missing_count += 1
+            last = data
 
-        # Handle NaN/Inf safety
-        if np.isnan(val) or np.isinf(val):
-            val = 0.0
-        aligned_vector.append(val)
-
-    # 3. Log if we had to fix things (Debugging only)
-    if missing_count > 0:
-        print(f"[ML REPAIR] Auto-filled {missing_count} missing features to prevent crash.")
-
-    # 4. Return correct DMatrix
-    data = np.array([aligned_vector], dtype=np.float32)
-    return xgb.DMatrix(data, feature_names=expected_features)
+        if "close" in last and "ma_50" in last:
+            if last["close"] > last["ma_50"]:
+                score += 10
+            else:
+                score -= 10
+        if "rsi_14" in last:
+            if last["rsi_14"] > 60: score -= 5
+            if last["rsi_14"] < 40: score += 5
+    except:
+        pass
+    return max(0.0, min(100.0, score)) / 100.0
 
 
-def predict_directional_edge(market_type: str, *args, **kwargs) -> float:
+def predict_directional_edge(market_type: str, symbol: str, trade_style: str, data) -> float:
     """
-    Main Prediction Function
+    Robust Prediction Bridge.
+    Accepts data as DataFrame OR Dict.
+    Aligns columns to match the trained model.
     """
-    # Extract dict from args/kwargs
-    feature_row = None
-    for arg in args:
-        if isinstance(arg, dict): feature_row = arg
-    if not feature_row:
-        for k in ["features", "feature_row", "snapshot"]:
-            if isinstance(kwargs.get(k), dict): feature_row = kwargs[k]
-
-    if not feature_row:
+    if data is None or (isinstance(data, pd.DataFrame) and data.empty) or (isinstance(data, dict) and not data):
         return 50.0
 
-    booster = _load_model_safe(market_type)
-    if booster is None:
-        return 50.0
+    # 1. Standardize to DataFrame row
+    if isinstance(data, pd.DataFrame):
+        # If full history passed (e.g. from backtest), take last row
+        input_row = data.iloc[[-1]].copy()
+    else:
+        # If dict passed (e.g. from live engine)
+        input_row = pd.DataFrame([data])
 
-    try:
-        # --- THE FIX IS HERE ---
-        # We use the safe aligner instead of raw DMatrix
-        dmat = _align_features_safe(feature_row, booster)
+    # 2. Load Model
+    model = _load_model(market_type)
 
-        prob = float(booster.predict(dmat)[0])
-        return round(prob * 100.0, 2)
-    except Exception as e:
-        print(f"[ML CRASH PREVENTED] {e}")
-        return 50.0
+    # 3. Align Features & Predict
+    if model and xgb:
+        try:
+            # Create a DF with exactly the columns the model wants (FEATURES list)
+            aligned_df = pd.DataFrame(index=input_row.index)
+
+            # Fill columns
+            for col in FEATURES:
+                if col in input_row.columns:
+                    aligned_df[col] = input_row[col]
+                else:
+                    aligned_df[col] = 0.0  # Missing feature = 0
+
+            # Predict
+            dmat = xgb.DMatrix(aligned_df)
+            prob = float(model.predict(dmat)[0])
+            return prob * 100.0
+
+        except Exception as e:
+            log.error(f"XGBoost Error: {e}")
+            return _heuristic_predict(input_row) * 100.0
+    else:
+        return _heuristic_predict(input_row) * 100.0

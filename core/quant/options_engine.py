@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 import pandas as pd
+import numpy as np
+
 from .base_engine import (
     QuantResult, compute_basic_ohlc_aliases, add_core_indicators,
     compute_trend_score, detect_volatility_regime, determine_signal_quality,
@@ -10,85 +12,83 @@ from .base_engine import (
 from .indicators import compute_all_indicators
 from .ml_bridge import predict_directional_edge
 
-
 class OptionsQuantEngine:
-    """
-    Institutional Options Engine.
-    Fixes: ML Feature Mismatch.
-    Adds: Dynamic Strategy Selection (Buy vs Sell) based on Volatility.
-    """
     MARKET_TYPE = "OPTIONS"
 
     @classmethod
     def run(cls, raw_df: pd.DataFrame, symbol: str, trade_style: str = "INTRADAY") -> QuantResult:
+        # 1. Analyze Underlying
         df = compute_basic_ohlc_aliases(raw_df)
-        if df.empty or len(df) < 80: return cls._empty_result(symbol, trade_style)
+        if df.empty or len(df) < 50:
+            return QuantResult(direction="NEUTRAL", score=0, extras={"error": "Insufficient Data"})
 
         df = add_core_indicators(df)
         last_price = float(df.iloc[-1]["close"])
 
-        # 1. ML Fix
+        # 2. ML Prediction
         ml_features = compute_all_indicators(df)
         try:
             raw_prob = float(predict_directional_edge(cls.MARKET_TYPE, symbol, trade_style, ml_features))
-        except:
+        except Exception:
             raw_prob = 50.0
         ml_edge = clamp_score(raw_prob)
 
-        # 2. Context
+        # 3. Technicals
         trend_score = compute_trend_score(df)
         vol_regime = detect_volatility_regime(df)
+        final_score = clamp_score(0.6 * ml_edge + 0.4 * (50 + trend_score))
 
-        # 3. Scoring
-        # Penalize buying in high chop
-        penalty = 10 if vol_regime == "HIGH" else 0
-        final_score = clamp_score((0.7 * ml_edge + 0.3 * (50 + trend_score / 2)) - penalty)
+        # 4. Direction
+        direction = "NEUTRAL"
+        if final_score > 55: direction = "BULLISH"
+        elif final_score < 45: direction = "BEARISH"
 
-        # 4. Strategy Logic
-        if final_score > 55:
-            direction = "BUY"  # Bullish Underlying
-            opt_type = "CE"
-        elif final_score < 45:
-            direction = "SELL"  # Bearish Underlying
-            opt_type = "PE"
-        else:
-            direction = "NEUTRAL"
-            opt_type = "-"
-
-        # 5. Smart Instrument Selection
-        # ATM Strike Calculation
+        # 5. Smart Contract Selection
         strike_step = 100 if "BANK" in symbol else 50
         atm_strike = round(last_price / strike_step) * strike_step
+        opt_type = "CE" if direction == "BULLISH" else "PE" if direction == "BEARISH" else "--"
 
-        strategy = "WAIT"
-        theta_risk = "MODERATE"
+        # 6. Manipulation Detection (Options Specific)
+        gamma_pin_risk = "LOW"
+        # If price is extremely close to a round number strike (within 0.1%), risk of pinning
+        if abs(last_price - atm_strike) < (last_price * 0.001):
+            gamma_pin_risk = "HIGH - PRICE MAGNET"
 
+        iv_crush_risk = "LOW"
+        # If Vol is HIGH but Trend is Neutral -> IV Crush Likely
+        if vol_regime == "HIGH" and abs(trend_score) < 10:
+            iv_crush_risk = "HIGH - PREMIUM DECAY WARNING"
+
+        theta_risk = "HIGH (BUYER)" if trade_style == "INTRADAY" else "MODERATE"
+
+        # 7. Premium Estimation
+        target_premium = 0.0
+        estimated_premium = 0.0
         if direction != "NEUTRAL":
-            if vol_regime == "HIGH":
-                # High Vol = Expensive Premiums = SELL/SPREAD
-                action = "CREDIT SPREAD"
-                theta_risk = "FRIENDLY (SELLER)"
-            else:
-                # Low Vol = Cheap Premiums = BUY
-                action = "LONG (BUY)"
-                theta_risk = "HIGH (BUYER)"
+            und_entry, und_target, _, _ = build_entry_target_stop(df, direction, trade_style)
+            expected_move = abs(und_target - und_entry)
+            estimated_premium = (last_price * 0.015) # Approx ATM
+            target_premium = estimated_premium + (expected_move * 0.5) # Delta 0.5
 
-            strategy = f"{action} {atm_strike} {opt_type}"
-
-        entry, target, stop, rr = build_entry_target_stop(df, direction, trade_style)
+        # Strategy
+        strategy = f"LONG {atm_strike} {opt_type}"
+        if vol_regime == "HIGH":
+            strategy = f"CREDIT SPREAD (SELL {atm_strike} { 'PE' if direction=='BULLISH' else 'CE'})"
 
         return QuantResult(
             symbol=symbol, market_type=cls.MARKET_TYPE, time_frame=trade_style,
             direction=direction, score=final_score, ml_edge=ml_edge,
-            raw_prob=ml_edge / 100, trend_score=trend_score, volatility_regime=vol_regime,
+            trend_score=trend_score, volatility_regime=vol_regime,
             signal_quality=determine_signal_quality(final_score, ml_edge),
-            entry=entry, target=target, stop=stop, risk_reward=rr,
+            entry=0.0, target=0.0, stop=0.0,
             extras={
                 "opt_strategy": strategy,
-                "theta_risk": theta_risk
+                "strike": atm_strike,
+                "ltp_info": {"ltp": f"{estimated_premium:.2f}"},
+                "target_premium": f"{target_premium:.2f}",
+                "theta_risk": theta_risk,
+                "gamma_pin_risk": gamma_pin_risk,
+                "iv_crush_risk": iv_crush_risk,
+                "underlying_price": last_price
             }
         )
-
-    @staticmethod
-    def _empty_result(symbol, style):
-        return QuantResult(symbol, "OPTIONS", style, "NEUTRAL", 0, 0, 0.5, 0, "UNKNOWN", "C", 0, 0, 0, 0)

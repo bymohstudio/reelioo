@@ -1,11 +1,10 @@
 # core/services/marketdata_service.py
 
-import os
+import datetime
+import logging
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
-import pyotp
-import re
+import os
 
 # Try importing SmartAPI
 try:
@@ -13,201 +12,250 @@ try:
 except ImportError:
     SmartConnect = None
 
+log = logging.getLogger(__name__)
+
 
 # =========================================
-# 1. YAHOO FINANCE FALLBACK (The Safety Net)
+# 1. DUAL-CLIENT WRAPPER (Live + Historical)
 # =========================================
-
-def fetch_yahoo_fallback(symbol: str, market_type: str, days: int = 365) -> pd.DataFrame:
+class SmartApiClientWrapper:
     """
-    Fallback fetcher if SmartAPI fails or is not configured.
-    Automatically handles Options by fetching the Underlying Index.
+    Manages TWO separate connections:
+    1. Historical Data Client (for Backtesting/Charts)
+    2. Live Feed Client (for Real-time Price updates)
     """
 
-    # 1. Clean Symbol (Remove -EQ, -BE)
-    clean_symbol = symbol.replace("-EQ", "").replace("-BE", "").strip().upper()
+    def __init__(self):
+        self.hist_client = None
+        self.live_client = None
+        self.logged_in_hist = False
+        self.logged_in_live = False
 
-    # 2. Map to Yahoo Ticker
-    ticker = clean_symbol
+        # Shared Credentials
+        self.client_id = os.environ.get("SMART_CLIENT_ID")
+        self.mpin = os.environ.get("SMART_PASSWORD")
+        self.totp_key = os.environ.get("SMART_TOTP_KEY")
 
-    if market_type == "EQUITY":
-        ticker = f"{clean_symbol}.NS"
+        # Separate API Keys (Fallback to generic SMART_API_KEY if specific not found)
+        self.hist_api_key = os.environ.get("SMART_HIST_API_KEY") or os.environ.get("SMART_API_KEY")
+        self.live_api_key = os.environ.get("SMART_LIVE_API_KEY") or os.environ.get("SMART_API_KEY")
 
-    elif market_type == "FUTURES":
-        # Yahoo doesn't have continuous futures. Use Index.
-        if "BANKNIFTY" in clean_symbol:
-            ticker = "^NSEBANK"
-        elif "NIFTY" in clean_symbol:
-            ticker = "^NSEI"
+    def _create_session(self, api_key):
+        """Helper to create a fresh session"""
+        if not SmartConnect or not api_key or not self.client_id:
+            return None
+        try:
+            client = SmartConnect(api_key=api_key)
+            if self.mpin and self.totp_key:
+                import pyotp
+                totp = pyotp.TOTP(self.totp_key).now()
+                data = client.generateSession(self.client_id, self.mpin, totp)
+                if data and data.get("status"):
+                    return client
+        except Exception as e:
+            log.error(f"SmartAPI Session Failed for key {api_key[:4]}...: {e}")
+        return None
 
-    elif market_type == "OPTIONS":
-        # CRITICAL FIX: Yahoo has no Options data. Use Underlying.
-        print(f"[DATA] Option requested ({symbol}). Yahoo Fallback -> Fetching Underlying Index.")
-        if "BANKNIFTY" in clean_symbol:
-            ticker = "^NSEBANK"
-        elif "NIFTY" in clean_symbol:
-            ticker = "^NSEI"
-        elif "FINNIFTY" in clean_symbol:
-            ticker = "NIFTY_FIN_SERVICE.NS"
-        else:
-            # Stock Option? Try fetching the stock
-            # Extract basic symbol e.g., "RELIANCE24JAN..." -> "RELIANCE"
-            # Simple regex to grab the first alphabetic part
-            match = re.match(r"([A-Z]+)", clean_symbol)
-            if match:
-                ticker = f"{match.group(1)}.NS"
+    def get_hist(self):
+        """Returns the Historical Data Client"""
+        if not self.hist_client:
+            log.info("[SmartAPI] Connecting Historical Client...")
+            self.hist_client = self._create_session(self.hist_api_key)
+            if self.hist_client: self.logged_in_hist = True
+        return self.hist_client
 
-    elif market_type == "CRYPTO":
-        ticker = "BTC-INR"
+    def get_live(self):
+        """Returns the Live Market Feed Client"""
+        if not self.live_client:
+            log.info("[SmartAPI] Connecting Live Feed Client...")
+            self.live_client = self._create_session(self.live_api_key)
+            if self.live_client: self.logged_in_live = True
+        return self.live_client
 
-    print(f"[DATA] Yahoo Fetching: {ticker} (Strategy: {market_type})")
+    def get(self):
+        # Fallback for legacy calls (defaults to Live)
+        return self.get_live()
 
-    # 3. Download
+
+smartapi_wrapper = SmartApiClientWrapper()
+
+# =========================================
+# 2. SMARTAPI FETCHER (Routing Logic)
+# =========================================
+TIMEFRAME_MAP = {
+    "1m": "ONE_MINUTE", "3m": "THREE_MINUTE", "5m": "FIVE_MINUTE",
+    "15m": "FIFTEEN_MINUTE", "30m": "THIRTY_MINUTE", "1h": "ONE_HOUR", "1d": "ONE_DAY"
+}
+
+
+def get_smart_ltp(symbol_token, exchange):
+    """
+    Get Real-Time Price using Live Feed API
+    """
+    client = smartapi_wrapper.get_live()
+    if not client: return None
     try:
-        df = yf.download(ticker, period=f"{days}d", interval="1d", progress=False, auto_adjust=True)
+        data = client.ltpData(exchange, symbol_token, symbol_token)  # SDK specific, mostly ltpData or getLTP
+        if data and data.get("data"):
+            return float(data["data"]["ltp"])
+    except:
+        pass
+    return None
 
-        if df is None or df.empty:
-            print(f"[DATA] Yahoo returned empty data for {ticker}")
-            return pd.DataFrame()
 
-        # 4. Clean Data (Handle MultiIndex)
-        df = df.copy()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+def smartapi_get_ohlc(symbol_token, exchange, timeframe, days):
+    """
+    Get Candles using Historical Data API
+    """
+    # Use HISTORICAL client
+    client = smartapi_wrapper.get_hist()
+    if not client:
+        return None
 
-        # Normalize
-        df.columns = [c.lower() for c in df.columns]
-        rename_map = {}
-        for c in df.columns:
-            if "open" in c: rename_map[c] = "open"
-            if "high" in c: rename_map[c] = "high"
-            if "low" in c: rename_map[c] = "low"
-            if "close" in c: rename_map[c] = "close"
-            if "volume" in c: rename_map[c] = "volume"
+    try:
+        interval = TIMEFRAME_MAP.get(timeframe, "FIFTEEN_MINUTE")
+        to_dt = datetime.datetime.now()
+        from_dt = to_dt - datetime.timedelta(days=days)
 
-        df = df.rename(columns=rename_map)
+        params = {
+            "exchange": exchange,
+            "symboltoken": str(symbol_token),
+            "interval": interval,
+            "fromdate": from_dt.strftime("%Y-%m-%d %H:%M"),
+            "todate": to_dt.strftime("%Y-%m-%d %H:%M")
+        }
 
-        # Numeric Safety
-        for c in ["open", "high", "low", "close", "volume"]:
-            if c in df.columns:
-                df[c] = pd.to_numeric(df[c], errors="coerce")
+        data = client.getCandleData(params)
+        if not data or not data.get("data"):
+            return None
+
+        records = []
+        for r in data["data"]:
+            records.append({
+                "timestamp": pd.to_datetime(r[0]),
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+                "volume": float(r[5])
+            })
+
+        df = pd.DataFrame(records).set_index("timestamp")
+
+        # --- INSTITUTIONAL EDGE: REAL-TIME PATCH ---
+        # If market is open, the historical candle might be lagging by 1-2 mins.
+        # We fetch the LIVE LTP and update the last close price to be instant.
+        try:
+            live_price = get_smart_ltp(symbol_token, exchange)
+            if live_price and not df.empty:
+                # Update last close to match live market price
+                df.iloc[-1, df.columns.get_loc("close")] = live_price
+                # Update High/Low if live price broke them
+                if live_price > df.iloc[-1]["high"]: df.iloc[-1, df.columns.get_loc("high")] = live_price
+                if live_price < df.iloc[-1]["low"]: df.iloc[-1, df.columns.get_loc("low")] = live_price
+        except Exception:
+            pass  # Fail silently, keep historical data
+
+        return df
+    except Exception as e:
+        log.error(f"SmartAPI Error: {e}")
+        return None
+
+
+# =========================================
+# 3. YAHOO FETCHER (Backup)
+# =========================================
+def yahoo_get_ohlc(symbol, timeframe, days, market_type="EQUITY"):
+    try:
+        tf_map = {"1m": "1m", "5m": "5m", "15m": "15m", "1h": "1h", "1d": "1d"}
+        interval = tf_map.get(timeframe, "1d")
+
+        safe_days = days
+        if interval == "1m":
+            safe_days = min(days, 5)
+        elif interval in ["5m", "15m", "30m"]:
+            safe_days = min(days, 55)
+
+        ticker = symbol
+        if market_type == "EQUITY" and not ticker.endswith(".NS"):
+            ticker = f"{symbol}.NS"
+        elif market_type in ["FUTURES", "OPTIONS"]:
+            if "BANKNIFTY" in symbol:
+                ticker = "^NSEBANK"
+            elif "NIFTY" in symbol:
+                ticker = "^NSEI"
+            elif "FINNIFTY" in symbol:
+                ticker = "NIFTY_FIN_SERVICE.NS"
+            elif "MIDCP" in symbol:
+                ticker = "^NSEMDCP50"
             else:
-                df[c] = 0.0
+                ticker = f"{symbol}.NS"
+        elif market_type == "CRYPTO":
+            ticker = f"{symbol.replace('INR', '')}-INR" if "INR" in symbol else f"{symbol}-USD"
 
-        df = df.dropna(subset=["close"])
+        df = yf.download(ticker, period=f"{safe_days}d", interval=interval, progress=False, auto_adjust=True)
 
-        print(f"[DATA] Yahoo Success: {len(df)} rows for {ticker}")
+        if df is None or df.empty: return None
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df.columns]
+        else:
+            df.columns = [c.lower() for c in df.columns]
+
+        rename = {}
+        for c in df.columns:
+            if "open" in c:
+                rename[c] = "open"
+            elif "high" in c:
+                rename[c] = "high"
+            elif "low" in c:
+                rename[c] = "low"
+            elif "close" in c:
+                rename[c] = "close"
+            elif "vol" in c:
+                rename[c] = "volume"
+
+        df = df.rename(columns=rename)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+
         return df
 
     except Exception as e:
-        print(f"[DATA] Yahoo Fallback Failed for {ticker}: {e}")
-        return pd.DataFrame()
+        log.error(f"Yahoo Fetch Error: {e}")
+        return None
 
 
 # =========================================
-# 2. SMART API PROVIDER
+# 4. MAIN SERVICE
 # =========================================
-
-class SmartApiProvider:
-    def __init__(self):
-        self.api_key = os.environ.get("SMART_API_KEY")
-        self.client_id = os.environ.get("SMART_CLIENT_ID")
-        self.password = os.environ.get("SMART_PASSWORD")
-        self.totp_key = os.environ.get("SMART_TOTP_KEY")
-        self.smart_api = None
-        self.logged_in = False
-
-    def login(self):
-        # Fail fast if no creds
-        if not all([self.api_key, self.client_id, self.password, self.totp_key]):
-            return False
-
-        if not SmartConnect:
-            return False
-
-        try:
-            self.smart_api = SmartConnect(api_key=self.api_key)
-            totp = pyotp.TOTP(self.totp_key).now()
-            data = self.smart_api.generateSession(self.client_id, self.password, totp)
-
-            if data['status']:
-                self.logged_in = True
-                print("[DATA] SmartAPI Login Successful")
-                return True
-            else:
-                print(f"[DATA] SmartAPI Login Failed: {data['message']}")
-                return False
-        except Exception as e:
-            print(f"[DATA] SmartAPI Exception: {e}")
-            return False
-
-    def get_candle_data(self, symbol_token, exchange, interval="ONE_DAY", days=200):
-        if not self.logged_in:
-            if not self.login():
-                return None
-
-        try:
-            to_date = datetime.now()
-            from_date = to_date - timedelta(days=days)
-
-            historicParam = {
-                "exchange": exchange,
-                "symboltoken": symbol_token,
-                "interval": interval,
-                "fromdate": from_date.strftime("%Y-%m-%d %H:%M"),
-                "todate": to_date.strftime("%Y-%m-%d %H:%M")
-            }
-
-            data = self.smart_api.getCandleData(historicParam)
-
-            if data and data.get('status') and data.get('data'):
-                candles = data['data']
-                df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
-                df["timestamp"] = pd.to_datetime(df["timestamp"])
-                df.set_index("timestamp", inplace=True)
-
-                cols = ["open", "high", "low", "close", "volume"]
-                df[cols] = df[cols].apply(pd.to_numeric)
-
-                print(f"[DATA] SmartAPI Fetch Success: {len(df)} rows")
-                return df
-            else:
-                return None
-
-        except Exception as e:
-            print(f"[DATA] SmartAPI Fetch Error: {e}")
-            return None
-
-
-# =========================================
-# 3. MAIN MARKET SERVICE (With Fallback)
-# =========================================
-
 class MarketService:
-    _smart_provider = SmartApiProvider()
-
-    @classmethod
-    def get_historical_data(cls, symbol_info: dict, market_type: str = "EQUITY",
-                            trade_style: str = "SWING") -> pd.DataFrame:
-        symbol = symbol_info.get("symbol")
+    @staticmethod
+    def get_historical_data(symbol_info, market_type, trade_style):
+        symbol = symbol_info.get("symbol", "")
         token = symbol_info.get("token")
-        exchange = symbol_info.get("exchange")
 
-        print(f"\n--- FETCHING DATA FOR {symbol} ({market_type}) ---")
+        timeframe = "1d"
+        days = 365
 
-        # 1. Try SmartAPI (Institutional)
-        if token and exchange:
-            interval = "ONE_DAY"
-            if trade_style == "INTRADAY": interval = "FIFTEEN_MINUTE"
+        if trade_style == "INTRADAY":
+            timeframe = "5m"
+            days = 5
+        elif trade_style == "SWING":
+            timeframe = "15m"
+            days = 59
 
-            df = cls._smart_provider.get_candle_data(token, exchange, interval)
+            # 1. Try SmartAPI (Institutional Routing)
+        if token and market_type in ["EQUITY", "FUTURES"]:
+            df = smartapi_get_ohlc(token, "NSE" if market_type == "EQUITY" else "NFO", timeframe, days)
             if df is not None and not df.empty:
                 return df
-            else:
-                print("[DATA] SmartAPI returned no data (or not configured).")
 
-        # 2. Fallback to Yahoo (Retail / Backup)
-        print("[DATA] Switching to Yahoo Finance Fallback...")
-        df_yahoo = fetch_yahoo_fallback(symbol, market_type)
+        # 2. Options Special Logic
+        if market_type == "OPTIONS":
+            if token:
+                df = smartapi_get_ohlc(token, "NFO", timeframe, days)
+                if df is not None and not df.empty: return df
 
-        return df_yahoo
+        # 3. Yahoo Fallback
+        return yahoo_get_ohlc(symbol, timeframe, days, market_type)

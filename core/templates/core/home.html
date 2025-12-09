@@ -1,375 +1,204 @@
 {% extends "core/base.html" %}
-{% block title %}Reelioo V2 | Indian Quant Terminal{% endblock %}
+{% block title %}Reelioo | AI Quant Terminal{% endblock %}
 
 {% block content %}
 
 <style>
-    /* --- GLASS & DEPTH --- */
-    .glass-panel {
-        background: rgba(15, 23, 42, 0.4);
-        backdrop-filter: blur(24px);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 24px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.03);
-    }
+    /* --- CORE GLASS UI --- */
+    .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .nav-tab { padding: 10px 24px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid transparent; transition: all 0.2s; color: #64748b; background: rgba(255, 255, 255, 0.02); }
+    .nav-tab:hover { color: white; border-color: rgba(255, 255, 255, 0.1); }
+    .nav-tab.active { background: #1e293b; color: white; border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 
-    /* --- TOOLTIPS --- */
-    .tooltip-box {
-        position: absolute;
-        bottom: 110%;
-        left: 50%;
-        transform: translateX(-50%) translateY(10px);
-        width: 180px;
-        padding: 10px;
-        background: rgba(2, 6, 23, 0.95);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        color: #94a3b8;
-        font-size: 10px;
-        line-height: 1.4;
-        text-align: center;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 50;
-        pointer-events: none;
-        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.8);
-    }
-    .tooltip-box::after {
-        content: '';
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: rgba(2, 6, 23, 0.95) transparent transparent transparent;
-    }
-    .metric-box:hover .tooltip-box {
-        opacity: 1;
-        visibility: visible;
-        transform: translateX(-50%) translateY(0);
-    }
+    .metric-box { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; transition: transform 0.2s; }
+    .metric-box:hover { border-color: rgba(255,255,255,0.1); transform: translateY(-2px); }
 
-    /* --- TABS (3D Look) --- */
-    .nav-tab {
-        padding: 10px 24px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        border: 1px solid transparent;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        color: #64748b;
-        white-space: nowrap;
-        background: rgba(255, 255, 255, 0.02);
-    }
-    .nav-tab:hover {
-        color: white;
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.08);
-    }
-    .nav-tab.active {
-        background: #1e293b;
-        color: white;
-        border-color: rgba(255, 255, 255, 0.1);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    }
-    .nav-tab.active span {
-        background: linear-gradient(to right, #60a5fa, #a78bfa);
-        -webkit-background-clip: text;
-        color: transparent;
-    }
+    .btn-primary { background: linear-gradient(to bottom, #3b82f6, #2563eb); border-top: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); transition: all 0.1s; }
+    .btn-primary:active { transform: translateY(1px); }
 
-    /* --- INPUTS --- */
-    .input-container {
-        background: #0b1121;
-        border: 1px solid #1e293b;
-        border-radius: 16px;
-        transition: all 0.2s;
-        position: relative;
-    }
-    .input-container:focus-within {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        z-index: 20;
-    }
-    .input-clean {
-        background: transparent;
-        border: none;
-        color: white;
-        width: 100%;
-        outline: none;
-        font-family: 'JetBrains Mono', monospace;
-        text-transform: uppercase;
-    }
+    .input-clean { background: transparent; border: none; color: white; width: 100%; outline: none; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; font-weight: 700; }
+    .autocomplete-box { position: absolute; top: 100%; left: 0; right: 0; background: #0f172a; border: 1px solid #334155; border-radius: 12px; z-index: 100; max-height: 240px; overflow-y: auto; display: none; }
+    .autocomplete-box.active { display: block; }
+    .autocomplete-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; color:#cbd5e1; font-size:12px; }
+    .autocomplete-item:hover { background: #1e293b; color: white; }
 
-    /* --- AUTOSUGGESTION --- */
-    .autocomplete-box {
-        position: absolute;
-        top: calc(100% + 8px);
-        left: 0;
-        right: 0;
-        background: rgba(15, 23, 42, 0.95);
-        backdrop-filter: blur(16px);
-        border: 1px solid #334155;
-        border-radius: 12px;
-        max-height: 240px;
-        overflow-y: auto;
-        z-index: 100;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        opacity: 0;
-        transform: translateY(-10px);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        pointer-events: none;
-    }
-    .autocomplete-box.active {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
-    }
+    /* SIGNAL STRIP BAR */
+    .signal-strip { height: 6px; border-radius: 99px; background: #1e293b; overflow: hidden; display: flex; }
+    .signal-seg { height: 100%; transition: width 0.5s ease; }
+    .seg-liq { background: #eab308; } /* Yellow */
+    .seg-stop { background: #ef4444; } /* Red */
+    .seg-whale { background: #3b82f6; } /* Blue */
 
-    .autocomplete-item {
-        padding: 12px 16px;
-        cursor: pointer;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        color: #cbd5e1;
-        font-size: 13px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: background 0.15s;
-    }
-    .autocomplete-item:last-child { border-bottom: none; }
-    .autocomplete-item:hover {
-        background: rgba(59, 130, 246, 0.15);
-    }
-    .autocomplete-item .sym {
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 700;
-        color: white;
-    }
-    .autocomplete-item .name {
-        font-size: 11px;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
+    /* MODAL */
+    .modal-backdrop { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); }
+    .opt-btn { flex:1; padding:10px; border-radius:8px; border:1px solid #334155; color:#64748b; font-size:10px; font-weight:700; transition:all 0.2s; cursor: pointer; }
+    .opt-btn.selected { background:#1e293b; color:white; border-color:#3b82f6; }
 
-    /* --- RESULT CARD --- */
-    .result-header {
-        background: linear-gradient(180deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0) 100%);
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .metric-box {
-        background: #0f172a;
-        border: 1px solid #1e293b;
-        border-radius: 12px;
-        position: relative; /* For tooltip positioning */
-        cursor: help;
-        transition: border-color 0.2s;
-    }
-    .metric-box:hover {
-        border-color: rgba(59, 130, 246, 0.3);
-    }
-
-    /* --- BUTTONS --- */
-    .btn-primary {
-        background: linear-gradient(to bottom, #3b82f6, #2563eb);
-        border-top: 1px solid rgba(255,255,255,0.2);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-        transition: transform 0.1s, box-shadow 0.1s;
-    }
-    .btn-primary:active {
-        transform: translateY(1px);
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
-    }
-
-    /* --- ANIMATIONS --- */
+    .fade-in { animation: fadeIn 0.3s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .fade-in { animation: fadeIn 0.4s ease-out forwards; }
-
-    #error-modal { backdrop-filter: blur(4px); }
 </style>
 
 <div class="max-w-7xl mx-auto pt-8 md:pt-16 pb-20 px-4 w-full">
-
     <!-- HERO SECTION -->
     <div class="text-center mb-16 relative">
-        <div class="inline-block mb-6">
-            <span class="px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] shadow-xl backdrop-blur-sm">
-                The Unfair Advantage
-            </span>
-        </div>
-
-        <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight leading-[0.9]">
-            Institutional Grade.<br>
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">Radically Simple.</span>
-        </h1>
-
-        <p class="text-slate-400 text-base md:text-xl max-w-2xl mx-auto leading-relaxed font-light">
-            Most traders drown in noise. Reelioo filters the Indian market chaos into clear, actionable signal cards using advanced quantitative models and Cognitive Synthesis.
-        </p>
+        <div class="inline-block mb-6"><span class="px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] shadow-xl backdrop-blur-sm">The Unfair Advantage</span></div>
+        <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 tracking-tight leading-[0.9]">Institutional Grade.<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">Radically Simple.</span></h1>
+        <p class="text-slate-400 text-base md:text-xl max-w-2xl mx-auto leading-relaxed font-light">Most traders drown in noise. Reelioo filters the Indian market chaos into clear, actionable signal cards using advanced quantitative models and Cognitive Synthesis.</p>
     </div>
 
     <!-- MAIN TERMINAL -->
     <div class="glass-panel p-1 md:p-1.5 min-h-[600px] flex flex-col relative z-10">
-
-        <div class="bg-[#020617]/80 rounded-[20px] h-full w-full p-4 md:p-8 border border-white/5">
+        <div class="bg-[#020617]/90 rounded-[20px] h-full w-full p-6 md:p-8 border border-white/5">
 
             <!-- TABS -->
-            <div class="flex overflow-x-auto pb-2 mb-8 gap-2 no-scrollbar border-b border-white/5">
-                <button onclick="switchTab('EQUITY')" id="tab-EQUITY" class="nav-tab active"><span>EQUITY</span></button>
-                <button onclick="switchTab('FUTURES')" id="tab-FUTURES" class="nav-tab"><span>FUTURES</span></button>
-                <button onclick="switchTab('OPTIONS')" id="tab-OPTIONS" class="nav-tab"><span>OPTIONS</span></button>
-                <button onclick="switchTab('CRYPTO')" id="tab-CRYPTO" class="nav-tab"><span>CRYPTO</span></button>
+            <div class="flex overflow-x-auto pb-4 mb-6 gap-2 border-b border-white/5 no-scrollbar">
+                <button onclick="switchTab('EQUITY')" id="tab-EQUITY" class="nav-tab active">EQUITY</button>
+                <button onclick="switchTab('FUTURES')" id="tab-FUTURES" class="nav-tab">FUTURES</button>
+                <button onclick="switchTab('OPTIONS')" id="tab-OPTIONS" class="nav-tab">OPTIONS</button>
+                <button onclick="switchTab('CRYPTO')" id="tab-CRYPTO" class="nav-tab">CRYPTO</button>
             </div>
 
-            <div class="grid lg:grid-cols-12 gap-10">
-
-                <!-- INPUTS (Left) -->
-                <div class="lg:col-span-4 flex flex-col gap-6">
-
-                    <!-- Symbol Input -->
-                    <div class="relative z-50">
-                        <label id="ticker-label" class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 block ml-1">Stock Symbol</label>
-                        <div class="input-container px-4 py-4 flex items-center gap-3">
-                            <i data-lucide="search" class="w-5 h-5 text-slate-500"></i>
-                            <input type="text" id="symbol-input" placeholder="RELIANCE"
-                                   class="input-clean text-xl font-bold placeholder-slate-700"
-                                   onkeyup="handleSearch(this.value)" autocomplete="off">
+            <!-- Responsive Grid: 1 col on mobile, 12 on desktop -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- INPUTS -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="relative">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Ticker Symbol</label>
+                        <div class="flex items-center gap-3 bg-[#0b1121] border border-slate-700 rounded-xl px-4 py-3 focus-within:border-blue-500 transition">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                            <input id="symbol-input" class="input-clean" placeholder="RELIANCE" onkeyup="handleSearch(this.value)" autocomplete="off">
                         </div>
-
-                        <!-- Autosuggestion Container -->
                         <div id="search-results" class="autocomplete-box"></div>
                     </div>
 
-                    <!-- Dynamic Inputs -->
-                    <div id="tab-specific-inputs"></div>
-
-                    <!-- Horizon -->
-                    <div id="style-selector-container">
-                        <label id="horizon-label" class="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 block ml-1">Strategy Horizon</label>
-                        <div id="style-buttons-container" class="flex w-full gap-2 bg-[#0b1121] p-1.5 rounded-xl border border-slate-800"></div>
+                    <!-- OPTIONS PANEL -->
+                    <div id="options-inputs" class="hidden space-y-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Contract Type</label>
+                            <div class="flex gap-2">
+                                <button onclick="setOptType('CE')" id="btn-CE" class="opt-btn selected">CALL (CE)</button>
+                                <button onclick="setOptType('PE')" id="btn-PE" class="opt-btn">PUT (PE)</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Expiry</label>
+                            <div class="flex gap-2">
+                                <button onclick="setExpiry('WEEKLY')" id="btn-WEEKLY" class="opt-btn selected">WEEKLY</button>
+                                <button onclick="setExpiry('MONTHLY')" id="btn-MONTHLY" class="opt-btn">MONTHLY</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Strike (Optional)</label>
+                            <input type="number" id="strike-input" placeholder="Auto-Detect ATM" class="w-full bg-[#0b1121] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none">
+                        </div>
                     </div>
 
-                    <!-- HIDDEN INPUTS & CSRF -->
+                    <div id="style-selector-container">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Strategy Horizon</label>
+                        <div id="style-buttons-container" class="flex gap-2 bg-[#0b1121] p-1 rounded-xl border border-slate-800"></div>
+                    </div>
+
                     <input type="hidden" id="current-style" value="SWING">
                     <input type="hidden" id="current-market" value="EQUITY">
+                    <input type="hidden" id="opt-type" value="CE">
+                    <input type="hidden" id="opt-expiry" value="WEEKLY">
                     <input type="hidden" id="selected-token">
                     <input type="hidden" id="selected-exchange">
                     {% csrf_token %}
 
-                    <!-- Action Buttons -->
-                    <div class="mt-8 space-y-3">
-                        <button onclick="runAnalysis()"
-                                class="btn-primary w-full py-4 rounded-xl text-white font-black text-sm uppercase tracking-[0.15em] flex items-center justify-center gap-3 group">
-                            <i data-lucide="zap" class="w-4 h-4 group-hover:text-yellow-300 transition"></i>
-                            Run Engine
+                    <div class="pt-4 space-y-3">
+                        <button onclick="runAnalysis()" id="btn-analyze" class="btn-primary w-full py-4 rounded-xl text-white font-black text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-2">
+                            <i data-lucide="zap" class="w-4 h-4"></i> Run Engine
                         </button>
-
-                        <button onclick="runBacktest()"
-                                class="w-full py-3 rounded-xl border border-slate-800 text-slate-500 hover:text-white hover:border-slate-600 transition font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                            <i data-lucide="history" class="w-3 h-3"></i> Validate Strategy
+                        <button onclick="runBacktest()" id="btn-backtest" class="w-full py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                            <i data-lucide="flask-conical" class="w-3 h-3"></i> Validate Strategy
                         </button>
                     </div>
                 </div>
 
-                <!-- RESULTS (Right) -->
-                <div class="lg:col-span-8 min-h-[500px] relative rounded-2xl bg-[#0b1121] border border-slate-800 overflow-hidden">
+                <!-- RESULTS -->
+                <div class="lg:col-span-8 min-h-[500px] bg-[#0b1121] rounded-2xl border border-slate-800 relative overflow-hidden flex flex-col">
 
-                    <!-- Placeholder -->
-                    <div id="placeholder-view" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 z-0">
-                        <div class="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 shadow-inner">
-                            <i data-lucide="activity" class="w-8 h-8 opacity-40"></i>
-                        </div>
-                        <p class="text-sm font-medium tracking-wide">SYSTEM READY</p>
+                    <!-- EMPTY STATE -->
+                    <div id="placeholder-view" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
+                        <i data-lucide="activity" class="w-12 h-12 opacity-20 mb-4"></i>
+                        <p class="text-xs font-bold tracking-widest opacity-50">SYSTEM READY</p>
                     </div>
 
-                    <!-- Results Content -->
-                    <div id="results-view" class="hidden relative z-10 h-full flex flex-col fade-in">
+                    <!-- LOADING -->
+                    <div id="loading-view" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0b1121] hidden">
+                        <div class="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                        <p class="text-[10px] font-mono text-blue-400 animate-pulse">PROCESSING DATA...</p>
+                    </div>
 
-                        <!-- HEADER CARD -->
-                        <div class="result-header p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <!-- CONTENT -->
+                    <div id="results-view" class="hidden flex-col h-full fade-in">
+                        <!-- HEADER -->
+                        <div class="p-6 md:p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                             <div>
-                                <div class="flex items-center gap-3 mb-1">
-                                    <span id="res-market" class="px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold uppercase tracking-widest text-slate-400">MARKET</span>
-                                    <span id="res-symbol" class="text-xs font-bold text-slate-500 tracking-widest">SYMBOL</span>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span id="res-market" class="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded text-slate-400">MARKET</span>
+                                    <span id="res-symbol" class="text-[10px] font-bold text-slate-500 tracking-widest">SYMBOL</span>
                                 </div>
-
-                                <div class="flex items-baseline gap-4">
-                                    <h2 id="res-action" class="text-5xl md:text-7xl font-black text-white tracking-tighter drop-shadow-2xl">WAIT</h2>
-                                </div>
-                                <p id="res-label" class="text-sm font-bold text-slate-400 uppercase tracking-widest mt-2">Neutral Bias</p>
+                                <!-- Dynamic Responsive Text Size -->
+                                <h2 id="res-action" class="text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter">--</h2>
+                                <p id="res-label" class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Neutral Bias</p>
                             </div>
-
-                            <div class="text-right">
-                                <div class="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-500" id="res-score">0%</div>
-                                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Confidence</div>
+                            <div class="text-left md:text-right mt-4 md:mt-0">
+                                <div id="res-score" class="text-5xl font-black text-slate-200">0%</div>
+                                <div class="text-[9px] font-bold text-slate-600 uppercase tracking-widest mt-1">Confidence</div>
                             </div>
                         </div>
 
-                        <!-- DATA GRID (With Tooltips) -->
-                        <div class="p-6 md:p-8 grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-white/5">
+                        <!-- METRICS: Grid 2 on mobile, 4 on desktop -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 border-b border-white/5 divide-y md:divide-y-0 divide-x divide-white/5">
+                            <div class="p-4"><p id="lbl-1" class="text-[9px] font-bold text-slate-500 uppercase">Entry</p><p id="res-1" class="text-lg font-mono font-bold text-blue-400 mt-1">--</p></div>
+                            <div class="p-4"><p id="lbl-2" class="text-[9px] font-bold text-slate-500 uppercase">Target</p><p id="res-2" class="text-lg font-mono font-bold text-emerald-400 mt-1">--</p></div>
+                            <div class="p-4"><p id="lbl-3" class="text-[9px] font-bold text-slate-500 uppercase">Stop</p><p id="res-3" class="text-lg font-mono font-bold text-red-400 mt-1">--</p></div>
+                            <div class="p-4"><p id="lbl-4" class="text-[9px] font-bold text-slate-500 uppercase">Time</p><p id="res-4" class="text-sm font-bold text-white mt-2">--</p></div>
+                        </div>
 
-                            <!-- Box 1 -->
-                            <div class="metric-box p-4">
-                                <p id="lbl-1" class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Entry Zone</p>
-                                <p id="res-1" class="text-lg font-mono text-blue-400 mt-1 font-bold">--</p>
-                                <div id="tip-1" class="tooltip-box">Optimal price range to enter based on volume support and ATR pullbacks.</div>
+                        <!-- SIGNAL STRIP -->
+                        <div class="px-4 md:px-8 py-6 border-b border-white/5 bg-[#080c16]">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Manipulation Risk</span>
+                                <span id="risk-text" class="text-[9px] font-bold text-slate-400">LOW</span>
                             </div>
-
-                            <!-- Box 2 -->
-                            <div class="metric-box p-4">
-                                <p id="lbl-2" class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Target</p>
-                                <p id="res-2" class="text-lg font-mono text-emerald-400 mt-1 font-bold">--</p>
-                                <div id="tip-2" class="tooltip-box">Statistically likely exit point calculated using trend projection and volatility.</div>
+                            <div class="signal-strip w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
+                                <div id="bar-liq" class="seg-liq" style="width:0%"></div>
+                                <div id="bar-stop" class="seg-stop" style="width:0%"></div>
+                                <div id="bar-whale" class="seg-whale" style="width:0%"></div>
                             </div>
-
-                            <!-- Box 3 -->
-                            <div class="metric-box p-4">
-                                <p id="lbl-3" class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stop Loss</p>
-                                <p id="res-3" class="text-lg font-mono text-red-400 mt-1 font-bold">--</p>
-                                <div id="tip-3" class="tooltip-box">Invalidation level where the trade setup fails. Adjusted for volatility noise.</div>
-                            </div>
-
-                            <!-- Box 4 -->
-                            <div class="metric-box p-4">
-                                <p id="lbl-4" class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Horizon</p>
-                                <p id="res-4" class="text-sm font-bold text-white mt-2">--</p>
-                                <div id="tip-4" class="tooltip-box">Estimated time to reach target based on current trend velocity.</div>
+                            <div class="flex justify-between mt-2 text-[8px] font-mono text-slate-600 uppercase">
+                                <span>Liquidity Grab</span>
+                                <span>Stop Run</span>
+                                <span>Whale Vol</span>
                             </div>
                         </div>
 
-                        <!-- FACTORS -->
-                        <div class="flex-grow grid md:grid-cols-2 bg-[#0b1121] divide-y divide-white/5 md:divide-y-0 md:divide-x md:divide-white/5">
-                            <!-- Commentary -->
+                        <!-- AI NOTE + FACTOR BREAKDOWN -->
+                        <div class="flex-grow grid grid-cols-1 md:grid-cols-2 bg-[#0b1121] divide-y divide-white/5 md:divide-y-0 md:divide-x md:divide-white/5">
                             <div class="p-6 md:p-8">
                                 <div class="flex items-center gap-2 mb-4">
                                     <i data-lucide="bot" class="w-4 h-4 text-blue-500"></i>
-                                    <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Desk Note</span>
+                                    <span class="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Analyst Desk Note</span>
                                 </div>
-                                <div id="res-comment" class="text-sm text-slate-300 leading-relaxed font-light">--</div>
+                                <div id="res-comment" class="space-y-2 text-sm leading-relaxed text-slate-300">--</div>
                             </div>
-
-                            <!-- Factor Bars -->
                             <div class="p-6 md:p-8">
                                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Factor Breakdown</p>
                                 <div id="factors-grid" class="space-y-5"></div>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- PREMIUM MARKETING SECTION (Restored) -->
+    <!-- PREMIUM MARKETING SECTION (RESTORED) -->
     <div class="mt-24 mb-24 relative">
         <div class="grid md:grid-cols-3 gap-8 relative z-10">
-            <!-- Feature 1 -->
             <div class="group p-8 rounded-3xl bg-slate-900/40 border border-white/5 hover:border-blue-500/30 transition duration-500 hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-blue-500/10">
                 <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300 border border-blue-500/20">
                     <i data-lucide="globe" class="w-6 h-6 text-blue-400"></i>
@@ -379,8 +208,6 @@
                     From <strong>Dalal Street</strong> equities to <strong>WazirX</strong> crypto flows and <strong>NFO</strong> options trends. One terminal to decode the Indian ecosystem with uniform institutional logic.
                 </p>
             </div>
-
-            <!-- Feature 2 -->
             <div class="group p-8 rounded-3xl bg-slate-900/40 border border-white/5 hover:border-purple-500/30 transition duration-500 hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-purple-500/10">
                 <div class="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300 border border-purple-500/20">
                     <i data-lucide="cpu" class="w-6 h-6 text-purple-400"></i>
@@ -390,8 +217,6 @@
                     Powered by our <strong>Neural Synthesis Engine</strong>. We deliver a senior analyst's desk note explaining <em>structure, risk, and execution nuance</em> in plain English.
                 </p>
             </div>
-
-            <!-- Feature 3 -->
             <div class="group p-8 rounded-3xl bg-slate-900/40 border border-white/5 hover:border-emerald-500/30 transition duration-500 hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-emerald-500/10">
                 <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition duration-300 border border-emerald-500/20">
                     <i data-lucide="shield-check" class="w-6 h-6 text-emerald-400"></i>
@@ -404,7 +229,7 @@
         </div>
     </div>
 
-    <!-- RISK WARNING (Footer Context) -->
+    <!-- RISK WARNING -->
     <div class="text-center pb-8 border-t border-white/5 pt-8">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded border border-red-500/20 bg-red-500/5 mb-3">
             <i data-lucide="alert-triangle" class="w-3 h-3 text-red-500"></i>
@@ -416,28 +241,13 @@
     </div>
 </div>
 
-<!-- ERROR MODAL -->
-<div id="error-modal" class="fixed inset-0 z-[100] hidden">
-    <div class="absolute inset-0 bg-black/60 transition-opacity" onclick="closeError()"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md p-6 glass-panel border border-red-500/30 shadow-2xl shadow-red-500/10 scale-95 opacity-0 transition-all duration-300 transform" id="error-content">
-        <div class="flex items-start gap-4">
-            <div class="p-3 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 shrink-0">
-                <i data-lucide="alert-octagon" class="w-6 h-6"></i>
-            </div>
-            <div class="flex-1">
-                <h3 class="text-lg font-bold text-white mb-2">System Alert</h3>
-                <p id="error-msg" class="text-sm text-slate-400 leading-relaxed">--</p>
-            </div>
-            <button onclick="closeError()" class="text-slate-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-        </div>
-    </div>
-</div>
-
 <!-- BACKTEST MODAL -->
-<div id="backtest-modal" class="fixed inset-0 z-[100] hidden">
+<div id="backtest-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity" onclick="closeBacktest()"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl p-8 glass-panel border border-blue-500/20 shadow-2xl shadow-blue-500/10 scale-95 opacity-0 transition-all duration-300 transform" id="backtest-content">
-        <div class="flex justify-between items-start mb-8">
+
+    <div id="backtest-content" class="relative bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-2xl p-8 shadow-2xl scale-95 opacity-0 transition-all duration-300 transform">
+        <!-- Header -->
+        <div class="flex justify-between items-start mb-8 border-b border-white/5 pb-6">
             <div>
                 <div class="flex items-center gap-3 mb-2">
                     <span class="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-widest">Strategy Report</span>
@@ -445,110 +255,86 @@
                 </div>
                 <h3 class="text-3xl font-black text-white tracking-tight">Backtest Results</h3>
             </div>
-            <button onclick="closeBacktest()" class="p-2 hover:bg-white/10 rounded-full transition text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            <button onclick="closeBacktest()" class="p-2 hover:bg-white/10 rounded-full transition text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Win Rate</p><p id="bt-win-rate" class="text-2xl font-mono font-bold text-emerald-400 mt-1">--%</p></div>
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Net Profit</p><p id="bt-pnl" class="text-2xl font-mono font-bold text-white mt-1">--%</p></div>
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Trades</p><p id="bt-trades" class="text-2xl font-mono font-bold text-blue-400 mt-1">--</p></div>
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Profit Factor</p><p id="bt-pf" class="text-xl font-mono font-bold text-slate-300 mt-1">--</p></div>
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Max Drawdown</p><p id="bt-dd" class="text-xl font-mono font-bold text-red-400 mt-1">--%</p></div>
-            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Avg Trade</p><p id="bt-avg" class="text-xl font-mono font-bold text-slate-300 mt-1">--%</p></div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 hover:border-emerald-500/30 transition">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Win Rate</p>
+                <p id="bt-winrate" class="text-2xl font-mono font-bold text-emerald-400">--%</p>
+            </div>
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 hover:border-blue-500/30 transition">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Net Profit</p>
+                <p id="bt-pnl" class="text-2xl font-mono font-bold text-white">--%</p>
+            </div>
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Total Trades</p>
+                <p id="bt-trades" class="text-2xl font-mono font-bold text-blue-400">--</p>
+            </div>
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Profit Factor</p>
+                <p id="bt-pf" class="text-xl font-mono font-bold text-slate-300">--</p>
+            </div>
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 hover:border-red-500/30 transition">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Max Drawdown</p>
+                <p id="bt-dd" class="text-xl font-mono font-bold text-red-400">--%</p>
+            </div>
+            <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Avg Trade</p>
+                <p id="bt-avg" class="text-xl font-mono font-bold text-slate-300">--%</p>
+            </div>
         </div>
-        <div class="text-center"><p class="text-xs text-slate-500">Past performance is not indicative of future results.</p></div>
+
+        <!-- Footer -->
+        <div class="text-center pt-6 border-t border-white/5">
+            <p class="text-[10px] text-slate-500 font-mono">
+                <i data-lucide="check-circle" class="w-3 h-3 inline mr-1 text-emerald-500"></i>
+                Event-Driven Simulation (Includes 0.05% Slippage & Fees)
+            </p>
+        </div>
     </div>
 </div>
 
-<!-- SCRIPTS (LOGIC FIXES ONLY) -->
-<script>
-    // --- STATE & CONFIG ---
-    let currentMarket = "EQUITY";
-    let activeTabName = "EQUITY";
+<!-- ERROR MODAL -->
+<div id="error-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeError()"></div>
+    <div class="bg-slate-900 border border-red-500/30 rounded-xl w-full max-w-sm p-6 relative z-10 shadow-2xl text-center">
+        <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4"><i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i></div>
+        <h3 class="text-white font-bold mb-2">Analysis Failed</h3>
+        <p id="error-msg" class="text-sm text-slate-400 mb-6">Error details.</p>
+        <button onclick="closeError()" class="w-full py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase transition">Dismiss</button>
+    </div>
+</div>
 
+<script>
+    let activeTabName = "EQUITY";
     const tabConfig = {
-        'EQUITY': {
-            market: 'EQUITY', label: 'Stock Symbol', placeholder: 'RELIANCE, TATASTEEL...',
-            styles: ['INTRADAY', 'SWING', 'LONG_TERM'], extraInputs: []
-        },
-        'FUTURES': {
-            market: 'FUTURES', label: 'Contract', placeholder: 'NIFTY 27MAR FUT',
-            styles: ['INTRADAY', 'SWING'], extraInputs: []
-        },
-        'OPTIONS': {
-            market: 'OPTIONS', label: 'Underlying', placeholder: 'NIFTY',
-            styles: ['INTRADAY', 'SWING'], // REMOVED LONG_TERM
-            extraInputs: [
-                { id: 'opt-strike', type: 'number', placeholder: 'Strike', label: 'Strike' },
-                { id: 'opt-type', type: 'select', label: 'Type', options: ['CALL', 'PUT'] },
-                { id: 'opt-expiry', type: 'date', label: 'Expiry' }
-            ]
-        },
-        'CRYPTO': { market: 'CRYPTO', label: 'Pair', placeholder: 'BTCINR', styles: ['INTRADAY', 'SWING'], extraInputs: [] }
+        'EQUITY': { placeholder: 'RELIANCE', styles: ['INTRADAY', 'SWING', 'LONG_TERM'], labels: ['ENTRY', 'TARGET', 'STOP', 'TIME'] },
+        'FUTURES': { placeholder: 'NIFTY', styles: ['INTRADAY', 'SWING'], labels: ['ENTRY', 'TARGET', 'STOP', 'LOT MULTIPLIER'] },
+        'OPTIONS': { placeholder: 'NIFTY', styles: ['INTRADAY', 'SWING'], labels: ['PREMIUM', 'TARGET', 'THETA RISK', 'STRIKE'] },
+        'CRYPTO': { placeholder: 'BTCINR', styles: ['INTRADAY', 'SWING'], labels: ['ENTRY', 'TARGET', 'STOP', 'LIQUIDITY RISK'] }
     };
 
-    function switchTab(tabName) {
-        activeTabName = tabName;
-        const config = tabConfig[tabName];
-        currentMarket = config.market;
-
-        document.querySelectorAll('.nav-tab').forEach(btn => {
-            btn.className = 'nav-tab';
-            if (btn.id === `tab-${tabName}`) {
-                btn.classList.add('active');
-            }
+    function switchTab(name) {
+        activeTabName = name;
+        const cfg = tabConfig[name];
+        document.querySelectorAll('.nav-tab').forEach(b => {
+            b.classList.remove('active');
+            if(b.id === `tab-${name}`) b.classList.add('active');
         });
+        document.getElementById('symbol-input').placeholder = cfg.placeholder;
+        document.getElementById('symbol-input').value = "";
 
-        document.getElementById("symbol-input").placeholder = config.placeholder;
-        document.getElementById("ticker-label").textContent = config.label;
-        document.getElementById("symbol-input").value = "";
+        // Show/Hide Options Inputs
+        if(name==='OPTIONS') document.getElementById('options-inputs').classList.remove('hidden');
+        else document.getElementById('options-inputs').classList.add('hidden');
 
-        // Clear tokens when switching
-        document.getElementById("selected-token").value = "";
-        document.getElementById("selected-exchange").value = "";
-
-        renderExtraInputs(config.extraInputs);
-        renderStyles(config.styles);
-
-        document.getElementById("results-view").classList.add("hidden");
-        document.getElementById("placeholder-view").classList.remove("hidden");
-
-        document.getElementById("search-results").innerHTML = "";
-        document.getElementById("search-results").classList.remove("active");
-        document.getElementById("search-results").style.opacity = "0";
-    }
-
-    function renderExtraInputs(inputs) {
-        const container = document.getElementById('tab-specific-inputs');
-        container.innerHTML = '';
-        if(!inputs.length) return;
-
-        const grid = document.createElement('div');
-        grid.className = 'grid grid-cols-2 gap-3 mb-6';
-
-        inputs.forEach(f => {
-            const wrap = document.createElement('div');
-            const lbl = document.createElement('label');
-            lbl.className = 'text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1';
-            lbl.textContent = f.label;
-
-            let el;
-            if(f.type === 'select') {
-                el = document.createElement('select');
-                el.className = 'input-container w-full px-4 py-3 text-sm font-bold text-white bg-[#0b1121] outline-none';
-                f.options.forEach(o => {
-                    const opt = document.createElement('option');
-                    opt.value = o; opt.textContent = o; el.appendChild(opt);
-                });
-            } else {
-                el = document.createElement('input');
-                el.type = f.type;
-                el.className = 'input-container w-full px-4 py-3 text-sm font-bold text-white bg-[#0b1121] outline-none placeholder-slate-700';
-                if(f.placeholder) el.placeholder = f.placeholder;
-            }
-            el.id = f.id;
-            wrap.appendChild(lbl); wrap.appendChild(el); grid.appendChild(wrap);
-        });
-        container.appendChild(grid);
+        renderStyles(cfg.styles);
+        document.getElementById('results-view').classList.add('hidden');
+        document.getElementById('placeholder-view').classList.remove('hidden');
     }
 
     function renderStyles(styles) {
@@ -557,320 +343,190 @@
         styles.forEach(s => {
             const btn = document.createElement('button');
             btn.className = 'flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition text-slate-500 hover:text-white';
-            if(s === document.getElementById('current-style').value) {
-                btn.classList.add('bg-slate-800', 'text-white', 'shadow-lg', 'border', 'border-slate-700');
-            }
+            if(s === document.getElementById('current-style').value) btn.classList.add('bg-slate-800', 'text-white', 'border', 'border-slate-700');
             btn.textContent = s.replace('_', ' ');
-            btn.onclick = (e) => {
-                e.preventDefault();
-                document.getElementById('current-style').value = s;
-                renderStyles(styles);
-            };
+            btn.onclick = (e) => { e.preventDefault(); document.getElementById('current-style').value = s; renderStyles(styles); };
             c.appendChild(btn);
         });
     }
 
-    // --- HELPER: ROUND TO TICK SIZE ---
-    function roundToTick(price) {
-        if (!price) return "0.00";
-        const val = parseFloat(price);
-        if (activeTabName === 'CRYPTO') return val.toFixed(2);
-        // NSE Tick Size is 0.05
-        return (Math.round(val * 20) / 20).toFixed(2);
-    }
-
-    // --- QUANT HORIZON CALCULATOR ---
-    function calculateDynamicHorizon(style, score, trend, volatility) {
-        let baseHours = 0;
-
-        if (activeTabName === 'CRYPTO') {
-            baseHours = (style === 'INTRADAY') ? 8 : 120;
-        } else {
-            baseHours = (style === 'INTRADAY') ? 6 : (style === 'LONG_TERM' ? 720 : 72);
-        }
-
-        const momentum = (score + Math.abs(trend)) / 100;
-        const volFactor = (volatility === 'HIGH') ? 1.2 : (volatility === 'LOW') ? 0.8 : 1.0;
-        let estimatedHours = baseHours / (momentum * volFactor);
-
-        if (style === 'INTRADAY') {
-            estimatedHours = Math.max(1, Math.min(estimatedHours, 6));
-            const h = Math.floor(estimatedHours);
-            const m = Math.round((estimatedHours - h) * 60);
-            return `~${h}H ${m}M (SESSION)`;
-        } else if (style === 'LONG_TERM') {
-            const days = estimatedHours / 24;
-            if (days > 20) return `~${(days/30).toFixed(1)} MONTHS`;
-            return `~${days.toFixed(1)} DAYS`;
-        } else {
-            const days = estimatedHours / 24;
-            return `~${days.toFixed(1)} DAYS (POSITIONAL)`;
-        }
-    }
-
-    async function runAnalysis() {
-        const symbol = document.getElementById("symbol-input").value;
-        const style = document.getElementById("current-style").value;
-        const token = document.getElementById("selected-token").value;
-        const exchange = document.getElementById("selected-exchange").value;
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-
-        if (!symbol) return showError("Please enter a ticker.");
-
-        const btn = document.querySelector('.btn-primary');
-        const ogText = btn.innerHTML;
-        btn.innerHTML = `PROCESSING...`;
-        btn.disabled = true;
-
-        try {
-            const res = await fetch("/api/analyze/market/", {
-                method: 'POST',
-                headers:{ 'Content-Type':'application/json', 'X-CSRFToken': csrfToken },
-                body:JSON.stringify({ symbol, token, exchange, trade_style: style, market_type: activeTabName })
-            });
-            const data = await res.json();
-            if(data.error) throw new Error(data.error);
-
-            // --- UI POPULATION ---
-            document.getElementById("placeholder-view").classList.add("hidden");
-            document.getElementById("results-view").classList.remove("hidden");
-
-            document.getElementById("res-market").innerText = activeTabName;
-            document.getElementById("res-symbol").innerText = data.symbol;
-            document.getElementById("res-score").innerText = parseFloat(data.score).toFixed(1) + "%";
-
-            // CONTEXT-AWARE LABELS AND TOOLTIPS
-            if(activeTabName === 'OPTIONS') {
-                document.getElementById("lbl-1").innerText = "STRIKE";
-                document.getElementById("res-1").innerText = data.extras.opt_strategy || "ATM";
-                document.getElementById("tip-1").innerText = "Selected option strike based on trend strength and moneyness.";
-
-                document.getElementById("lbl-2").innerText = "THETA RISK";
-                document.getElementById("res-2").innerText = data.extras.theta_risk || "MODERATE";
-                document.getElementById("tip-2").innerText = "Impact of time decay on premium. Higher is worse for buyers.";
-
-                document.getElementById("lbl-3").innerText = "IV REGIME";
-                document.getElementById("res-3").innerText = data.volatility_regime;
-                document.getElementById("tip-3").innerText = "Current Implied Volatility level. High IV favors selling options.";
-
-                document.getElementById("lbl-4").innerText = "DIRECTION";
-                document.getElementById("res-4").innerText = data.direction;
-                document.getElementById("tip-4").innerText = "Overall directional bias for the underlying asset.";
-            }
-            else if(activeTabName === 'CRYPTO') {
-                document.getElementById("lbl-1").innerText = "ENTRY";
-                document.getElementById("res-1").innerText = roundToTick(data.entry);
-                document.getElementById("tip-1").innerText = "Suggested entry zone based on current support levels.";
-
-                document.getElementById("lbl-2").innerText = "TARGET";
-                document.getElementById("res-2").innerText = roundToTick(data.target);
-                document.getElementById("tip-2").innerText = "Projected take profit level derived from volatility expansion.";
-
-                document.getElementById("lbl-3").innerText = "INVALIDATION";
-                document.getElementById("res-3").innerText = roundToTick(data.stop);
-                document.getElementById("tip-3").innerText = "Price level where the trade setup becomes invalid.";
-
-                document.getElementById("lbl-4").innerText = "PHASE";
-                document.getElementById("res-4").innerText = data.extras.market_phase || "NORMAL";
-                document.getElementById("tip-4").innerText = "Current market cycle phase (e.g., Accumulation, Markup).";
-            }
-            else {
-                // Equity & Futures
-                document.getElementById("lbl-1").innerText = "ENTRY";
-                document.getElementById("res-1").innerText = roundToTick(data.entry);
-                document.getElementById("tip-1").innerText = "Optimal entry point identified by technical confluence.";
-
-                document.getElementById("lbl-2").innerText = "TARGET";
-                document.getElementById("res-2").innerText = roundToTick(data.target);
-                document.getElementById("tip-2").innerText = "Calculated exit target based on ATR projection.";
-
-                document.getElementById("lbl-3").innerText = "STOP LOSS";
-                document.getElementById("res-3").innerText = roundToTick(data.stop);
-                document.getElementById("tip-3").innerText = "Risk management level to limit potential downside.";
-
-                document.getElementById("lbl-4").innerText = "HORIZON";
-                document.getElementById("res-4").innerText = calculateDynamicHorizon(style, data.score, data.trend_score, data.volatility_regime);
-                document.getElementById("tip-4").innerText = "Estimated trade duration based on current trend velocity.";
-            }
-
-            document.getElementById("res-label").innerText = "Grade " + (data.signal_quality || "C");
-
-            // Direction Text
-            const act = document.getElementById("res-action");
-            act.innerText = data.direction;
-            if(data.direction === "BUY") act.className = "text-5xl md:text-7xl font-black text-emerald-400";
-            else if(data.direction === "SELL") act.className = "text-5xl md:text-7xl font-black text-red-500";
-            else act.className = "text-5xl md:text-7xl font-black text-slate-400";
-
-            // AI Note
-            document.getElementById("res-comment").innerHTML = data.ai_comment;
-
-            // Factor Bars (Dynamic)
-            const mlEdge = parseFloat(data.ml_edge || 0);
-            const trendScore = parseFloat(data.trend_score || 0);
-
-            // Visual scale logic
-            let visualEdge = 0;
-            if(mlEdge > 50) visualEdge = (mlEdge - 50) * 4;
-            else visualEdge = (50 - mlEdge) * 4;
-            if(visualEdge > 100) visualEdge = 100;
-
-            const trendPct = Math.min(Math.abs(trendScore), 100);
-            const volPct = data.volatility_regime === 'HIGH' ? 85 : 45;
-
-            const fg = document.getElementById("factors-grid");
-            fg.innerHTML = `
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-500 font-bold uppercase tracking-wider">ML EDGE</span>
-                    <div class="flex items-center gap-3">
-                        <div class="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                            <div class="h-full bg-blue-500" style="width: ${visualEdge}%"></div>
-                        </div>
-                        <span class="font-mono text-white font-bold">${mlEdge.toFixed(1)}%</span>
-                    </div>
-                </div>
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-500 font-bold uppercase tracking-wider">TREND</span>
-                    <div class="flex items-center gap-3">
-                        <div class="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                            <div class="h-full ${trendScore > 0 ? 'bg-emerald-500' : 'bg-red-500'}" style="width: ${trendPct}%"></div>
-                        </div>
-                        <span class="font-mono text-white font-bold">${trendScore.toFixed(1)}</span>
-                    </div>
-                </div>
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-500 font-bold uppercase tracking-wider">VOLATILITY</span>
-                    <div class="flex items-center gap-3">
-                        <div class="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                            <div class="h-full bg-purple-500" style="width: ${volPct}%"></div>
-                        </div>
-                        <span class="font-mono text-white font-bold">${data.volatility_regime}</span>
-                    </div>
-                </div>
-            `;
-
-        } catch(e) {
-            showError(e.message);
-        } finally {
-            btn.innerHTML = ogText;
-            btn.disabled = false;
-            lucide.createIcons();
-        }
-    }
-
-    // [KEEP REST OF FUNCTIONS: showError, closeError, handleSearch, runBacktest same as before]
-
-    function showError(msg) { document.getElementById('error-modal').classList.remove('hidden'); }
+    function setOptType(t) { document.getElementById('opt-type').value=t; document.getElementById('btn-CE').classList.toggle('selected', t==='CE'); document.getElementById('btn-PE').classList.toggle('selected', t==='PE'); }
+    function setExpiry(e) { document.getElementById('opt-expiry').value = e; document.getElementById('btn-WEEKLY').classList.toggle('selected', e==='WEEKLY'); document.getElementById('btn-MONTHLY').classList.toggle('selected', e==='MONTHLY'); }
+    function showError(m) { document.getElementById('error-msg').innerText = m; document.getElementById('error-modal').classList.remove('hidden'); }
     function closeError() { document.getElementById('error-modal').classList.add('hidden'); }
 
-    // ... search logic ...
-    let searchTimer;
-    async function handleSearch(q) {
-        // ... (standard logic) ...
-        const box = document.getElementById("search-results");
-        if (q.length < 2) {
-            box.classList.remove('active');
-            box.style.opacity = "0";
-            box.style.visibility = "hidden";
-            setTimeout(() => { box.innerHTML = ""; }, 200);
-            return;
-        }
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(async () => {
-            try {
-                const res = await fetch(`/api/search-symbol/?q=${q}&market_type=${activeTabName}`);
-                const data = await res.json();
-                box.innerHTML = "";
-                if (data.length > 0) {
-                    box.classList.add('active');
-                    box.style.opacity = "1";
-                    box.style.visibility = "visible";
-                    data.forEach(item => {
-                        const div = document.createElement("div");
-                        div.className = "autocomplete-item";
-                        div.innerHTML = `<span class="sym">${item.symbol}</span> <span class="name">${item.name}</span>`;
-                        div.onclick = () => {
-                            document.getElementById("symbol-input").value = item.symbol;
-                            document.getElementById("selected-token").value = item.token;
-                            document.getElementById("selected-exchange").value = item.exchange;
-                            box.classList.remove('active');
-                            box.style.opacity = "0";
-                            box.style.visibility = "hidden";
-                        };
-                        box.appendChild(div);
-                    });
-                } else {
-                    box.classList.remove('active');
-                    box.style.opacity = "0";
-                    box.style.visibility = "hidden";
-                }
-            } catch (e) { box.classList.remove('active'); }
-        }, 200);
-    }
+    async function runAnalysis() {
+        const symbol = document.getElementById('symbol-input').value;
+        if(!symbol) return showError("Enter a ticker symbol.");
 
-    async function runBacktest() {
-        // ... (standard logic) ...
-        const symbol = document.getElementById("symbol-input").value;
-        const token = document.getElementById("selected-token").value;
-        const exchange = document.getElementById("selected-exchange").value;
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-
-        if (!symbol) return showError("Please select a symbol first.");
-
-        const btn = document.querySelector('button[onclick="runBacktest()"]');
-        const ogText = btn.innerHTML;
-        btn.innerHTML = "RUNNING...";
-        btn.disabled = true;
+        const btn = document.getElementById('btn-analyze');
+        btn.innerHTML = "PROCESSING..."; btn.disabled = true;
+        document.getElementById('loading-view').classList.remove('hidden');
 
         try {
             const payload = {
-                symbol, token, exchange,
-                market_type: activeTabName,
-                trade_style: 'SWING'
+                symbol, token: document.getElementById('selected-token').value,
+                market_type: activeTabName, trade_style: document.getElementById('current-style').value,
+                expiry: document.getElementById('opt-expiry').value, strike: document.getElementById('strike-input').value,
+                opt_type: document.getElementById('opt-type').value
             };
-            const res = await fetch("/api/analyze/backtest/", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
+            const res = await fetch('/api/analyze/market/', {
+                method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
             if(data.error) throw new Error(data.error);
 
-            document.getElementById('bt-symbol').innerText = symbol;
-            document.getElementById('bt-win-rate').innerText = parseFloat(data.win_rate || 0).toFixed(1) + "%";
-            document.getElementById('bt-pnl').innerText = parseFloat(data.net_profit_percent || 0).toFixed(2) + "%";
-            document.getElementById('bt-trades').innerText = data.total_trades;
-            document.getElementById('bt-pf').innerText = parseFloat(data.profit_factor || 0).toFixed(2);
-            document.getElementById('bt-dd').innerText = parseFloat(data.max_drawdown_percent || 0).toFixed(1) + "%";
-            document.getElementById('bt-avg').innerText = parseFloat(data.avg_trade_percent || 0).toFixed(2) + "%";
+            document.getElementById('placeholder-view').classList.add('hidden');
+            document.getElementById('results-view').classList.remove('hidden');
 
-            const modal = document.getElementById('backtest-modal');
-            const content = document.getElementById('backtest-content');
-            modal.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                content.classList.remove('scale-95', 'opacity-0');
-                content.classList.add('scale-100', 'opacity-100');
-            });
-        } catch(e) {
-            showError(e.message);
-        } finally {
-            btn.innerHTML = ogText;
-            btn.disabled = false;
+            // Header
+            document.getElementById('res-symbol').innerText = data.symbol;
+            document.getElementById('res-market').innerText = activeTabName;
+            document.getElementById('res-score').innerText = Math.round(data.score) + "%";
+
+            // COLOR CODED BIAS & LABEL
+            const act = document.getElementById('res-action');
+            const label = document.getElementById('res-label');
+            act.innerText = data.direction;
+
+            // Responsive text sizing for Action
+            let actionClasses = "text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter drop-shadow-2xl ";
+
+            if(data.direction.includes('BULL') || data.direction.includes('BUY')) {
+                act.className = actionClasses + "text-emerald-400";
+                label.innerText = "Bullish Bias";
+                label.className = "text-xs font-bold text-emerald-500 uppercase tracking-widest mt-2";
+            } else if(data.direction.includes('BEAR') || data.direction.includes('SELL')) {
+                act.className = actionClasses + "text-red-500";
+                label.innerText = "Bearish Bias";
+                label.className = "text-xs font-bold text-red-500 uppercase tracking-widest mt-2";
+            } else {
+                act.className = actionClasses + "text-slate-400";
+                label.innerText = "Neutral Bias";
+                label.className = "text-xs font-bold text-slate-500 uppercase tracking-widest mt-2";
+            }
+
+            // Labels
+            const cfg = tabConfig[activeTabName];
+            [1,2,3,4].forEach(i => document.getElementById(`lbl-${i}`).innerText = cfg.labels[i-1]);
+
+            // Metrics
+            const ex = data.extras || {};
+            if(activeTabName === 'OPTIONS') {
+                document.getElementById('res-1').innerText = ex.ltp_info?.ltp || "0.00";
+                document.getElementById('res-2').innerText = ex.target_premium || "0.00";
+                document.getElementById('res-3').innerText = ex.theta_risk || "MODERATE";
+                document.getElementById('res-4').innerText = ex.strike || "--";
+            } else {
+                document.getElementById('res-1').innerText = data.entry?.toFixed(2);
+                document.getElementById('res-2').innerText = data.target?.toFixed(2);
+                document.getElementById('res-3').innerText = data.stop?.toFixed(2);
+                document.getElementById('res-4').innerText = (activeTabName==='CRYPTO' && ex.liquidity_grab_risk) ? ex.liquidity_grab_risk : "NORMAL";
+            }
+
+            // SIGNAL STRIP LOGIC
+            const liq = (ex.liquidity_grab_risk === 'HIGH') ? 33 : 0;
+            const stop = (ex.stop_run_risk === 'HIGH') ? 33 : 0;
+            const whale = (ex.whale_activity_z > 2) ? 33 : 0;
+
+            document.getElementById('bar-liq').style.width = liq + "%";
+            document.getElementById('bar-stop').style.width = stop + "%";
+            document.getElementById('bar-whale').style.width = whale + "%";
+
+            const totalRisk = liq + stop + whale;
+            const rt = document.getElementById('risk-text');
+            if(totalRisk > 60) { rt.innerText = "CRITICAL"; rt.className = "text-[9px] font-bold text-red-500"; }
+            else if(totalRisk > 30) { rt.innerText = "ELEVATED"; rt.className = "text-[9px] font-bold text-orange-500"; }
+            else { rt.innerText = "NORMAL"; rt.className = "text-[9px] font-bold text-emerald-500"; }
+
+            // Comment
+            document.getElementById('res-comment').innerHTML = data.ai_comment;
+
+            // Factor Breakdown (RESTORED)
+            const mlEdge = parseFloat(data.ml_edge || 50);
+            let visualEdge = Math.max(0, (mlEdge - 50) * 4); if (mlEdge < 50) visualEdge = Math.max(0, (50 - mlEdge) * 4);
+            const trendScore = parseFloat(data.trend_score || 0);
+
+            document.getElementById("factors-grid").innerHTML = `
+                <div class="flex justify-between items-center text-xs"><span class="text-slate-500 font-bold uppercase tracking-wider">ML EDGE</span><div class="flex items-center gap-3"><div class="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800"><div class="h-full bg-blue-500" style="width: ${visualEdge}%"></div></div><span class="font-mono text-white font-bold">${mlEdge.toFixed(1)}%</span></div></div>
+                <div class="flex justify-between items-center text-xs"><span class="text-slate-500 font-bold uppercase tracking-wider">TREND</span><div class="flex items-center gap-3"><div class="w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800"><div class="h-full ${trendScore>0?'bg-emerald-500':'bg-red-500'}" style="width: ${Math.min(Math.abs(trendScore), 100)}%"></div></div><span class="font-mono text-white font-bold">${trendScore.toFixed(1)}</span></div></div>
+                <div class="flex justify-between items-center text-xs"><span class="text-slate-500 font-bold uppercase tracking-wider">VOLATILITY</span><div class="flex items-center gap-3"><span class="font-mono text-white font-bold">${data.volatility_regime}</span></div></div>
+            `;
+
+        } catch(e) { showError(e.message); } finally {
+            document.getElementById('loading-view').classList.add('hidden');
+            btn.innerHTML = "RUN ENGINE"; btn.disabled = false;
+            try { lucide.createIcons(); } catch(e){}
         }
     }
 
+    async function runBacktest() {
+        const symbol = document.getElementById('symbol-input').value;
+        if(!symbol) return showError("Enter symbol first.");
+        const btn = document.getElementById('btn-backtest');
+        btn.innerHTML = "SIMULATING..."; btn.disabled = true;
+        try {
+            const payload = { symbol, token: document.getElementById('selected-token').value, market_type: activeTabName, trade_style: document.getElementById('current-style').value };
+            const res = await fetch('/api/analyze/backtest/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken':document.querySelector('[name=csrfmiddlewaretoken]').value}, body:JSON.stringify(payload) });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            // Using IDs from your pasted HTML code
+            document.getElementById('bt-winrate').innerText = (data.win_rate||0) + "%";
+            document.getElementById('bt-pnl').innerText = (data.net_profit_percent||0).toFixed(1) + "%";
+            document.getElementById('bt-pnl').className = `text-2xl font-mono font-bold ${(data.net_profit_percent>=0)?'text-emerald-400':'text-red-400'}`;
+            document.getElementById('bt-dd').innerText = (data.max_drawdown_percent||0).toFixed(1) + "%";
+            document.getElementById('bt-trades').innerText = data.total_trades||0;
+            document.getElementById('bt-pf').innerText = (data.profit_factor||0).toFixed(2);
+            document.getElementById('bt-avg').innerText = (data.avg_trade_percent||0).toFixed(2) + "%";
+
+            const m = document.getElementById('backtest-modal');
+            const c = document.getElementById('backtest-content');
+            m.classList.remove('hidden');
+            setTimeout(() => { c.classList.remove('scale-95','opacity-0'); c.classList.add('scale-100','opacity-100'); }, 10);
+        } catch(e) { showError(e.message); } finally { btn.innerHTML = "VALIDATE STRATEGY"; btn.disabled = false; }
+    }
+
     function closeBacktest() {
-        const modal = document.getElementById('backtest-modal');
-        const content = document.getElementById('backtest-content');
-        content.classList.remove('scale-100', 'opacity-100');
-        content.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        const m = document.getElementById('backtest-modal');
+        const c = document.getElementById('backtest-content');
+        c.classList.remove('scale-100','opacity-100'); c.classList.add('scale-95','opacity-0');
+        setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    // Search
+    let searchTimer;
+    async function handleSearch(q) {
+        document.getElementById("selected-token").value = "";
+        const box = document.getElementById("search-results");
+        if (q.length < 2) { box.classList.remove('active'); return; }
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/search-symbol/?q=${encodeURIComponent(q)}&market_type=${activeTabName}`);
+                const data = await res.json();
+                box.innerHTML = "";
+                if (data.length > 0) {
+                    box.classList.add('active');
+                    data.forEach(item => {
+                        const div = document.createElement("div");
+                        div.className = "autocomplete-item";
+                        div.innerHTML = `<span class="font-bold text-white">${item.symbol}</span> <span class="text-xs text-slate-500 ml-2">${item.name||''}</span>`;
+                        div.onclick = () => {
+                            document.getElementById("symbol-input").value = item.symbol;
+                            document.getElementById("selected-token").value = item.token || "";
+                            document.getElementById("selected-exchange").value = item.exchange || "";
+                            box.classList.remove('active');
+                        };
+                        box.appendChild(div);
+                    });
+                } else box.classList.remove('active');
+            } catch (e) { box.classList.remove('active'); }
+        }, 200);
     }
 
     switchTab('EQUITY');
+    try { lucide.createIcons(); } catch(e){}
 </script>
-
 {% endblock %}

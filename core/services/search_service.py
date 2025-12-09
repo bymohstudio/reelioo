@@ -117,3 +117,82 @@ def search_symbols(query: str, market_type: str = "EQUITY", limit: int = 10) -> 
         })
 
     return final
+
+
+# ============================================================
+#  FIND SYMBOL TOKEN (MISSING EARLIER — RESTORED NOW)
+# ============================================================
+
+def find_symbol_token(symbol: str) -> str:
+    """
+    Returns SmartAPI instrument token for:
+    - Equity (NSE/BSE)
+    - Index (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY)
+    - Futures (NIFTY25JANFUT)
+    - Options (NIFTY25JAN22500CE)
+    """
+
+    global INSTRUMENTS_DF
+
+    if INSTRUMENTS_DF is None or INSTRUMENTS_DF.empty:
+        load_instruments()
+        if INSTRUMENTS_DF.empty:
+            return None
+
+    s = symbol.strip().upper()
+
+    df = INSTRUMENTS_DF
+
+    # ----------------------------------------------------------
+    #  If exact symbol match exists → BEST case
+    # ----------------------------------------------------------
+    exact = df[df["symbol"] == s]
+    if not exact.empty:
+        return exact.iloc[0]["token"]
+
+    # ----------------------------------------------------------
+    #  Options contract detection (NIFTY25JAN22500CE)
+    # ----------------------------------------------------------
+    if len(s) > 10 and ("CE" in s or "PE" in s):
+        opt = df[
+            (df["symbol"].str.contains(s[:10])) &
+            (df["instrumenttype"].str.contains("OPT"))
+        ]
+        if not opt.empty:
+            return opt.iloc[0]["token"]
+
+    # ----------------------------------------------------------
+    #  Futures detection (NIFTY25JANFUT)
+    # ----------------------------------------------------------
+    if s.endswith("FUT"):
+        fut = df[
+            (df["symbol"].str.contains(s.replace("FUT", ""))) &
+            (df["instrumenttype"].str.contains("FUT"))
+        ]
+        if not fut.empty:
+            return fut.iloc[0]["token"]
+
+    # ----------------------------------------------------------
+    #  Index fallback (FINNIFTY, BANKNIFTY, MIDCPNIFTY)
+    # ----------------------------------------------------------
+    idx_map = {
+        "NIFTY": "NIFTY",
+        "BANKNIFTY": "BANKNIFTY",
+        "FINNIFTY": "FINNIFTY",
+        "MIDCPNIFTY": "MIDCPNIFTY",
+    }
+
+    for key, val in idx_map.items():
+        if key in s:
+            idx = df[df["symbol"] == val]
+            if not idx.empty:
+                return idx.iloc[0]["token"]
+
+    # ----------------------------------------------------------
+    #  Looser match for equities
+    # ----------------------------------------------------------
+    loose = df[df["symbol"].str.contains(s)]
+    if not loose.empty:
+        return loose.iloc[0]["token"]
+
+    return None

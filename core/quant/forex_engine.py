@@ -1,70 +1,120 @@
+# core/quant/ml_training/feature_engineering.py
+
 from __future__ import annotations
-from typing import Dict, Any
 import numpy as np
 import pandas as pd
 
-from .base_engine import (
-    SignalResult, STYLE_CONFIG, _safe_last, _pick_style,
-    compute_basic_ohlc_aliases, compute_atr, compute_rsi,
-    expected_bars_to_target, format_time_window, Direction
-)
+# --- SINGLE SOURCE OF TRUTH ---
+# This list must match indicators.py EXACTLY.
+FEATURES = [
+    "open", "high", "low", "close", "volume",
+    "ret_1", "ret_3", "ret_5", "ret_10",
+    "vol_10", "vol_20",
+    "ma_10", "ma_20", "ma_50",
+    "close_over_ma20", "close_over_ma50",
+    "atr_14", "rsi_14",
+    "body_to_range", "upper_wick", "lower_wick",
+    "vol_zscore_20"
+]
 
-class ForexQuantEngine:
-    MODEL_VERSION = "forex_v1.0"
+
+class FeatureEngineering:
+    DEFAULT_LOOKAHEAD = 5
 
     @classmethod
-    def run(cls, df: pd.DataFrame, symbol: str, trade_style: str | None = None) -> SignalResult:
-        if df is None or df.empty: raise ValueError("Empty Data")
-        style = _pick_style(trade_style)
-        df = compute_basic_ohlc_aliases(df)
-        close = _safe_last(df["Close"])
-        
-        # Forex typically mean reverts on shorter frames
-        rsi = _safe_last(compute_rsi(df["Close"], 14))
-        bb_mean = _safe_last(df["Close"].rolling(20).mean())
-        
-        # Scoring
-        score = 50.0
-        if close > bb_mean:
-            if rsi > 70: score = 40.0 # Reversion Short
-            elif rsi > 50: score = 70.0 # Trend Continuation Long
+    def build(cls, raw_df: pd.DataFrame, horizon: int | None = None) -> pd.DataFrame:
+        if raw_df is None or raw_df.empty:
+            return pd.DataFrame()
+
+        horizon = horizon or cls.DEFAULT_LOOKAHEAD
+        df = cls._normalize_ohlc(raw_df)
+        if df.empty: return pd.DataFrame()
+
+        # 1. Generate Features
+        df = cls._add_features(df)
+
+        # 2. Add Target (Training only)
+        if "close" in df.columns:
+            future_close = df["close"].shift(-horizon)
+            df["target"] = (future_close > df["close"]).astype(int)
+
+        # 3. Filter Columns
+        cols_to_keep = [f for f in FEATURES if f in df.columns]
+        if "target" in df.columns:
+            cols_to_keep.append("target")
+
+        return df[cols_to_keep].dropna()
+
+    @staticmethod
+    def _normalize_ohlc(raw_df: pd.DataFrame) -> pd.DataFrame:
+        df = raw_df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [str(c[0]).lower() if isinstance(c, tuple) else str(c).lower() for c in df.columns]
         else:
-            if rsi < 30: score = 60.0 # Reversion Long
-            elif rsi < 50: score = 30.0 # Trend Continuation Short
-            
-        if score >= 60: direction, label = "UP", "LONG"
-        elif score <= 40: direction, label = "DOWN", "SHORT"
-        else: direction, label = "FLAT", "WAIT"
-        
-        # Forex Pips Calculation
-        atr = _safe_last(compute_atr(df, 14))
-        if direction == "UP":
-            target = close + atr * 2
-            stop = close - atr
-        elif direction == "DOWN":
-            target = close - atr * 2
-            stop = close + atr
-        else:
-            target, stop = close, close
-            
-        factors = {"rsi": round(rsi, 1), "composite_score": score}
-        
-        return SignalResult(
-            symbol=symbol.upper(),
-            market="FOREX",
-            style=style,
-            model_version=cls.MODEL_VERSION,
-            score=score,
-            direction=direction,
-            label=label,
-            entry=round(close, 5),
-            target=round(target, 5),
-            stop=round(stop, 5),
-            support=round(df.tail(50)["Low"].min(), 5),
-            resistance=round(df.tail(50)["High"].max(), 5),
-            time_frame="Intraday/Swing",
-            expected_bars_to_target=None,
-            expected_time_to_target_hours=None,
-            factors=factors,
-            meta={}
-        )
+            df.columns = [str(c).lower() for c in df.columns]
+
+        rename_map = {}
+        for c in df.columns:
+            if "open" in c:
+                rename_map[c] = "open"
+            elif "high" in c:
+                rename_map[c] = "high"
+            elif "low" in c:
+                rename_map[c] = "low"
+            elif "close" in c:
+                rename_map[c] = "close"
+            elif "vol" in c:
+                rename_map[c] = "volume"
+        df = df.rename(columns=rename_map)
+
+        for c in ["open", "high", "low", "close", "volume"]:
+            if c in df.columns: df[c] = pd.to_numeric(df[c], errors="coerce")
+        return df
+
+    @classmethod
+    def _add_features(cls, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        close = df["close"]
+
+        # Returns
+        df["ret_1"] = close.pct_change(1)
+        df["ret_3"] = close.pct_change(3)
+        df["ret_5"] = close.pct_change(5)
+        df["ret_10"] = close.pct_change(10)
+
+        # Volatility
+        df["vol_10"] = df["ret_1"].rolling(10).std()
+        df["vol_20"] = df["ret_1"].rolling(20).std()
+
+        # Trends
+        df["ma_10"] = close.rolling(10).mean()
+        df["ma_20"] = close.rolling(20).mean()
+        df["ma_50"] = close.rolling(50).mean()
+
+        df["close_over_ma20"] = (close / df["ma_20"]) - 1
+        df["close_over_ma50"] = (close / df["ma_50"]) - 1
+
+        # ATR & Candle
+        if "high" in df.columns and "low" in df.columns:
+            tr1 = df["high"] - df["low"]
+            tr2 = (df["high"] - close.shift(1)).abs()
+            tr3 = (df["low"] - close.shift(1)).abs()
+            df["atr_14"] = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).rolling(14).mean()
+
+            rng = (df["high"] - df["low"]).replace(0, np.nan)
+            df["body_to_range"] = (close - df["open"]).abs() / rng
+            df["upper_wick"] = (df["high"] - df[["open", "close"]].max(axis=1)) / rng
+            df["lower_wick"] = (df[["open", "close"]].min(axis=1) - df["low"]) / rng
+
+        # RSI
+        delta = close.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        rs = gain / loss.replace(0, 1e-9)
+        df["rsi_14"] = 100 - (100 / (1 + rs))
+
+        # Volume Z
+        if "volume" in df.columns:
+            df["vol_zscore_20"] = (df["volume"] - df["volume"].rolling(20).mean()) / df["volume"].rolling(20).std()
+
+        return df
