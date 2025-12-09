@@ -1,5 +1,5 @@
 {% extends "core/base.html" %}
-{% block title %}Reelioo | AI Quant Terminal{% endblock %}
+{% block title %}Reelioo V2 | Institutional Terminal{% endblock %}
 
 {% block content %}
 
@@ -58,8 +58,8 @@
                 <button onclick="switchTab('CRYPTO')" id="tab-CRYPTO" class="nav-tab">CRYPTO</button>
             </div>
 
-            <!-- Responsive Grid: 1 col on mobile, 12 on desktop -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Responsive Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
                 <!-- INPUTS -->
                 <div class="lg:col-span-4 space-y-6">
                     <div class="relative">
@@ -140,7 +140,7 @@
                                     <span id="res-market" class="text-[9px] font-bold bg-slate-800 px-2 py-0.5 rounded text-slate-400">MARKET</span>
                                     <span id="res-symbol" class="text-[10px] font-bold text-slate-500 tracking-widest">SYMBOL</span>
                                 </div>
-                                <!-- Dynamic Responsive Text Size -->
+                                <!-- ACTION (BUY/SELL/HOLD) -->
                                 <h2 id="res-action" class="text-5xl md:text-6xl lg:text-7xl font-black text-white tracking-tighter">--</h2>
                                 <p id="res-label" class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Neutral Bias</p>
                             </div>
@@ -150,7 +150,7 @@
                             </div>
                         </div>
 
-                        <!-- METRICS: Grid 2 on mobile, 4 on desktop -->
+                        <!-- METRICS: 2 cols on mobile, 4 on desktop -->
                         <div class="grid grid-cols-2 md:grid-cols-4 border-b border-white/5 divide-y md:divide-y-0 divide-x divide-white/5">
                             <div class="p-4"><p id="lbl-1" class="text-[9px] font-bold text-slate-500 uppercase">Entry</p><p id="res-1" class="text-lg font-mono font-bold text-blue-400 mt-1">--</p></div>
                             <div class="p-4"><p id="lbl-2" class="text-[9px] font-bold text-slate-500 uppercase">Target</p><p id="res-2" class="text-lg font-mono font-bold text-emerald-400 mt-1">--</p></div>
@@ -196,7 +196,7 @@
         </div>
     </div>
 
-    <!-- PREMIUM MARKETING SECTION (RESTORED) -->
+    <!-- PREMIUM MARKETING SECTION -->
     <div class="mt-24 mb-24 relative">
         <div class="grid md:grid-cols-3 gap-8 relative z-10">
             <div class="group p-8 rounded-3xl bg-slate-900/40 border border-white/5 hover:border-blue-500/30 transition duration-500 hover:bg-slate-900/60 hover:shadow-2xl hover:shadow-blue-500/10">
@@ -264,7 +264,7 @@
         <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 hover:border-emerald-500/30 transition">
                 <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Win Rate</p>
-                <p id="bt-winrate" class="text-2xl font-mono font-bold text-emerald-400">--%</p>
+                <p id="bt-win-rate" class="text-2xl font-mono font-bold text-emerald-400">--%</p>
             </div>
             <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 hover:border-blue-500/30 transition">
                 <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Net Profit</p>
@@ -388,24 +388,32 @@
             // COLOR CODED BIAS & LABEL
             const act = document.getElementById('res-action');
             const label = document.getElementById('res-label');
-            act.innerText = data.direction;
 
-            // Responsive text sizing for Action
-            let actionClasses = "text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter drop-shadow-2xl ";
+            const rawDir = (data.direction || "").toUpperCase();
+            let displayAction = "HOLD";
+            let actionColorClass = "text-slate-400";
+            let labelText = "Neutral Bias";
+            let labelColorClass = "text-slate-500";
 
-            if(data.direction.includes('BULL') || data.direction.includes('BUY')) {
-                act.className = actionClasses + "text-emerald-400";
-                label.innerText = "Bullish Bias";
-                label.className = "text-xs font-bold text-emerald-500 uppercase tracking-widest mt-2";
-            } else if(data.direction.includes('BEAR') || data.direction.includes('SELL')) {
-                act.className = actionClasses + "text-red-500";
-                label.innerText = "Bearish Bias";
-                label.className = "text-xs font-bold text-red-500 uppercase tracking-widest mt-2";
-            } else {
-                act.className = actionClasses + "text-slate-400";
-                label.innerText = "Neutral Bias";
-                label.className = "text-xs font-bold text-slate-500 uppercase tracking-widest mt-2";
+            if(rawDir.includes('BULL') || rawDir.includes('BUY')) {
+                displayAction = "BUY";
+                actionColorClass = "text-emerald-400";
+                labelText = "Bullish Bias";
+                labelColorClass = "text-emerald-500";
+            } else if(rawDir.includes('BEAR') || rawDir.includes('SELL')) {
+                displayAction = "SELL";
+                actionColorClass = "text-red-500";
+                labelText = "Bearish Bias";
+                labelColorClass = "text-red-500";
             }
+
+            act.innerText = displayAction;
+            // Responsive text sizes
+            let baseClasses = "text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter drop-shadow-2xl ";
+            act.className = baseClasses + actionColorClass;
+
+            label.innerText = labelText;
+            label.className = `text-xs font-bold uppercase tracking-widest mt-2 ${labelColorClass}`;
 
             // Labels
             const cfg = tabConfig[activeTabName];
@@ -473,7 +481,7 @@
             if(data.error) throw new Error(data.error);
 
             // Using IDs from your pasted HTML code
-            document.getElementById('bt-winrate').innerText = (data.win_rate||0) + "%";
+            document.getElementById('bt-win-rate').innerText = (data.win_rate||0) + "%";
             document.getElementById('bt-pnl').innerText = (data.net_profit_percent||0).toFixed(1) + "%";
             document.getElementById('bt-pnl').className = `text-2xl font-mono font-bold ${(data.net_profit_percent>=0)?'text-emerald-400':'text-red-400'}`;
             document.getElementById('bt-dd').innerText = (data.max_drawdown_percent||0).toFixed(1) + "%";
