@@ -1,97 +1,152 @@
+# core/quant/ml_training/fetch_data.py
+
+import os
 import pandas as pd
-import yfinance as yf
+import datetime
+import time
+import logging
+from SmartApi import SmartConnect
+import pyotp
+from dotenv import load_dotenv
 
-# -------------------------------
-# CLEAN YAHOO OHLC DATA (patched)
-# -------------------------------
-def _clean_yahoo_df(df):
-    if df is None or df.empty:
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("TrainData")
+
+
+class SmartTrainSession:
+    _instance = None
+    _instruments = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SmartTrainSession, cls).__new__(cls)
+            cls._instance.client = None
+            cls._instance._login()
+            cls._instance._load_instruments()
+        return cls._instance
+
+    def _login(self):
+        try:
+            api_key = os.environ.get("SMART_HIST_API_KEY") or os.environ.get("SMART_API_KEY")
+            client_id = os.environ.get("SMART_CLIENT_ID")
+            mpin = os.environ.get("SMART_PASSWORD")
+            totp_key = os.environ.get("SMART_TOTP_KEY")
+
+            if not (api_key and client_id and mpin and totp_key):
+                return
+
+            self.client = SmartConnect(api_key=api_key)
+            totp = pyotp.TOTP(totp_key).now()
+            data = self.client.generateSession(client_id, mpin, totp)
+
+            if data and data.get("status"):
+                log.info("✅ SmartAPI Connected")
+            else:
+                self.client = None
+        except Exception as e:
+            self.client = None
+
+    def _load_instruments(self):
+        csv_path = os.path.join(os.getcwd(), "instruments.csv")
+        if not os.path.exists(csv_path): return
+        try:
+            df = pd.read_csv(csv_path, usecols=["symbol", "token", "exch_seg", "name"], dtype=str)
+            self._instruments = df
+        except Exception:
+            pass
+
+    def get_token(self, symbol, exchange="NSE"):
+        if self._instruments is None: return None
+        subset = self._instruments[self._instruments["exch_seg"] == exchange]
+        match = subset[subset["symbol"] == symbol]
+        if not match.empty: return match.iloc[0]["token"]
+        match = subset[subset["symbol"].str.contains(symbol)]
+        if not match.empty: return match.iloc[0]["token"]
         return None
 
-    df = df.copy()
 
-    # 1. Flatten MultiIndex safely
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [
-            "_".join([str(x) for x in col if x]).strip("_")
-            for col in df.columns
-        ]
-
-    # 2. Lowercase the column names
-    df.columns = [str(c).lower() for c in df.columns]
-
-    # 3. If dataframe still contains datetime columns, drop them
-    for col in df.columns:
-        if "date" in col or df[col].dtype == "datetime64[ns]":
-            df = df.drop(columns=[col], errors="ignore")
-
-    # 4. Map the common OHLC names
-    rename_map = {}
-    for col in df.columns:
-        if "open" in col: rename_map[col] = "open"
-        if "high" in col: rename_map[col] = "high"
-        if "low" in col: rename_map[col] = "low"
-        if "close" in col: rename_map[col] = "close"
-        if "volume" in col: rename_map[col] = "volume"
-
-    df = df.rename(columns=rename_map)
-
-    # 5. Keep only valid OHLCV
-    keep = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
-    if not keep:
-        print("[CLEAN] ERROR: No usable OHLC columns after cleaning")
-        return None
-
-    df = df[keep].dropna()
-
-    if df.empty:
-        return None
-
-    return df.reset_index(drop=True)
-
-
-# -------------------------------
-# YAHOO FETCHERS
-# -------------------------------
-def fetch_equity_yahoo(symbol: str, days: int = 365):
-    ticker = f"{symbol}.NS"
-    print(f"[ML] Yahoo fetch → {ticker}")
-    df = yf.download(ticker, period=f"{days}d", interval="1d")
-    return _clean_yahoo_df(df)
-
-
-def fetch_index_yahoo(symbol: str, days: int = 365):
-    ticker = "^NSEI" if symbol.upper() == "NIFTY" else "^NSEBANK"
-    print(f"[ML] Yahoo fetch → {ticker}")
-    df = yf.download(ticker, period=f"{days}d", interval="1d")
-    return _clean_yahoo_df(df)
-
-
-def fetch_crypto_yahoo(days: int = 365):
-    print("[ML] Yahoo fetch → BTC-INR")
-    df = yf.download("BTC-INR", period=f"{days}d", interval="1d")
-    return _clean_yahoo_df(df)
-
-
-# -------------------------------
-# Main DataFetcher
-# -------------------------------
 class DataFetcher:
 
     @staticmethod
-    def fetch(symbol: str, market: str, days: int = 365):
-        market = market.upper()
+    def fetch(symbol: str, market: str, days: int = 730):
+        # 1. FORCE YAHOO FOR INDICES (Most reliable for training history)
+        if symbol in ["NIFTY", "BANKNIFTY"]:
+            return DataFetcher.fetch_yahoo(symbol, days)
 
-        if market == "EQUITY":
-            return fetch_equity_yahoo(symbol, days)
-
-        if market == "FUTURES":
-            return fetch_index_yahoo(symbol, days)
-
-        if market == "OPTIONS":
-            return fetch_index_yahoo(symbol, days)
+        # 2. Try SmartAPI for Stocks
+        session = SmartTrainSession()
+        exchange = "NSE"
 
         if market == "CRYPTO":
-            return fetch_crypto_yahoo(days)
+            return DataFetcher.fetch_yahoo(symbol, days)
 
-        raise ValueError(f"Unknown market type: {market}")
+        token = session.get_token(symbol, exchange)
+
+        if session.client and token:
+            try:
+                log.info(f"⬇ SmartAPI: {symbol}...")
+                to_date = datetime.datetime.now()
+                from_date = to_date - datetime.timedelta(days=days)
+
+                params = {
+                    "exchange": exchange,
+                    "symboltoken": token,
+                    "interval": "ONE_DAY",
+                    "fromdate": from_date.strftime("%Y-%m-%d %H:%M"),
+                    "todate": to_date.strftime("%Y-%m-%d %H:%M")
+                }
+
+                res = session.client.getCandleData(params)
+                if res and res.get("data"):
+                    records = []
+                    for r in res["data"]:
+                        records.append({
+                            "timestamp": pd.to_datetime(r[0]),
+                            "open": float(r[1]), "high": float(r[2]), "low": float(r[3]), "close": float(r[4]),
+                            "volume": float(r[5])
+                        })
+                    df = pd.DataFrame(records)
+                    return df[["open", "high", "low", "close", "volume"]]
+            except Exception:
+                pass
+
+        # 3. Fallback
+        return DataFetcher.fetch_yahoo(symbol, days)
+
+    @staticmethod
+    def fetch_yahoo(symbol, days):
+        import yfinance as yf
+        try:
+            ticker = f"{symbol}.NS"
+            if symbol == "NIFTY": ticker = "^NSEI"
+            if symbol == "BANKNIFTY": ticker = "^NSEBANK"
+            if "INR" in symbol: ticker = symbol  # Crypto
+
+            print(f"  > Yahoo Fetch: {ticker}")
+            df = yf.download(ticker, period=f"{days}d", interval="1d", progress=False, auto_adjust=True)
+
+            if df.empty: return None
+
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df.columns]
+            else:
+                df.columns = [c.lower() for c in df.columns]
+
+            rename = {}
+            for c in df.columns:
+                if "open" in c:
+                    rename[c] = "open"
+                elif "high" in c:
+                    rename[c] = "high"
+                elif "low" in c:
+                    rename[c] = "low"
+                elif "close" in c:
+                    rename[c] = "close"
+                elif "vol" in c:
+                    rename[c] = "volume"
+            df = df.rename(columns=rename)
+            return df
+        except Exception:
+            return None
