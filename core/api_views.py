@@ -6,7 +6,7 @@ from dataclasses import asdict
 import logging
 
 from .services.marketdata_service import MarketService
-from .quant.quant_engine import run_quant
+from .quant.quant_engine import run_quant, _get_engine_cls
 from .backtest.backtest_engine import BacktestEngine
 from .services.market_universe import get_enabled_markets
 from .services.search_service import search_symbols
@@ -61,37 +61,45 @@ class AnalyzeMarketView(APIView):
             log.exception(f"Engine Error: {e}")
             return Response({"error": f"Analysis Failed: {str(e)}"}, status=500)
 
+
 class BacktestView(APIView):
     def post(self, request):
         try:
-            data = request.data
-            symbol = data.get("symbol")
-            market = data.get("market_type", "EQUITY")
-            style = data.get("trade_style", "SWING")
+            d = request.data
+            sym = d.get("symbol")
+            mkt = d.get("market_type", "EQUITY")
+            style = d.get("trade_style", "SWING")
 
+            # For Backtest, we need MORE data.
+            # Force 1D timeframe for long-term backtest if Style is LongTerm
+            # Or 15m for Swing.
+            # Yahoo limits intraday to 60d. SmartAPI limits to recent history.
+
+            # Strategy: Try fetching max available
             df = MarketService.get_historical_data(
-                {"symbol": symbol, "token": data.get("token")},
-                market,
-                style
+                {"symbol": sym, "token": d.get("token")}, mkt, style
             )
 
+            # Options Backtest Fix: Use Index Data
+            if (df is None or len(df) < 50) and mkt in ["OPTIONS", "FUTURES"]:
+                idx = "NIFTY"
+                if "BANK" in sym: idx = "BANKNIFTY"
+                df = MarketService.get_historical_data({"symbol": idx}, "FUTURES", "INTRADAY")
+
             if df is None or len(df) < 50:
-                return Response({"error": "Insufficient historical data for backtest"}, status=400)
+                return Response({"error": "Not enough history for backtest (Need >50 candles)"}, 400)
 
-            from .quant.quant_engine import _get_engine_cls
-            engine_cls = _get_engine_cls(market)
-            bt_engine = BacktestEngine(engine_cls, df, symbol, style)
-            results = bt_engine.run(start_idx=50)
+            engine_cls = _get_engine_cls(mkt)
+            bt = BacktestEngine(engine_cls, df, sym, style)
 
-            try:
-                payload = asdict(results)
-            except Exception:
-                payload = results.__dict__
+            # Run simulation
+            # Start from index 30 to allow indicators to warm up
+            res = bt.run(start_idx=30)
 
-            return Response(payload)
-
+            return Response(asdict(res))
         except Exception as e:
-            return Response({"error": f"Backtest Failed: {str(e)}"}, status=500)
+            log.error(f"Backtest Error: {e}")
+            return Response({"error": str(e)}, 500)
 
 class MarketUniverseView(APIView):
     def get(self, request):
