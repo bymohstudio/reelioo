@@ -27,172 +27,123 @@ def load_instruments():
 
     try:
         cols = ["token", "symbol", "name", "exch_seg", "instrumenttype", "expiry"]
-        df = pd.read_csv(csv_path, usecols=lambda c: c in cols, dtype={"token": str})
+        # Force dtype=str to prevent mixed types
+        df = pd.read_csv(csv_path, usecols=lambda c: c in cols, dtype=str)
 
-        # Clean NaN values to prevent JSON serialization crash
+        # CRITICAL FIX: Fill NaN with empty string to prevent boolean indexing crashes
         df = df.fillna("")
 
         # Filter only valid segments
         df = df[df["exch_seg"].isin(["NSE", "BSE", "NFO", "MCX"])]
 
         # Normalize text for searching
-        df["symbol"] = df["symbol"].astype(str).str.upper()
-        df["name"] = df["name"].astype(str).str.upper()
+        df["symbol"] = df["symbol"].str.upper()
+        df["name"] = df["name"].str.upper()
 
-        df["search_text"] = (df["symbol"] + " " + df["name"]).str.upper()
+        df["search_text"] = df["symbol"] + " " + df["name"]
 
         INSTRUMENTS_DF = df
         print(f"✔ Loaded {len(df)} instruments from CSV.")
-
     except Exception as e:
-        print(f"Error loading instruments.csv: {e}")
+        print(f"Error loading instruments: {e}")
         INSTRUMENTS_DF = pd.DataFrame()
+
+
+# Load on startup
+if INSTRUMENTS_DF is None:
+    load_instruments()
 
 
 def search_symbols(query: str, market_type: str = "EQUITY", limit: int = 10) -> List[Dict]:
     """
-    Fully cleaned autosuggestion.
-    Prevents:
-    - Showing indices in equity search
-    - Nan crashes
-    - Wrong matches
+    Fast search for autocomplete.
     """
-    global INSTRUMENTS_DF
+    q = query.upper().strip()
+    if not q: return []
 
+    # --- CRYPTO HANDLING (CoinDCX / WazirX Pairs) ---
+    if market_type == "CRYPTO":
+        # Expanded List of Top Liquid Pairs
+        top_crypto = [
+            "BTCINR", "ETHINR", "USDTINR", "XRPINR", "SOLINR", "DOGEINR",
+            "ADAINR", "MATICINR", "TRXINR", "LTCINR", "SHIBINR", "BNBINR",
+            "DOTINR", "AVAXINR", "LINKINR", "UNIINR", "ATOMINR", "XMRINR",
+            "BCHINR", "FILINR", "NEARINR", "ALGOINR", "MANAINR", "SANDINR",
+            "EOSINR", "AAVEINR", "AXSINR", "GRTINR", "FTMINR", "GALAINR",
+            "CHZINR", "ENJINR", "BATINR", "ZILINR", "ETCINR", "VETINR"
+        ]
+
+        matches = [c for c in top_crypto if q in c]
+        # Sort matches: items starting with query first
+        matches.sort(key=lambda x: 0 if x.startswith(q) else 1)
+
+        return [
+            {"symbol": m, "name": f"Crypto {m}", "token": m, "exchange": "COINDCX", "market": "CRYPTO"}
+            for m in matches[:limit]
+        ]
+
+    # --- EQUITY / F&O HANDLING (SmartAPI) ---
     if INSTRUMENTS_DF is None or INSTRUMENTS_DF.empty:
-        load_instruments()
-        if INSTRUMENTS_DF.empty:
-            return []
-
-    q = query.strip().upper()
-    if not q:
         return []
 
-    df = INSTRUMENTS_DF
+    # 1. Filter by Query
+    mask = INSTRUMENTS_DF["search_text"].str.contains(q, na=False)
+    matches = INSTRUMENTS_DF[mask].copy()
 
-    # Base filter
-    matches = df[df["search_text"].str.contains(q, na=False)]
-
-    # MARKET FILTERS
+    # 2. Filter by Market Type (With Crash Fixes)
     if market_type == "EQUITY":
         matches = matches[
             (matches["exch_seg"].isin(["NSE", "BSE"])) &
-            (~matches["instrumenttype"].str.contains("FUT|OPT", regex=True)) &
-            (~matches["symbol"].str.contains("NIFTY|BANKNIFTY|MIDCAP|SENSEX"))
-        ]
+            (~matches["instrumenttype"].str.contains("FUT|OPT", regex=True, na=False)) &  # Added na=False
+            (~matches["symbol"].str.contains("NIFTY|BANKNIFTY", regex=True, na=False))  # Added na=False
+            ]
 
     elif market_type == "FUTURES":
         matches = matches[
             (matches["exch_seg"] == "NFO") &
-            (matches["instrumenttype"].str.contains("FUT"))
-        ]
+            (matches["instrumenttype"].str.contains("FUT", na=False))
+            ]
 
     elif market_type == "OPTIONS":
         matches = matches[
             (matches["exch_seg"] == "NFO") &
-            (matches["instrumenttype"].str.contains("OPT"))
-        ]
+            (matches["instrumenttype"].str.contains("OPT", na=False))
+            ]
 
-    elif market_type == "CRYPTO":
-        # WazirX custom list
-        crypto_pairs = ["BTCINR", "ETHINR", "USDTINR", "WRXINR", "MATICINR"]
-        return [
-            {"symbol": p, "name": p, "token": p, "exchange": "WAZIRX", "market": "CRYPTO"}
-            for p in crypto_pairs if q in p
-        ][:limit]
+    # 3. Format Output
+    results = []
+    # Sort: Exact symbol match first, then name match
+    matches["is_exact"] = matches["symbol"] == q
+    matches = matches.sort_values(["is_exact", "symbol"], ascending=[False, True])
 
-    # Format + clean output
-    final = []
     for _, row in matches.head(limit).iterrows():
+        name = row["name"] if row["name"] else row["symbol"]
+        expiry = row["expiry"] if row["expiry"] else ""
 
-        clean_name = row["name"].title() if row["name"] else row["symbol"]
-        expiry = f" ({row['expiry']})" if row["expiry"] else ""
+        # Nice Label
+        if market_type in ["FUTURES", "OPTIONS"]:
+            label = f"{row['symbol']} ({expiry})"
+        else:
+            label = f"{row['symbol']} - {name}"
 
-        final.append({
+        results.append({
             "symbol": row["symbol"],
-            "name": clean_name + expiry,
-            "token": row["token"].strip(),
+            "name": label,
+            "token": row["token"],
             "exchange": row["exch_seg"],
-            "market": market_type,
+            "expiry": expiry,
+            "market": market_type
         })
 
-    return final
+    return results
 
 
-# ============================================================
-#  FIND SYMBOL TOKEN (MISSING EARLIER — RESTORED NOW)
-# ============================================================
-
-def find_symbol_token(symbol: str) -> str:
-    """
-    Returns SmartAPI instrument token for:
-    - Equity (NSE/BSE)
-    - Index (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY)
-    - Futures (NIFTY25JANFUT)
-    - Options (NIFTY25JAN22500CE)
-    """
-
-    global INSTRUMENTS_DF
-
-    if INSTRUMENTS_DF is None or INSTRUMENTS_DF.empty:
-        load_instruments()
-        if INSTRUMENTS_DF.empty:
-            return None
-
-    s = symbol.strip().upper()
-
-    df = INSTRUMENTS_DF
-
-    # ----------------------------------------------------------
-    #  If exact symbol match exists → BEST case
-    # ----------------------------------------------------------
-    exact = df[df["symbol"] == s]
-    if not exact.empty:
-        return exact.iloc[0]["token"]
-
-    # ----------------------------------------------------------
-    #  Options contract detection (NIFTY25JAN22500CE)
-    # ----------------------------------------------------------
-    if len(s) > 10 and ("CE" in s or "PE" in s):
-        opt = df[
-            (df["symbol"].str.contains(s[:10])) &
-            (df["instrumenttype"].str.contains("OPT"))
+def find_symbol_token(symbol: str, exchange: str = "NSE"):
+    if INSTRUMENTS_DF is None or INSTRUMENTS_DF.empty: return None
+    match = INSTRUMENTS_DF[
+        (INSTRUMENTS_DF["symbol"] == symbol) &
+        (INSTRUMENTS_DF["exch_seg"] == exchange)
         ]
-        if not opt.empty:
-            return opt.iloc[0]["token"]
-
-    # ----------------------------------------------------------
-    #  Futures detection (NIFTY25JANFUT)
-    # ----------------------------------------------------------
-    if s.endswith("FUT"):
-        fut = df[
-            (df["symbol"].str.contains(s.replace("FUT", ""))) &
-            (df["instrumenttype"].str.contains("FUT"))
-        ]
-        if not fut.empty:
-            return fut.iloc[0]["token"]
-
-    # ----------------------------------------------------------
-    #  Index fallback (FINNIFTY, BANKNIFTY, MIDCPNIFTY)
-    # ----------------------------------------------------------
-    idx_map = {
-        "NIFTY": "NIFTY",
-        "BANKNIFTY": "BANKNIFTY",
-        "FINNIFTY": "FINNIFTY",
-        "MIDCPNIFTY": "MIDCPNIFTY",
-    }
-
-    for key, val in idx_map.items():
-        if key in s:
-            idx = df[df["symbol"] == val]
-            if not idx.empty:
-                return idx.iloc[0]["token"]
-
-    # ----------------------------------------------------------
-    #  Looser match for equities
-    # ----------------------------------------------------------
-    loose = df[df["symbol"].str.contains(s)]
-    if not loose.empty:
-        return loose.iloc[0]["token"]
-
+    if not match.empty:
+        return match.iloc[0]["token"]
     return None

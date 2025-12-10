@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Tuple
 import numpy as np
 import pandas as pd
+import math
 
 
 @dataclass
@@ -43,15 +44,12 @@ class QuantResult:
 
 
 def compute_basic_ohlc_aliases(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalizes any OHLCV dataframe."""
-    if df is None or df.empty:
-        return pd.DataFrame()
-
+    if df is None or df.empty: return pd.DataFrame()
     out = df.copy()
-    # Normalize columns to lowercase first
-    out.columns = [str(c).lower() for c in out.columns]
-
-    # Map aliases strictly
+    if isinstance(out.columns, pd.MultiIndex):
+        out.columns = [str(c[0]).lower() if isinstance(c, tuple) else str(c).lower() for c in out.columns]
+    else:
+        out.columns = [str(c).lower() for c in out.columns]
     rename_map = {}
     for c in out.columns:
         if c in ["open", "high", "low", "close", "volume"]: continue
@@ -65,39 +63,24 @@ def compute_basic_ohlc_aliases(df: pd.DataFrame) -> pd.DataFrame:
             rename_map[c] = "close"
         elif "vol" in c:
             rename_map[c] = "volume"
-
     out = out.rename(columns=rename_map)
-
-    # CRITICAL: Only require Price data. Volume is optional (for Indices).
     req = ["open", "high", "low", "close"]
-    if not all(c in out.columns for c in req):
-        return pd.DataFrame()  # Missing core data
-
-    # Numeric coercion
-    for c in req:
-        out[c] = pd.to_numeric(out[c], errors="coerce")
-
-    if "volume" in out.columns:
-        out["volume"] = pd.to_numeric(out["volume"], errors="coerce")
-
-    # FIX: Drop only if PRICES are missing. Keep rows where Vol is NaN.
+    if not all(c in out.columns for c in req): return pd.DataFrame()
+    for c in req: out[c] = pd.to_numeric(out[c], errors="coerce")
+    if "volume" in out.columns: out["volume"] = pd.to_numeric(out["volume"], errors="coerce")
     return out.dropna(subset=req)
 
 
 def add_core_indicators(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty: return df
     close = df["close"]
-    # Simple MAs
     df["ma_20"] = close.rolling(20).mean()
     df["ma_50"] = close.rolling(50).mean()
-
-    # ATR
     if "high" in df.columns and "low" in df.columns:
         tr1 = df["high"] - df["low"]
         tr2 = (df["high"] - close.shift(1)).abs()
         tr3 = (df["low"] - close.shift(1)).abs()
         df["atr_14"] = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).rolling(14).mean()
-
     return df
 
 
@@ -161,3 +144,56 @@ def build_entry_target_stop(df, direction, trade_style, atr_fallback=1.0):
         entry, stop, target = 0.0, 0.0, 0.0
 
     return entry, target, stop, 0.0
+
+
+# --- NEW: BACKEND TIME CALCULATION ---
+def calculate_holding_period(df: pd.DataFrame, entry: float, target: float, trade_style: str,
+                             market_type: str = "EQUITY") -> str:
+    """
+    Calculates estimated time to target based on ATR Velocity.
+    Returns a human-readable string (e.g., "~4 Hours", "~3 Days").
+    """
+    if entry == 0 or target == 0 or df.empty or entry == target:
+        return "--"
+
+    atr = df["atr_14"].iloc[-1] if "atr_14" in df.columns else (entry * 0.01)
+    if atr <= 0: atr = entry * 0.01
+
+    distance = abs(target - entry)
+
+    # "R-Multiples" distance (How many ATRs away is the target?)
+    atr_distance = distance / atr
+
+    # Velocity Factor: How many bars does it typically take to move 1 ATR?
+    # Strong trends move 1 ATR in ~3 bars. Choppy markets take ~8 bars.
+    # We use a conservative estimate of 5 bars per ATR.
+    bars_needed = atr_distance * 5
+
+    if trade_style == "INTRADAY":
+        # Assumes 5m candles
+        total_minutes = bars_needed * 5
+        if total_minutes < 60:
+            return f"~{int(total_minutes)} Mins"
+        else:
+            return f"~{round(total_minutes / 60, 1)} Hours"
+
+    elif trade_style == "SWING":
+        # Assumes 15m candles
+        total_minutes = bars_needed * 15
+
+        if market_type == "CRYPTO":
+            # Crypto runs 24 hours
+            hours = total_minutes / 60
+            days = hours / 24
+            if days < 1: return f"~{int(hours)} Hours"
+            return f"~{round(days, 1)} Days"
+        else:
+            # Equity/F&O runs approx 6.25 hours (375 mins) per day
+            trading_days = total_minutes / 375
+            if trading_days < 1:
+                return "Intraday/BTST"
+            return f"~{round(trading_days, 1)} Days"
+
+    else:  # LONG_TERM
+        # Assumes daily candles implied, but logic handles via ATR distance
+        return f"~{int(candles_needed / 5)} Weeks"
