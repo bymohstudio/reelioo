@@ -1,64 +1,68 @@
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
-class Prediction(models.Model):
-    MARKET_CHOICES = [
-        ("EQUITY", "Equity"),
-        ("FUTURES", "Futures"),
-        ("OPTIONS", "Options"),
-        ("CRYPTO", "Crypto"),
-        ("FOREX", "Forex"),
-        ("METALS", "Metals"),
-    ]
-    DIRECTION_CHOICES = [
-        ("UP", "Up"),
-        ("DOWN", "Down"),
-        ("FLAT", "Flat"),
-    ]
-    OUTCOME_CHOICES = [
-        ("PENDING", "Pending"),
-        ("WIN", "Win"),
-        ("LOSS", "Loss"),
-        ("BREAKEVEN", "Breakeven"),
-    ]
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    symbol = models.CharField(max_length=50)
-    market = models.CharField(max_length=20, choices=MARKET_CHOICES)
-    trade_type = models.CharField(max_length=20)  # INTRADAY/SWING/LONG_TERM
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
 
-    model_probability = models.FloatField()
-    predicted_direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
-    
-    entry_price = models.FloatField()
-    target_price = models.FloatField()
-    stop_loss_price = models.FloatField()
+    # Subscription Logic
+    trial_start_date = models.DateTimeField(auto_now_add=True)
+    is_premium = models.BooleanField(default=False)
+    razorpay_subscription_id = models.CharField(max_length=100, blank=True, null=True)
+    subscription_status = models.CharField(max_length=20, default="trial")
 
-    # Outcome tracking
-    actual_outcome = models.CharField(
-        max_length=10, choices=OUTCOME_CHOICES, default="PENDING"
-    )
-    pnl_percent = models.FloatField(null=True, blank=True) # Realized PnL
-    is_correct = models.BooleanField(null=True, blank=True)
+    # Extended Profile Fields
+    country = models.CharField(max_length=100, blank=True, null=True)
+    terms_accepted = models.BooleanField(default=False)
+
+    def is_access_granted(self):
+        # 1. Premium Check
+        if self.is_premium and self.subscription_status == "active":
+            return True
+
+        # 2. Trial Check
+        if not self.is_trial_expired():
+            return True
+
+        return False
+
+    def is_trial_expired(self):
+        trial_end = self.trial_start_date + timedelta(days=21)
+        return timezone.now() > trial_end
+
+    def get_days_left(self):
+        if self.is_premium: return "LIFETIME"
+        trial_end = self.trial_start_date + timedelta(days=21)
+        remaining = trial_end - timezone.now()
+        return max(0, remaining.days)
 
     def __str__(self):
-        return f"{self.symbol} {self.market} ({self.created_at:%Y-%m-%d})"
+        return f"{self.user.username} | Premium: {self.is_premium}"
 
 
-class Feedback(models.Model):
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
+
+
+# --- AUTO-CREATE PROFILE SIGNAL ---
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)
+
+
+# --- ANALYTICS MODELS (For future Admin Dashboard) ---
+class PredictionLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    market = models.CharField(max_length=20, blank=True, default="GLOBAL")
-    symbol = models.CharField(max_length=50, blank=True)
-    
-    # 1-5 Star Ratings
-    accuracy_rating = models.IntegerField(default=0)
-    ux_rating = models.IntegerField(default=0)
-    speed_rating = models.IntegerField(default=0)
-    
-    # Text
-    comment = models.TextField(blank=True)
-    
-    # Flags
-    hallucination_report = models.BooleanField(default=False)
-    
+    symbol = models.CharField(max_length=20)
+    score = models.FloatField()
+    bias = models.CharField(max_length=10)
+
     def __str__(self):
-        return f"Feedback: {self.market} - {self.accuracy_rating}/5"
+        return f"{self.symbol} - {self.bias} ({self.score})"

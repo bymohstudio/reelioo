@@ -1,0 +1,185 @@
+{% extends "core/base.html" %}
+{% block title %}Contact | Reelioo{% endblock %}
+
+{% block content %}
+<main class="relative max-w-5xl mx-auto px-6 py-20 font-sans text-slate-300">
+
+  <!-- Header -->
+  <div class="text-center mb-14">
+    <h1 class="text-4xl font-black text-white tracking-tight">
+      Get in touch with <span class="text-blue-500">Reelioo</span>
+    </h1>
+    <p class="mt-4 text-slate-400 max-w-2xl mx-auto font-light">
+      Questions about your account, subscription, or platform usage?
+      Send us a message and we’ll get back within one business day.
+    </p>
+  </div>
+
+  <!-- Content Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+    <!-- LEFT: CONTACT INFO -->
+    <div class="space-y-6">
+
+      <!-- Support -->
+      <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-full bg-blue-900/20 flex items-center justify-center border border-blue-500/20">
+            <i data-lucide="mail" class="w-6 h-6 text-blue-400"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Support</h3>
+        </div>
+        <p class="text-xs text-slate-400 mb-4 font-mono">
+          Account access, subscriptions, platform usage, and general questions.
+        </p>
+        <a
+          href="mailto:reeliooapp@gmail.com"
+          class="inline-block px-4 py-2 rounded-lg bg-emerald-900/20 border border-emerald-500/30
+                 text-emerald-400 font-mono text-xs font-bold tracking-wide
+                 hover:bg-emerald-900/40 transition"
+        >
+          reeliooapp@gmail.com
+        </a>
+      </div>
+
+      <!-- Partnerships -->
+      <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-full bg-purple-900/20 flex items-center justify-center border border-purple-500/20">
+            <i data-lucide="briefcase" class="w-6 h-6 text-purple-400"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Partnerships & Access</h3>
+        </div>
+        <p class="text-xs text-slate-400 mb-4 font-mono">
+          Enterprise access, institutional research, and collaborations.
+        </p>
+        <a
+          href="mailto:reeliooapp@gmail.com"
+          class="inline-block px-4 py-2 rounded-lg bg-emerald-900/20 border border-emerald-500/30
+                 text-emerald-400 font-mono text-xs font-bold tracking-wide
+                 hover:bg-emerald-900/40 transition"
+        >
+          reeliooapp@gmail.com
+        </a>
+      </div>
+
+      <!-- Support Hours -->
+      <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center border border-white/5">
+            <i data-lucide="clock" class="w-6 h-6 text-slate-400"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Support Hours</h3>
+        </div>
+        <p class="text-xs text-slate-400 font-mono">
+          Mon–Fri · 9am–6pm IST<br>
+          Messages are monitored outside business hours.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: CONTACT FORM -->
+    <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 shadow-2xl">
+
+      <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Name</label>
+            <input
+              type="text"
+              name="name"
+              placeholder="Your name"
+              required
+              class="w-full rounded-lg bg-[#111] border border-white/10
+                     px-4 py-3 text-white text-sm placeholder-slate-700 font-mono
+                     focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
+            />
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Email</label>
+            <input
+              type="email"
+              name="email"
+              placeholder="you@email.com"
+              required
+              class="w-full rounded-lg bg-[#111] border border-white/10
+                     px-4 py-3 text-white text-sm placeholder-slate-700 font-mono
+                     focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Company (optional)</label>
+          <input
+            type="text"
+            name="company"
+            placeholder="Company name"
+            class="w-full rounded-lg bg-[#111] border border-white/10
+                   px-4 py-3 text-white text-sm placeholder-slate-700 font-mono
+                   focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
+          />
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Topic</label>
+          <select
+            name="topic"
+            class="w-full rounded-lg bg-[#111] border border-white/10
+                   px-4 py-3 text-white text-sm font-mono cursor-pointer
+                   focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner appearance-none"
+          >
+            <option>Platform Support</option>
+            <option>Billing & Subscription</option>
+            <option>Signal / Data Clarification</option>
+            <option>Technical Issue</option>
+            <option>Enterprise / Partnerships</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Message</label>
+          <textarea
+            name="message"
+            rows="5"
+            placeholder="Please describe your issue or question. Include symbol or timeframe if relevant."
+            required
+            class="w-full rounded-lg bg-[#111] border border-white/10
+                   px-4 py-3 text-white text-sm placeholder-slate-700 font-mono
+                   focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
+          ></textarea>
+        </div>
+
+        <div class="flex items-start gap-3 text-xs text-slate-400 font-mono">
+          <input type="checkbox" required class="mt-0.5 accent-blue-500 w-4 h-4 rounded bg-[#111] border-white/10">
+          <span>
+            I agree to the <a href="{% url 'privacy' %}" class="text-blue-400 hover:text-white underline decoration-blue-500/30">Privacy Policy</a>
+            and understand this is not financial advice.
+          </span>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg
+                 bg-blue-600 hover:bg-blue-500
+                 text-white font-bold text-xs uppercase tracking-widest transition shadow-lg transform active:scale-[0.98]"
+        >
+          <i data-lucide="send" class="w-4 h-4"></i>
+          Contact Reelioo Support
+        </button>
+      </form>
+
+      <p class="mt-6 text-[10px] text-slate-600 text-center font-mono uppercase tracking-widest">
+        Support is limited to platform usage and account-related questions.
+      </p>
+
+    </div>
+
+  </div>
+</main>
+{% endblock %}

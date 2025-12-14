@@ -1,0 +1,87 @@
+{% extends "core/base.html" %}
+{% block title %}Pricing | Reelioo{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans">
+
+    <!-- Header -->
+    <div class="mb-14">
+        <span class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest
+                     border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 rounded-full">
+            21-Day Free Trial
+        </span>
+
+        <h1 class="text-4xl font-black text-white mt-6 mb-4">
+            Trade Less. <span class="text-violet-400">Win Smarter.</span>
+        </h1>
+
+        <p class="text-slate-400 max-w-xl mx-auto leading-relaxed text-sm">
+            Reelioo is an AI-powered signal quality engine designed to filter market noise
+            and highlight rare, high-confidence setups.
+            Start free — no credit card required.
+        </p>
+    </div>
+
+    <!-- Pricing Card -->
+    <div class="bg-[#0a0a0a] border border-blue-500/30 rounded-3xl p-10 max-w-md mx-auto
+                shadow-[0_0_60px_rgba(139,92,246,0.15)]
+                relative overflow-hidden group hover:border-violet-500/50 transition duration-500">
+
+        <!-- Badge -->
+        <div class="absolute top-0 right-0 bg-blue-500 text-white text-[9px]
+                    font-bold px-4 py-1.5 rounded-bl-xl tracking-widest shadow-lg">
+            LAUNCH OFFER
+        </div>
+
+        <!-- Price -->
+        <div class="text-left mb-8 border-b border-white/5 pb-8">
+            <h2 class="text-5xl font-black text-white mb-2">
+                $19 <span class="text-lg text-slate-500 font-normal">/ month</span>
+            </h2>
+            <p class="text-xs text-blue-400 font-bold uppercase tracking-widest">
+                Regular Price $29 · Save 33%
+            </p>
+        </div>
+
+        <ul class="text-left space-y-4 mb-10 text-sm text-slate-300">
+  <li class="flex items-center gap-3">
+    <i data-lucide="activity" class="text-emerald-500 w-5 h-5"></i>
+    <span><strong>Quant + ML Signal Engine</strong> (probability-based)</span>
+  </li>
+  <li class="flex items-center gap-3">
+    <i data-lucide="target" class="text-emerald-500 w-5 h-5"></i>
+    <span>Machine-Learning <strong>Confidence Scoring</strong></span>
+  </li>
+  <li class="flex items-center gap-3">
+    <i data-lucide="bar-chart-2" class="text-emerald-500 w-5 h-5"></i>
+    <span>Whale Activity & <strong>Volume Anomalies</strong></span>
+  </li>
+  <li class="flex items-center gap-3">
+    <i data-lucide="shield" class="text-emerald-500 w-5 h-5"></i>
+    <span>Model-Driven <strong>Risk Context</strong></span>
+  </li>
+  <li class="flex items-center gap-3">
+    <i data-lucide="sparkles" class="text-emerald-500 w-5 h-5"></i>
+    <span>AI Market Briefs <span class="text-slate-400">(explanations only)</span></span>
+  </li>
+</ul>
+
+
+        <!-- CTA -->
+        <a href="{% url 'signup' %}"
+           class="block w-full py-4 bg-white text-black font-bold rounded-xl
+                  hover:bg-slate-200 transition shadow-lg
+                  transform active:scale-[0.98]
+                  text-xs uppercase tracking-widest">
+            Start 21-Day Free Trial
+        </a>
+
+        <!-- Footer note -->
+        <div class="mt-6 text-center text-[10px] text-slate-600 leading-relaxed">
+            No credit card required · Cancel anytime<br>
+            This is an analysis tool — not financial advice
+        </div>
+    </div>
+
+</div>
+{% endblock %}

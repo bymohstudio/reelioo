@@ -1,129 +1,171 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{% block title %}Reelioo V2 | Global Quant Terminal{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Reelioo V2: Institutional-Grade Crypto Quant Terminal. Decode Whale Order Flow and Volatility Regimes with AI.">
+    <meta name="keywords" content="crypto quant, bitcoin trading, whale alerts, ai trading, reelioo, volatility analysis">
+    <meta property="og:title" content="Reelioo | Quant Intelligence">
+    <meta property="og:description" content="The unfair advantage for retail traders. Powered by Neural Networks.">
 
-    <!-- Tailwind -->
+    <title>{% block title %}Reelioo | Quant Intelligence{% endblock %}</title>
+
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
-        body {
-            background-color: #020617;
-            color: #f8fafc;
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #020202; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .cursor-blink { animation: blink 1s step-end infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-        /* Mobile Menu Transition */
-        #mobile-menu { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        /* Mobile Menu Animation */
+        #mobile-menu { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
+        #mobile-menu.open { max-height: 500px; opacity: 1; }
     </style>
 </head>
-<body class="antialiased min-h-screen flex flex-col">
 
-    <!-- NAVIGATION -->
-    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#020617]/80 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+<body class="text-slate-400 font-mono antialiased min-h-screen flex flex-col selection:bg-blue-500/30 selection:text-white">
 
-            <!-- Logo -->
-            <a href="/" class="flex items-center gap-2 group">
-                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center group-hover:bg-blue-500 transition shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-                    <i data-lucide="bar-chart-2" class="text-white w-5 h-5"></i>
+    <nav class="border-b border-white/5 bg-black/90 backdrop-blur-xl sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6">
+            <div class="h-20 flex items-center justify-between">
+
+                <a href="/" class="flex items-center gap-3 group select-none z-50">
+                    <span class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">REEL<span class="text-blue-500">IOO</span></span>
+                    <div class="w-1.5 h-5 bg-blue-500 cursor-blink"></div>
+                </a>
+
+                <div class="hidden md:flex items-center gap-6">
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'terminal' %}" class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition">Terminal</a>
+                        <a href="{% url 'settings' %}" class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition">Settings</a>
+
+                        {% if not user.profile.is_premium %}
+                            <a href="{% url 'pricing' %}" class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition">
+                                Upgrade
+                            </a>
+                        {% endif %}
+
+                        <form action="{% url 'logout' %}" method="post" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-[10px] font-bold text-slate-500 hover:text-red-400 uppercase tracking-widest transition">Logout</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log In</a>
+                        <a href="{% url 'signup' %}" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5">
+                            Start Trial
+                        </a>
+                    {% endif %}
                 </div>
-                <span class="font-black text-lg tracking-tight text-white">REELIOO</span>
-            </a>
 
-            <!-- Desktop Links -->
-            <div class="hidden md:flex gap-8">
-                <a href="/" class="text-sm font-medium text-slate-400 hover:text-white transition">Terminal</a>
-                <a href="/why-reelioo/" class="text-sm font-medium text-slate-400 hover:text-white transition">Why Reelioo?</a>
-                <a href="/about-reelioo/" class="text-sm font-medium text-slate-400 hover:text-white transition">Methodology</a>
-                <a href="/feedback_page/" class="text-sm font-medium text-slate-400 hover:text-white transition">Help Us Improve</a>
+                <button id="mobile-menu-btn" class="md:hidden text-slate-300 hover:text-white focus:outline-none z-50">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
             </div>
+        </div>
 
-            <!-- Mobile Menu Button (FIXED) -->
-            <button id="mobile-menu-btn" class="md:hidden text-slate-400 p-2 hover:text-white transition z-50 relative">
-                <i data-lucide="menu" class="w-6 h-6"></i>
-            </button>
+        <div id="mobile-menu" class="md:hidden bg-[#0a0a0a] border-b border-white/5 absolute w-full left-0 top-full shadow-2xl">
+            <div class="px-6 py-8 flex flex-col gap-6 text-center">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'terminal' %}" class="text-sm font-bold text-white uppercase tracking-widest hover:text-blue-400 transition">Terminal</a>
+                    <a href="{% url 'settings' %}" class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition">Settings</a>
+
+                    {% if not user.profile.is_premium %}
+                        <a href="{% url 'pricing' %}" class="text-sm font-bold text-emerald-400 uppercase tracking-widest">Upgrade Plan</a>
+                    {% endif %}
+
+                    <form action="{% url 'logout' %}" method="post" class="w-full">
+                        {% csrf_token %}
+                        <button type="submit" class="text-sm font-bold text-red-400 uppercase tracking-widest hover:text-red-300 transition w-full">Logout</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="text-sm font-bold text-slate-300 uppercase tracking-widest hover:text-white transition">Log In</a>
+                    <a href="{% url 'signup' %}" class="bg-blue-600 text-white text-sm font-bold px-6 py-3 rounded-lg uppercase tracking-widest shadow-lg">
+                        Start 21-Day Trial
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
-    <!-- MOBILE MENU OVERLAY (NEW) -->
-    <div id="mobile-menu" class="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-xl transform translate-x-full flex flex-col items-center justify-center gap-8 md:hidden transition-transform duration-300">
-        <button id="close-menu-btn" class="absolute top-5 right-5 text-slate-400 hover:text-white p-2">
-            <i data-lucide="x" class="w-8 h-8"></i>
-        </button>
+    <main class="flex-grow w-full relative">
+        {% if messages %}
+            <div class="max-w-2xl mx-auto pt-6 px-4 absolute top-0 left-0 right-0 z-40 pointer-events-none">
+                {% for message in messages %}
+                    <div class="pointer-events-auto p-3 mb-3 text-xs font-bold text-center rounded border shadow-xl backdrop-blur-md animate-fade-in
+                        {% if message.tags == 'success' %}bg-emerald-900/40 border-emerald-500/30 text-emerald-400{% else %}bg-red-900/40 border-red-500/30 text-red-400{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
 
-        <a href="/" class="mobile-link text-2xl font-bold text-white hover:text-blue-500 transition">Terminal</a>
-        <a href="/why-reelioo/" class="mobile-link text-2xl font-bold text-slate-400 hover:text-white transition">Why Reelioo?</a>
-        <a href="/about-reelioo/" class="mobile-link text-2xl font-bold text-slate-400 hover:text-white transition">Methodology</a>
-        <a href="/feedback_page/" class="mobile-link text-2xl font-bold text-slate-400 hover:text-white transition">Feedback</a>
-    </div>
-
-    <!-- MAIN CONTENT -->
-    <main class="flex-grow relative z-10 w-full mt-16">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- FOOTER -->
-    <footer class="border-t border-white/5 bg-[#020617] py-10 mt-12">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p class="text-[10px] text-slate-600 uppercase tracking-widest">
-                &copy; 2025 Reelioo Quant Systems.
-            </p>
-            <div class="flex gap-6">
-                <a href="#" class="text-xs text-slate-500 hover:text-white transition">Terms</a>
-                <a href="#" class="text-xs text-slate-500 hover:text-white transition">Privacy</a>
+    <footer class="border-t border-white/5 bg-black pt-16 pb-10 z-10 relative mt-auto">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 text-center md:text-left">
+                <div class="col-span-1 md:col-span-1 space-y-4">
+                    <span class="text-xl font-black text-white">REELIOO</span>
+                    <p class="text-[10px] text-slate-500 leading-relaxed mx-auto md:mx-0 max-w-[200px]">
+                        The quantitative edge for retail traders. Built on institutional-grade data vectors.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Product</h4>
+                    <ul class="space-y-2 text-[11px] text-slate-500">
+                        <li><a href="{% url 'terminal' %}" class="hover:text-blue-400 transition">Terminal</a></li>
+                        <li><a href="{% url 'pricing' %}" class="hover:text-blue-400 transition">Pricing</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Legal</h4>
+                    <ul class="space-y-2 text-[11px] text-slate-500">
+                        <li><a href="{% url 'terms' %}" class="hover:text-white transition">Terms of Service</a></li>
+                        <li><a href="{% url 'privacy' %}" class="hover:text-white transition">Privacy Policy</a></li>
+                        <li><a href="{% url 'refund' %}" class="hover:text-white transition">Refund Policy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Support</h4>
+                    <a href="{% url 'contact' %}" class="space-y-2 text-[11px] text-slate-500 hover:text-white transition block">Contact Us</a>
+                </div>
+            </div>
+
+            <div class="border-t border-white/5 pt-8 text-[10px] text-slate-600 text-center flex flex-col gap-2">
+                <p>&copy; 2025 REELIOO.</p>
+                <p class="text-[9px] text-red-400 max-w-2xl mx-auto px-4">
+                    <strong>DISCLAIMER:</strong> Reelioo is a software application designed for educational and analytical purposes only. We are not a registered investment advisor, broker-dealer, or financial institution. The information provided does not constitute investment advice. Trading in financial markets involves a high degree of risk and may not be suitable for all investors. Past performance is not indicative of future results.
+                </p>
             </div>
         </div>
     </footer>
 
-    <!-- GLOBAL SCRIPTS -->
     <script>
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const menuBtn = document.getElementById('mobile-menu-btn');
-            const closeBtn = document.getElementById('close-menu-btn');
-            const menu = document.getElementById('mobile-menu');
-            const links = document.querySelectorAll('.mobile-link');
+        // Mobile Menu Logic
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
 
-            function toggleMenu() {
-                // Toggle the class that moves the menu off-screen
-                menu.classList.toggle('translate-x-full');
-            }
+        if(btn && menu) {
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('open');
 
-            if(menuBtn) {
-                menuBtn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent bubbling
-                    toggleMenu();
-                });
-            }
+                // Toggle Icon (Menu <-> X)
+                const isOpen = menu.classList.contains('open');
+                btn.innerHTML = isOpen
+                    ? '<i data-lucide="x" class="w-6 h-6"></i>'
+                    : '<i data-lucide="menu" class="w-6 h-6"></i>';
 
-            if(closeBtn) {
-                closeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    toggleMenu();
-                });
-            }
-
-            // Close menu when a link is clicked
-            links.forEach(link => {
-                link.addEventListener('click', () => {
-                    if (!menu.classList.contains('translate-x-full')) {
-                        toggleMenu();
-                    }
-                });
+                if (window.lucide) lucide.createIcons();
             });
-        });
+        }
     </script>
 </body>
 </html>

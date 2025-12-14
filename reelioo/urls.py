@@ -17,14 +17,8 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from core import views
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("", views.home, name="home"),
-    path("dashboard/", views.dashboard, name="dashboard"),
-    path("feedback_page/", views.feedback_page, name="feedback_page"),
-    path("about-reelioo/", views.about_reelioo, name="about_reelioo"),
-    path("why-reelioo/", views.why_reelioo, name="why-reelioo"),
-    path("api/", include("core.api_urls")),
+    path('admin/', admin.site.urls),
+    path('', include('core.api_urls')),
 ]

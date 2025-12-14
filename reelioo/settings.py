@@ -31,6 +31,8 @@ SECRET_KEY = os.getenv('SECRET_KEY','dev-secret')
 DEBUG = os.getenv('DEBUG','True') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS','localhost').split(',')
 
+CSRF_TRUSTED_ORIGINS = ["https://*.railway.app", "https://reelioo.app"]
+
 
 # Application definition
 
@@ -42,11 +44,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'core',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -92,7 +96,28 @@ else:
             "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
         }
     }
+# If REDIS_URL exists (e.g. on Railway), use Redis.
+# Otherwise, use local memory (e.g. on your laptop).
 
+if os.environ.get('REDIS_URL'):
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.environ.get("REDIS_URL"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                # Optional: Ignore exceptions so site doesn't crash if Redis is down
+                "IGNORE_EXCEPTIONS": True,
+            }
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+        }
+    }
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -111,6 +136,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -127,33 +161,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+# --- STATIC FILES ---
 STATIC_URL = 'static/'
-
-# ADD THIS LINE: This tells Django where to put collected files
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Keep this (where your current static files live)
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
+# --- REDIRECTS ---
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'terminal'
+LOGOUT_REDIRECT_URL = 'landing'
 
-SMARTAPI_INSTRUMENTS_PATH = BASE_DIR / "instruments.csv"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
-
-
-SMARTAPI_INSTRUMENTS_PATH = BASE_DIR / "instruments.csv"
-
-SMARTAPI_INSTRUMENTS_CSV = os.getenv(
-    "SMARTAPI_INSTRUMENTS_CSV",
-    str(BASE_DIR / "instruments.csv"),
-)
-
-WAZIRX_BASE_URL = os.getenv("WAZIRX_BASE_URL", "https://api.wazirx.com")
 

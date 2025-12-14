@@ -1,45 +1,50 @@
-from __future__ import annotations
+# core/quant/ml_training/train_crypto.py
+
 import os
-
 import xgboost as xgb
-
+import logging
 from .fetch_data import DataFetcher
-from .feature_engineering import FeatureEngineering
+from .feature_engineering import FeatureEngineering, FEATURES
+
+log = logging.getLogger("TrainCrypto")
 
 
 class TrainCryptoModel:
-    MODEL_PATH = os.path.join(
-        os.path.dirname(__file__), "..", "ml_models", "crypto_edge.json"
-    )
+    # Save as 'crypto_edge.json' to be loaded by the engine
+    MODEL_PATH = os.path.join(os.getcwd(), "core", "quant", "ml_models", "crypto_edge.json")
 
     @classmethod
-    def run(cls, symbol: str = "btcinr"):
-        print(f"[ML] Fetching crypto data for BTC-INR (Yahoo)")
-        df = DataFetcher.fetch(symbol, market="CRYPTO", days=365)
+    def run(cls, symbol: str = "BTC"):
+        log.info(f"--- Training Crypto Model on {symbol} ---")
 
-        if df is None or df.empty:
-            raise ValueError("No crypto data for BTC-INR")
+        # 1. Get Data
+        df = DataFetcher.fetch(symbol, interval="1h")
+        if df.empty:
+            log.error("No data found.")
+            return
 
-        print("[ML] Building crypto features + labels…")
+        # 2. Build Features
         df = FeatureEngineering.build(df)
+        log.info(f"Training on {len(df)} samples...")
 
-        X = df.drop(columns=["target"])
+        X = df[FEATURES]
         y = df["target"]
 
+        # 3. Train XGBoost
         dtrain = xgb.DMatrix(X, label=y)
 
         params = {
             "objective": "binary:logistic",
             "eval_metric": "logloss",
-            "max_depth": 5,
-            "eta": 0.05,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
+            "max_depth": 4,
+            "eta": 0.1,
+            "subsample": 0.8
         }
 
-        print("[ML] Training crypto XGBoost model…")
-        booster = xgb.train(params, dtrain, num_boost_round=150)
+        model = xgb.train(params, dtrain, num_boost_round=100)
 
+        # 4. Save
+        # Ensure dir exists
         os.makedirs(os.path.dirname(cls.MODEL_PATH), exist_ok=True)
-        booster.save_model(cls.MODEL_PATH)
-        print(f"[OK] Crypto Model saved → {cls.MODEL_PATH}")
+        model.save_model(cls.MODEL_PATH)
+        log.info(f"✅ Model saved to {cls.MODEL_PATH}")

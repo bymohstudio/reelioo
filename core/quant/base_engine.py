@@ -2,198 +2,189 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 import numpy as np
 import pandas as pd
-import math
 
 
+# -------------------------------------------------------------------
+# 1. Unified Result Object
+# -------------------------------------------------------------------
 @dataclass
 class QuantResult:
-    symbol: str = ""
-    market_type: str = ""
-    time_frame: str = ""
-    direction: str = "NEUTRAL"
-    score: float = 0.0
+    """
+    Standardized result object used by all engines.
+    """
+    symbol: str
+    market_type: str
+    time_frame: str
+    direction: str  # BUY, SELL, NEUTRAL
+
+    # Scores
+    score: float
     ml_edge: float = 0.0
-    raw_prob: float = 0.0
+    raw_prob: float = 0.5
     trend_score: float = 0.0
-    volatility_regime: str = "UNKNOWN"
-    signal_quality: str = "C"
-    entry: Optional[float] = None
-    target: Optional[float] = None
-    stop: Optional[float] = None
-    risk_reward: Optional[float] = None
+
+    # Context
+    volatility_regime: str = "NORMAL"
+    signal_quality: str = "NONE"
+
+    # Trade Levels
+    entry: float = 0.0
+    target: float = 0.0
+    stop: float = 0.0
+    risk_reward: float = 0.0
+
+    # Extra Data (Time estimates, Leverage, News, Kelly)
     extras: Dict[str, Any] = field(default_factory=dict)
 
-    def to_json(self):
-        return {
-            "symbol": self.symbol,
-            "market_type": self.market_type,
-            "time_frame": self.time_frame,
-            "direction": self.direction,
-            "score": float(self.score),
-            "ml_edge": float(self.ml_edge),
-            "trend_score": float(self.trend_score),
-            "volatility_regime": self.volatility_regime,
-            "entry": self.entry,
-            "target": self.target,
-            "stop": self.stop,
-            "extras": self.extras or {},
-        }
+
+# -------------------------------------------------------------------
+# 2. Smart Position Sizing (Kelly Criterion)
+# -------------------------------------------------------------------
+class KellySizer:
+    """
+    Calculates Optimal Position Size using the Kelly Criterion.
+    Formula: K% = W - [(1 - W) / R]
+    """
+
+    @staticmethod
+    def calculate(prob_score: float, risk_reward: float, fractional: float = 0.5) -> str:
+        # 1. Convert Score to Probability
+        W = max(0.01, min(0.99, prob_score / 100.0))
+
+        # 2. Risk Reward (R)
+        R = max(0.1, risk_reward)
+
+        # 3. Kelly Formula
+        kelly_pct = W - ((1 - W) / R)
+
+        # 4. Safety Scaling (Half Kelly is standard)
+        safe_kelly = kelly_pct * fractional
+
+        # 5. Constraints (Max 20% allocation per trade)
+        if safe_kelly <= 0:
+            return "0% (No Trade)"
+
+        final_pct = min(0.20, safe_kelly)
+        return f"{final_pct * 100:.1f}% Capital"
 
 
+# -------------------------------------------------------------------
+# 3. Core Math & Indicators
+# -------------------------------------------------------------------
 def compute_basic_ohlc_aliases(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty: return pd.DataFrame()
-    out = df.copy()
-    if isinstance(out.columns, pd.MultiIndex):
-        out.columns = [str(c[0]).lower() if isinstance(c, tuple) else str(c).lower() for c in out.columns]
-    else:
-        out.columns = [str(c).lower() for c in out.columns]
-    rename_map = {}
-    for c in out.columns:
-        if c in ["open", "high", "low", "close", "volume"]: continue
-        if "open" in c:
-            rename_map[c] = "open"
-        elif "high" in c:
-            rename_map[c] = "high"
-        elif "low" in c:
-            rename_map[c] = "low"
-        elif "close" in c or "price" in c:
-            rename_map[c] = "close"
-        elif "vol" in c:
-            rename_map[c] = "volume"
-    out = out.rename(columns=rename_map)
-    req = ["open", "high", "low", "close"]
-    if not all(c in out.columns for c in req): return pd.DataFrame()
-    for c in req: out[c] = pd.to_numeric(out[c], errors="coerce")
-    if "volume" in out.columns: out["volume"] = pd.to_numeric(out["volume"], errors="coerce")
-    return out.dropna(subset=req)
-
-
-def add_core_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty: return df
-    close = df["close"]
-    df["ma_20"] = close.rolling(20).mean()
-    df["ma_50"] = close.rolling(50).mean()
-    if "high" in df.columns and "low" in df.columns:
-        tr1 = df["high"] - df["low"]
-        tr2 = (df["high"] - close.shift(1)).abs()
-        tr3 = (df["low"] - close.shift(1)).abs()
-        df["atr_14"] = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).rolling(14).mean()
+    df.columns = [c.lower() for c in df.columns]
     return df
 
 
+def add_core_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    # 1. ATR (Volatility)
+    df['tr'] = np.maximum(
+        df['high'] - df['low'],
+        np.maximum(
+            abs(df['high'] - df['close'].shift(1)),
+            abs(df['low'] - df['close'].shift(1))
+        )
+    )
+    df['atr_14'] = df['tr'].rolling(14).mean()
+
+    # 2. RSI (Momentum)
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rs = gain / loss
+    df['rsi_14'] = 100 - (100 / (1 + rs))
+
+    # 3. EMAs (Trend)
+    df['ema_9'] = df['close'].ewm(span=9).mean()
+    df['ema_20'] = df['close'].ewm(span=20).mean()
+    df['ema_50'] = df['close'].ewm(span=50).mean()
+
+    return df.fillna(0)
+
+
 def compute_trend_score(df: pd.DataFrame) -> float:
-    if df.empty or "ma_20" not in df.columns: return 0.0
-    last = df.iloc[-1]
+    # Basic Trend Logic: Price vs EMAs + RSI context
     score = 0
-    if last["close"] > last["ma_20"]:
-        score += 20
-    else:
-        score -= 20
-    if last["close"] > last["ma_50"]:
-        score += 20
-    else:
-        score -= 20
-    if last["ma_20"] > last["ma_50"]:
-        score += 10
-    else:
-        score -= 10
-    return float(score)
+    last = df.iloc[-1]
+
+    # Bullish Factors
+    if last['close'] > last['ema_20']: score += 20
+    if last['close'] > last['ema_50']: score += 20
+    if last['ema_20'] > last['ema_50']: score += 20
+    if last['rsi_14'] > 50: score += 20
+
+    # Bearish Factors
+    if last['close'] < last['ema_20']: score -= 20
+    if last['close'] < last['ema_50']: score -= 20
+    if last['ema_20'] < last['ema_50']: score -= 20
+    if last['rsi_14'] < 50: score -= 20
+
+    return float(max(-100, min(100, score)))
 
 
 def detect_volatility_regime(df: pd.DataFrame) -> str:
-    if df.empty or "atr_14" not in df.columns: return "NORMAL"
-    last = df.iloc[-1]
-    atr_pct = (last["atr_14"] / last["close"]) * 100
-    return "HIGH" if atr_pct > 1.5 else "NORMAL"
+    current_atr = df['atr_14'].iloc[-1]
+    avg_atr = df['atr_14'].rolling(50).mean().iloc[-1]
+
+    if current_atr > avg_atr * 1.2: return "HIGH"
+    if current_atr < avg_atr * 0.8: return "LOW"
+    return "NORMAL"
 
 
 def determine_signal_quality(score: float, ml_edge: float) -> str:
-    if score > 70 and ml_edge > 60: return "A+"
-    if score > 60: return "A"
-    if score > 50: return "B"
-    return "C"
+    if abs(score) > 80 and ml_edge > 55: return "HIGH_CONVICTION"
+    if abs(score) > 60: return "MODERATE"
+    return "WEAK"
 
 
 def clamp_score(val: float) -> float:
-    return max(0.0, min(100.0, float(val)))
+    return max(-100, min(100, val))
 
 
-def build_entry_target_stop(df, direction, trade_style, atr_fallback=1.0):
-    if df.empty: return 0, 0, 0, 0
-    price = df["close"].iloc[-1]
-    atr = df["atr_14"].iloc[-1] if "atr_14" in df.columns else (price * 0.01)
-    if pd.isna(atr) or atr <= 0: atr = price * 0.01
+# -------------------------------------------------------------------
+# 4. Dynamic Level Builder
+# -------------------------------------------------------------------
+def build_entry_target_stop(
+        df: pd.DataFrame,
+        direction: str,
+        trade_style: str = "SWING"
+) -> Tuple[float, float, float, float]:
+    """
+    Calculates dynamic Entry, Target, and Stop-Loss based on Volatility (ATR).
+    """
+    last = df.iloc[-1]
+    price = float(last["close"])
+    atr = float(last.get("atr_14", 0))
 
+    if atr <= 0: atr = price * 0.02  # Fallback 2% if ATR missing
+
+    # Multipliers based on style
     if trade_style == "INTRADAY":
-        stop_mult, tgt_mult = 0.5, 1.2
-    else:
         stop_mult, tgt_mult = 1.5, 2.5
+    elif trade_style == "LONG_TERM":
+        stop_mult, tgt_mult = 2.5, 5.0
+    else:  # SWING
+        stop_mult, tgt_mult = 2.0, 3.5
 
-    if direction in ["BULLISH", "BUY"]:
+    risk = stop_mult * atr
+    reward = tgt_mult * atr
+
+    if "BUY" in direction or "LONG" in direction:
         entry = price
-        stop = price - (atr * stop_mult)
-        target = price + (atr * tgt_mult)
-    elif direction in ["BEARISH", "SELL"]:
+        stop = price - risk
+        target = price + reward
+    elif "SELL" in direction or "SHORT" in direction:
         entry = price
-        stop = price + (atr * stop_mult)
-        target = price - (atr * tgt_mult)
+        stop = price + risk
+        target = price - reward
     else:
-        entry, stop, target = 0.0, 0.0, 0.0
+        entry = price
+        stop = price
+        target = price
 
-    return entry, target, stop, 0.0
+    rr = round(reward / risk, 2) if risk > 0 else 0.0
 
-
-# --- NEW: BACKEND TIME CALCULATION ---
-def calculate_holding_period(df: pd.DataFrame, entry: float, target: float, trade_style: str,
-                             market_type: str = "EQUITY") -> str:
-    """
-    Calculates estimated time to target based on ATR Velocity.
-    Returns a human-readable string (e.g., "~4 Hours", "~3 Days").
-    """
-    if entry == 0 or target == 0 or df.empty or entry == target:
-        return "--"
-
-    atr = df["atr_14"].iloc[-1] if "atr_14" in df.columns else (entry * 0.01)
-    if atr <= 0: atr = entry * 0.01
-
-    distance = abs(target - entry)
-
-    # "R-Multiples" distance (How many ATRs away is the target?)
-    atr_distance = distance / atr
-
-    # Velocity Factor: How many bars does it typically take to move 1 ATR?
-    # Strong trends move 1 ATR in ~3 bars. Choppy markets take ~8 bars.
-    # We use a conservative estimate of 5 bars per ATR.
-    bars_needed = atr_distance * 5
-
-    if trade_style == "INTRADAY":
-        # Assumes 5m candles
-        total_minutes = bars_needed * 5
-        if total_minutes < 60:
-            return f"~{int(total_minutes)} Mins"
-        else:
-            return f"~{round(total_minutes / 60, 1)} Hours"
-
-    elif trade_style == "SWING":
-        # Assumes 15m candles
-        total_minutes = bars_needed * 15
-
-        if market_type == "CRYPTO":
-            # Crypto runs 24 hours
-            hours = total_minutes / 60
-            days = hours / 24
-            if days < 1: return f"~{int(hours)} Hours"
-            return f"~{round(days, 1)} Days"
-        else:
-            # Equity/F&O runs approx 6.25 hours (375 mins) per day
-            trading_days = total_minutes / 375
-            if trading_days < 1:
-                return "Intraday/BTST"
-            return f"~{round(trading_days, 1)} Days"
-
-    else:  # LONG_TERM
-        # Assumes daily candles implied, but logic handles via ATR distance
-        return f"~{int(candles_needed / 5)} Weeks"
+    return round(entry, 4), round(target, 4), round(stop, 4), rr

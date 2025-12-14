@@ -1,0 +1,161 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="relative overflow-hidden font-sans text-slate-300">
+
+<!-- GRID BACKGROUND -->
+<div class="fixed inset-0 pointer-events-none"
+style="background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+background-size:60px 60px"></div>
+
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] -z-10"></div>
+
+<!-- HERO -->
+<section class="max-w-7xl mx-auto px-6 pt-32 pb-40 text-center relative z-10">
+<span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] uppercase tracking-widest mb-10">
+<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+Signal Engine v2.4 Online
+</span>
+
+<h1 class="text-6xl md:text-8xl font-black text-white mb-8 leading-[0.9]">
+Trade Less.<br>
+<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">Win More.</span>
+</h1>
+
+<p class="max-w-2xl mx-auto text-lg text-slate-400 mb-12">
+Reelioo is a <strong>quantitative + machine-learning signal intelligence engine</strong>
+designed to filter market noise and surface only rare, high-confidence setups.
+<strong>Fewer signals = higher quality.</strong>
+</p>
+
+<div class="flex flex-col sm:flex-row justify-center gap-5">
+{% if user.is_authenticated %}
+<a href="{% url 'terminal' %}" class="px-10 py-4 bg-white text-black font-bold rounded-xl">ENTER TERMINAL</a>
+{% else %}
+<a href="{% url 'signup' %}" class="px-10 py-4 bg-white text-black font-bold rounded-xl">START FREE TRIAL</a>
+<a href="#audit" class="px-10 py-4 bg-[#111] border border-white/10 rounded-xl">VIEW AUDIT</a>
+{% endif %}
+</div>
+
+<p class="mt-8 text-[10px] text-slate-500 uppercase tracking-widest">21-Day Free Trial • No Credit Card Required</p>
+<p class="mt-2 text-[10px] text-slate-600 uppercase tracking-widest">
+Analysis Tool · No Auto-Trading · No Financial Advice
+</p>
+</section>
+
+<!-- AUDIT -->
+<section id="audit" class="max-w-5xl mx-auto px-6 mb-36">
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8">
+<h3 class="text-xl font-bold text-white mb-2">Performance Audit</h3>
+<p class="text-xs text-slate-500 font-mono mb-6">
+LOCKED CONFIDENCE THRESHOLD: 0.80 (High-Selectivity Mode)
+</p>
+
+<ul class="space-y-2 text-sm text-slate-400">
+<li>• Selective, probability-filtered signals</li>
+<li>• Machine-learning confidence scoring</li>
+<li>• Quantitative structure & volatility analysis</li>
+<li>• Fully auditable, non-curve-fit logic</li>
+</ul>
+
+<p class="mt-6 text-[10px] text-slate-600 font-mono text-center">
+Past performance is not indicative of future results.
+</p>
+</div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="max-w-4xl mx-auto px-6 mb-32 text-center">
+<h3 class="text-2xl font-bold text-white mb-10">How Reelioo Works</h3>
+<div class="grid md:grid-cols-3 gap-10 text-sm text-slate-400">
+<div><strong class="text-white">1. Quant Models</strong><br>Structure, volatility, liquidity</div>
+<div><strong class="text-white">2. ML Confidence</strong><br>Probability-based filtering</div>
+<div><strong class="text-white">3. AI Context</strong><br>Explanation only, not prediction</div>
+</div>
+</section>
+
+<!-- FOUNDER NOTE -->
+<section class="max-w-4xl mx-auto px-6 mb-36">
+<h3 class="text-2xl font-bold text-white mb-8 text-center">A Note From the Founder</h3>
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 text-sm text-slate-400 space-y-5">
+<p>Reelioo was built after seeing capable traders lose money not because they were wrong — but because they traded too often.</p>
+<p>The philosophy is simple: <strong class="text-white">trade less, but with higher confidence.</strong></p>
+<p>If you’re looking for guaranteed profits or constant alerts, Reelioo is not for you — intentionally.</p>
+<p class="text-xs text-slate-500 pt-4 border-t border-white/5">— Founder, Reelioo</p>
+</div>
+</section>
+
+<!-- WHO NOT FOR -->
+<section class="max-w-4xl mx-auto px-6 mb-36 text-center">
+<h3 class="text-2xl font-bold text-white mb-8">Who Reelioo Is <span class="text-red-400">Not</span> For</h3>
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 text-left text-sm text-slate-400 space-y-3">
+<p>• Guaranteed profit seekers</p>
+<p>• High-frequency scalpers</p>
+<p>• Fully automated trading expectations</p>
+<p>• Users unwilling to manage risk</p>
+<p>• Gambling-oriented mindsets</p>
+</div>
+</section>
+
+<!-- FAQ -->
+<section class="max-w-5xl mx-auto px-6 mb-36">
+<h3 class="text-2xl font-bold text-white mb-10 text-center">Frequently Asked Questions</h3>
+
+<div class="space-y-6">
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+<h4 class="text-white font-semibold mb-2">Does Reelioo guarantee profits?</h4>
+<p class="text-sm text-slate-400">No. Reelioo provides probabilistic analysis only.</p>
+</div>
+
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+<h4 class="text-white font-semibold mb-2">Is this an automated trading bot?</h4>
+<p class="text-sm text-slate-400">No. Reelioo does not place trades or manage capital.</p>
+</div>
+
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+<h4 class="text-white font-semibold mb-2">What role does AI play?</h4>
+<p class="text-sm text-slate-400">AI explains signals. Quant + ML generate them.</p>
+</div>
+
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+<h4 class="text-white font-semibold mb-2">Why not show fixed win rates?</h4>
+<p class="text-sm text-slate-400">Because fixed win rates create false expectations.</p>
+</div>
+</div>
+</section>
+
+<!-- PRICING -->
+<section class="max-w-4xl mx-auto px-6 pb-32 text-center">
+<h2 class="text-4xl font-black text-white mb-16">Invest in Clarity.</h2>
+
+<div class="bg-gradient-to-b from-[#111] to-black border border-blue-500/30 rounded-3xl p-10">
+<h3 class="text-xl font-bold text-white mb-2">Reelioo Supreme</h3>
+<div class="text-5xl font-black text-white">$19<span class="text-sm text-slate-500">/mo</span></div>
+<p class="text-xs text-slate-500 line-through mb-8">Regular Price $29</p>
+
+<ul class="space-y-3 text-sm text-slate-300 mb-10">
+<li>• Quant + ML Signal Engine</li>
+<li>• Confidence Threshold Filtering</li>
+<li>• Whale Activity & Volume Anomalies</li>
+<li>• AI Market Context (explanations only)</li>
+</ul>
+
+{% if user.is_authenticated %}
+<a href="{% url 'pricing' %}" class="block py-4 bg-blue-600 rounded-xl font-bold">Upgrade Now</a>
+{% else %}
+<a href="{% url 'signup' %}" class="block py-4 bg-blue-600 rounded-xl font-bold">Start 21-Day Trial</a>
+{% endif %}
+</div>
+</section>
+
+<!-- DISCLAIMER -->
+<section class="max-w-6xl mx-auto px-6 pb-32 text-center">
+<div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 text-xs text-slate-500 space-y-4">
+<p>Performance metrics are based on historical analysis with fixed parameters.</p>
+<p>Reelioo is not a registered investment advisor or broker.</p>
+<p>Trading involves substantial risk. You are solely responsible for your decisions.</p>
+</div>
+</section>
+
+</div>
+{% endblock %}

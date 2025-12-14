@@ -1,0 +1,92 @@
+{% extends "core/base.html" %}
+{% block title %}Terms of Service | Reelioo{% endblock %}
+{% block content %}
+<main class="relative max-w-4xl mx-auto px-6 py-20 text-slate-300 font-sans">
+
+  <header class="mb-12 border-b border-white/10 pb-8 text-center">
+    <h1 class="text-4xl font-black text-white mb-4">Terms of Service</h1>
+    <p class="text-sm text-slate-500 uppercase tracking-widest">Reelioo Intelligence Pvt Ltd</p>
+  </header>
+
+  <div class="space-y-8 leading-relaxed text-sm bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl">
+
+    <!-- 1. RISK DISCLOSURE -->
+    <section class="p-6 bg-red-900/10 border border-red-500/20 rounded-xl">
+      <h3 class="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i> 1. Risk Disclosure & Disclaimer
+      </h3>
+      <div class="space-y-4 text-red-200/80 text-xs font-mono">
+        <div>
+            <strong class="block text-red-300 mb-1">1.1 Educational Use Only</strong>
+            <p>Reelioo is a software platform designed solely for quantitative analysis, market research, and educational purposes. Reelioo is not a financial advisory service, broker-dealer, portfolio manager, or a SEBI-registered investment advisor.</p>
+        </div>
+        <div>
+            <strong class="block text-red-300 mb-1">1.2 No Financial Advice</strong>
+            <p>All information, signals, confidence scores, whale alerts, and AI-generated insights provided by Reelioo are general in nature and do not constitute financial, investment, legal, or tax advice. Nothing on the platform should be construed as a recommendation to buy, sell, or hold any asset.</p>
+        </div>
+        <div>
+            <strong class="block text-red-300 mb-1">1.3 No Guarantee of Results</strong>
+            <p>Reelioo operates on probabilistic models trained on historical data. Past performance is not indicative of future results. We make no representations or warranties regarding accuracy, profitability, or future performance. Cryptocurrency markets are volatile and unpredictable.</p>
+        </div>
+        <div>
+            <strong class="block text-red-300 mb-1">1.4 User Responsibility</strong>
+            <p>You acknowledge and agree that all trading decisions are made at your sole discretion and risk. Reelioo Intelligence Pvt Ltd, its directors, founders, employees, and affiliates shall not be held liable for any financial losses, damages, or missed opportunities arising from the use of the platform.</p>
+        </div>
+        <div>
+            <strong class="block text-red-300 mb-1">1.5 High-Risk Warning</strong>
+            <p>Trading cryptocurrencies, derivatives, and leveraged instruments involves substantial risk and may not be suitable for all individuals. You may lose some or all of your invested capital. Do not trade with funds you cannot afford to lose.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ACCEPTANCE -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">2. Acceptance of Terms</h3>
+      <p>By accessing or using Reelioo (“the Terminal”), you agree to be bound by these Terms of Service. If you do not agree, you must discontinue use of the Service immediately.</p>
+    </section>
+
+    <!-- 3. USAGE LICENSE -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">3. Usage License & Restrictions</h3>
+      <p>Reelioo grants you a limited, non-exclusive, non-transferable, revocable license to access and use the platform for personal, non-commercial purposes. You agree not to:</p>
+      <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-400">
+        <li>Reverse engineer, copy, or attempt to extract proprietary models or logic</li>
+        <li>Automate access, scrape data, or bypass rate limits</li>
+        <li>Share account credentials or resell access</li>
+      </ul>
+    </section>
+
+    <!-- 4. NO TRADE EXECUTION -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">4. No Trade Execution</h3>
+      <p>Reelioo does not execute trades, place orders, manage funds, connect to wallets, or act on behalf of users. All execution decisions are entirely controlled by the user through third-party platforms.</p>
+    </section>
+
+    <!-- 5. SERVICE AVAILABILITY -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">5. Service Availability</h3>
+      <p>While we aim to maintain high availability, uninterrupted access is not guaranteed. Reelioo reserves the right to modify, suspend, or discontinue any part of the Service, including specific features or market data feeds, at any time.</p>
+    </section>
+
+    <!-- 6. SUBSCRIPTION & FEES -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">6. Subscription & Fees</h3>
+      <p>Subscription fees grant access to the software platform only and do not guarantee profitability or trading success. Fees are independent of trading outcomes.</p>
+    </section>
+
+    <!-- 7. LIMITATION OF LIABILITY -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">7. Limitation of Liability</h3>
+      <p>To the fullest extent permitted by law, Reelioo Intelligence Pvt Ltd shall not be liable for any indirect, incidental, consequential, special, or punitive damages, including loss of profits, data, goodwill, or other intangible losses, arising from your use of the Service.</p>
+    </section>
+
+    <!-- 8. GOVERNING LAW -->
+    <section>
+      <h3 class="text-lg font-bold text-white mb-3">8. Governing Law</h3>
+      <p>These Terms shall be governed and interpreted in accordance with the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts located in India.</p>
+    </section>
+
+  </div>
+</main>
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}
