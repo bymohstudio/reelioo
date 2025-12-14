@@ -7,40 +7,71 @@
     <p class="text-sm text-slate-500 mb-10">Manage your profile and subscription preferences.</p>
 
     <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 mb-8">
-        <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">Profile Details</h3>
+        <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">
+            Profile Details
+        </h3>
 
         {% if form.errors %}
-            <div class="mb-6 bg-red-900/10 border border-red-500/20 p-4 rounded-lg hidden"> <p class="text-xs font-bold text-red-400 mb-1">Update Failed</p>
-            </div>
+            <div class="mb-6 bg-red-900/10 border border-red-500/20 p-4 rounded-lg hidden"></div>
         {% endif %}
 
         <form method="post" class="space-y-6">
             {% csrf_token %}
+
+            <!-- Username -->
             <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Username</label>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Username
+                </label>
                 {{ form.username }}
+
+                {% if form.username.errors %}
+                    <p class="mt-1 text-xs text-red-400 font-medium">
+                        {{ form.username.errors.0 }}
+                    </p>
+                {% endif %}
             </div>
+
+            <!-- Email -->
             <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Email Address</label>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Email Address
+                </label>
                 {{ form.email }}
+
+                {% if form.email.errors %}
+                    <p class="mt-1 text-xs text-red-400 font-medium">
+                        {{ form.email.errors.0 }}
+                    </p>
+                {% endif %}
             </div>
+
+            <!-- Country -->
             <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Country</label>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Country
+                </label>
                 {{ form.country }}
             </div>
 
-            <button type="submit" class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
+            <button type="submit"
+                class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
                 Save Changes
             </button>
         </form>
     </div>
 
+    <!-- Subscription -->
     <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8">
-        <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">Subscription</h3>
+        <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">
+            Subscription
+        </h3>
 
         <div class="flex justify-between items-center">
             <div class="space-y-3">
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Current Status</p>
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Current Status
+                </p>
 
                 {% if user.profile.is_premium %}
                     <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
@@ -57,29 +88,22 @@
             </div>
 
             {% if user.profile.is_premium %}
-                <button onclick="openCancelModal()" type="button" class="text-red-400 hover:text-red-300 text-[10px] font-bold border border-red-500/20 bg-red-500/5 px-4 py-2 rounded-lg transition hover:bg-red-500/10 uppercase tracking-widest">
+                <button onclick="openCancelModal()" type="button"
+                    class="text-red-400 hover:text-red-300 text-[10px] font-bold border border-red-500/20 bg-red-500/5 px-4 py-2 rounded-lg transition hover:bg-red-500/10 uppercase tracking-widest">
                     Cancel Plan
                 </button>
             {% else %}
-                <a href="{% url 'pricing' %}" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-lg shadow-blue-900/20 uppercase tracking-widest">
+                <a href="{% url 'pricing' %}"
+                    class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-lg shadow-blue-900/20 uppercase tracking-widest">
                     Upgrade Now
                 </a>
             {% endif %}
         </div>
     </div>
 
-    <div class="mt-12 pt-8 border-t border-white/5 flex justify-center">
-        <form action="{% url 'logout' %}" method="post" class="w-full">
-            {% csrf_token %}
-            <button type="submit" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl uppercase tracking-widest transition shadow-lg shadow-red-900/20 flex items-center justify-center gap-2">
-                <i data-lucide="log-out" class="w-4 h-4"></i>
-                Secure Session Logout
-            </button>
-        </form>
-    </div>
-
 </div>
 
+<!-- Cancel Modal -->
 <div id="cancel-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.1)] relative">
 
@@ -89,17 +113,19 @@
 
         <h3 class="text-xl font-black text-white mb-2">Are you sure?</h3>
         <p class="text-slate-400 text-xs leading-relaxed mb-8">
-            You will lose access to the Neural Engine immediately. This action cannot be undone.
+            You will lose access to the Neural Engine immediately.
         </p>
 
         <div class="grid grid-cols-2 gap-3">
-            <button onclick="closeCancelModal()" type="button" class="py-3 bg-[#111] border border-white/10 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-white/5 transition">
+            <button onclick="closeCancelModal()" type="button"
+                class="py-3 bg-[#111] border border-white/10 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-white/5 transition">
                 Keep Plan
             </button>
 
-            <form action="{% url 'cancel_subscription' %}" method="POST" class="w-full">
+            <form action="{% url 'cancel_subscription' %}" method="POST">
                 {% csrf_token %}
-                <button type="submit" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest transition shadow-lg shadow-red-900/20">
+                <button type="submit"
+                    class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest transition shadow-lg shadow-red-900/20">
                     Confirm Cancel
                 </button>
             </form>
@@ -107,8 +133,9 @@
     </div>
 </div>
 
+<!-- Fail Modal -->
 <div id="fail-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-scale-in">
+    <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-scale-in">
 
         <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
             <i data-lucide="x" class="w-8 h-8 text-red-500"></i>
@@ -116,37 +143,39 @@
 
         <h3 class="text-xl font-black text-white mb-2">Update Failed</h3>
         <p class="text-slate-400 text-xs leading-relaxed mb-8">
-            The username or email is already taken, or the format is invalid.
+            Please fix the highlighted fields and try again.
         </p>
 
-        <button onclick="closeFailModal()" class="w-full py-3 bg-white text-black font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
+        <button onclick="closeFailModal()"
+            class="w-full py-3 bg-white text-black font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
             Fix Errors
         </button>
     </div>
 </div>
 
 <style>
-    @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
-    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+    @keyframes scaleIn {
+        0% { opacity: 0; transform: scale(0.9); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+    .animate-scale-in {
+        animation: scaleIn 0.3s ease-out forwards;
+    }
 </style>
 
 <script>
     if (window.lucide) lucide.createIcons();
 
-    // Cancel Modal Logic
     function openCancelModal() {
         document.getElementById('cancel-modal').classList.remove('hidden');
     }
     function closeCancelModal() {
         document.getElementById('cancel-modal').classList.add('hidden');
     }
-
-    // Failure Modal Logic
     function closeFailModal() {
         document.getElementById('fail-modal').classList.add('hidden');
     }
 
-    // 🚀 AUTO-TRIGGER: If Django sent form errors, open the Fail Modal immediately
     {% if form.errors %}
         document.getElementById('fail-modal').classList.remove('hidden');
     {% endif %}
