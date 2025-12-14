@@ -202,16 +202,26 @@ def settings_view(request):
 
     if request.method == 'POST':
         form = UserUpdateForm(request.POST, instance=user)
+
         if form.is_valid():
-            user = form.save(commit=False)
-            # Handle manual country update since it's not on User model
-            profile.country = form.cleaned_data.get('country', profile.country)
-            user.save()
-            profile.save()
-            messages.success(request, "Profile Updated Successfully.")
-            return redirect('settings')
+            # 1. Update the User Model (Username, Email)
+            # We save immediately. No commit=False needed unless doing custom logic on user object.
+            user = form.save()
+
+            # 2. Update the Profile Model (Country) manually
+            # Because 'country' is NOT in the User model, form.save() won't touch it.
+            new_country = form.cleaned_data.get('country')
+            if new_country:
+                profile.country = new_country
+                profile.save()  # <--- CRITICAL: Must save profile separately
+
+                # 🚀 RENDER SUCCESS POPUP (Instead of just redirecting)
+                return render(request, 'core/auth/profile_saved.html')
+        else:
+            # If form is invalid, errors will be shown in the template
+            messages.error(request, "Update failed.")
     else:
-        # Pre-fill form
+        # Pre-fill the form with User data + Profile country
         initial_data = {'country': profile.country}
         form = UserUpdateForm(instance=user, initial=initial_data)
 

@@ -9,6 +9,11 @@
     <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 mb-8">
         <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">Profile Details</h3>
 
+        {% if form.errors %}
+            <div class="mb-6 bg-red-900/10 border border-red-500/20 p-4 rounded-lg hidden"> <p class="text-xs font-bold text-red-400 mb-1">Update Failed</p>
+            </div>
+        {% endif %}
+
         <form method="post" class="space-y-6">
             {% csrf_token %}
             <div>
@@ -62,6 +67,17 @@
             {% endif %}
         </div>
     </div>
+
+    <div class="mt-12 pt-8 border-t border-white/5 flex justify-center">
+        <form action="{% url 'logout' %}" method="post" class="w-full">
+            {% csrf_token %}
+            <button type="submit" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl uppercase tracking-widest transition shadow-lg shadow-red-900/20 flex items-center justify-center gap-2">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                Secure Session Logout
+            </button>
+        </form>
+    </div>
+
 </div>
 
 <div id="cancel-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -91,15 +107,48 @@
     </div>
 </div>
 
+<div id="fail-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center relative shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-scale-in">
+
+        <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+            <i data-lucide="x" class="w-8 h-8 text-red-500"></i>
+        </div>
+
+        <h3 class="text-xl font-black text-white mb-2">Update Failed</h3>
+        <p class="text-slate-400 text-xs leading-relaxed mb-8">
+            The username or email is already taken, or the format is invalid.
+        </p>
+
+        <button onclick="closeFailModal()" class="w-full py-3 bg-white text-black font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
+            Fix Errors
+        </button>
+    </div>
+</div>
+
+<style>
+    @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+</style>
+
 <script>
     if (window.lucide) lucide.createIcons();
 
+    // Cancel Modal Logic
     function openCancelModal() {
         document.getElementById('cancel-modal').classList.remove('hidden');
     }
-
     function closeCancelModal() {
         document.getElementById('cancel-modal').classList.add('hidden');
     }
+
+    // Failure Modal Logic
+    function closeFailModal() {
+        document.getElementById('fail-modal').classList.add('hidden');
+    }
+
+    // 🚀 AUTO-TRIGGER: If Django sent form errors, open the Fail Modal immediately
+    {% if form.errors %}
+        document.getElementById('fail-modal').classList.remove('hidden');
+    {% endif %}
 </script>
 {% endblock %}
