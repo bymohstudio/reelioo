@@ -50,12 +50,6 @@ def create_user_profile(sender, instance, created, **kwargs):
         UserProfile.objects.get_or_create(user=instance)
 
 
-# --- AUTO-CREATE PROFILE SIGNAL ---
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        UserProfile.objects.create(user=instance)
-
 
 # --- ANALYTICS MODELS (For future Admin Dashboard) ---
 class PredictionLog(models.Model):

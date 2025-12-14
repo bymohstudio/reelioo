@@ -52,7 +52,8 @@
 
                         <form action="{% url 'logout' %}" method="post" class="inline">
                             {% csrf_token %}
-                            <button type="submit" class="text-[10px] font-bold text-slate-500 hover:text-red-400 uppercase tracking-widest transition">Logout</button>
+                            <button type="submit" class="w-full py-2 px-5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-widest transition shadow-lg shadow-red-900/20 flex items-center justify-center gap-2">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>Logout</button>
                         </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log In</a>

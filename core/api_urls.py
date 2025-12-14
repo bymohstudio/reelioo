@@ -12,7 +12,8 @@ urlpatterns = [
     path("", views.landing_view, name="landing"),
     path("terminal/", views.terminal_view, name="terminal"),
     path("pricing/", views.pricing_view, name="pricing"),
-    path("payment/success/", views.payment_success, name="payment_success"),
+    path("payment/success/", views.payment_success_view, name="payment_success"),
+    path("settings/cancel/", views.cancel_subscription_view, name="cancel_subscription"),
 
     # Auth
     path("auth/login/", views.login_view, name="login"),

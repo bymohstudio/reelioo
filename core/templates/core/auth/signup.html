@@ -2,14 +2,12 @@
 {% block content %}
 <div class="flex items-center justify-center min-h-[85vh] px-4 animate-fade-in relative overflow-hidden font-sans">
 
-    <!-- Ambient Glow -->
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
                 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px] -z-10"></div>
 
     <div class="w-full max-w-md bg-[#0a0a0a] border border-white/10
                 rounded-2xl p-8 sm:p-10 shadow-2xl relative z-10">
 
-        <!-- Header -->
         <div class="text-center mb-8">
             <h2 class="text-3xl font-black text-white mb-2">
                 Create Your Reelioo Account
@@ -19,25 +17,49 @@
             </p>
         </div>
 
-        <!-- Form -->
+        {% if form.non_field_errors %}
+        <div class="mb-5 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs text-center">
+            {{ form.non_field_errors.0 }}
+        </div>
+        {% endif %}
+
         <form method="post" class="space-y-5">
             {% csrf_token %}
 
-            <!-- Email -->
             <div>
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
                     Email Address
                 </label>
                 <input type="email" name="email" required
                        placeholder="you@email.com"
+                       value="{{ form.email.value|default:'' }}"
                        class="w-full bg-[#111] border border-white/10 rounded-lg
                               px-4 py-3 text-white text-sm
                               focus:border-blue-500 focus:outline-none
                               focus:ring-1 focus:ring-blue-500 transition
                               shadow-inner placeholder-slate-700 font-mono">
+                {% if form.email.errors %}
+                <p class="text-red-500 text-[10px] mt-1">{{ form.email.errors.0 }}</p>
+                {% endif %}
             </div>
 
-            <!-- Password -->
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Country
+                </label>
+                <input type="text" name="country" required
+                       placeholder="e.g. India"
+                       value="{{ form.country.value|default:'' }}"
+                       class="w-full bg-[#111] border border-white/10 rounded-lg
+                              px-4 py-3 text-white text-sm
+                              focus:border-blue-500 focus:outline-none
+                              focus:ring-1 focus:ring-blue-500 transition
+                              shadow-inner placeholder-slate-700">
+                {% if form.country.errors %}
+                <p class="text-red-500 text-[10px] mt-1">{{ form.country.errors.0 }}</p>
+                {% endif %}
+            </div>
+
             <div>
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
                     Password
@@ -52,9 +74,23 @@
                 <p class="mt-1 text-[10px] text-slate-600">
                     Use at least 8 characters
                 </p>
+                {% if form.password.errors %}
+                <p class="text-red-500 text-[10px] mt-1">{{ form.password.errors.0 }}</p>
+                {% endif %}
             </div>
 
-            <!-- CTA -->
+            <div class="flex items-start gap-3 pt-2">
+                <input type="checkbox" name="terms_agreement" required id="terms"
+                       class="mt-1 bg-[#111] border border-white/10 rounded focus:ring-blue-500 cursor-pointer">
+                <label for="terms" class="text-xs text-slate-500 leading-relaxed cursor-pointer select-none">
+                    I agree to the <a href="{% url 'terms' %}" class="text-blue-400 hover:text-white transition">Terms of Service</a>
+                    and <a href="{% url 'privacy' %}" class="text-blue-400 hover:text-white transition">Privacy Policy</a>.
+                </label>
+            </div>
+            {% if form.terms_agreement.errors %}
+            <p class="text-red-500 text-[10px] text-center">{{ form.terms_agreement.errors.0 }}</p>
+            {% endif %}
+
             <button type="submit"
                     class="w-full bg-gradient-to-r from-blue-600 to-blue-500
                            hover:from-blue-500 hover:to-blue-400
@@ -65,13 +101,11 @@
                 Start 21-Day Free Trial
             </button>
 
-            <!-- Trust -->
             <p class="text-[10px] text-slate-600 text-center">
                 No credit card required · Cancel anytime
             </p>
         </form>
 
-        <!-- Footer -->
         <div class="mt-8 pt-6 border-t border-white/5 text-center">
             <p class="text-xs text-slate-500">
                 Already have an account?
