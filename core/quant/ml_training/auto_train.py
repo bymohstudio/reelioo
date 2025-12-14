@@ -13,9 +13,12 @@ from sklearn.metrics import roc_auc_score, precision_score, recall_score
 # ---------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+SYMBOLS = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
+    "ADAUSDT","AVAXUSDT","DOGEUSDT","LINKUSDT","MATICUSDT",
+    "ARBUSDT","OPUSDT","INJUSDT","APTUSDT","ATOMUSDT",
+    "NEARUSDT","FILUSDT","RNDRUSDT","SUIUSDT","SEIUSDT"]
 INTERVAL = "1h"  # Changed to 1H for Swing Trading stability
-LOOKBACK_DAYS = 180  # 6 Months of data
+LOOKBACK_DAYS = 720  # 24 Months of data
 TARGET_PROFIT = 0.015  # 1.5% Move
 TARGET_CANDLES = 6  # Within 6 Hours
 
