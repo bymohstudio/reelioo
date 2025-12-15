@@ -21,7 +21,6 @@ class CryptoQuantEngine:
     _MODEL = None
     _META = None
 
-    # MUST MATCH TRAINING
     ML_FEATURES = [
         'rsi', 'squeeze', 'vol_z',
         'trend_strength', 'atr_ratio',
@@ -29,7 +28,7 @@ class CryptoQuantEngine:
     ]
 
     # ---------------------------------------------------------
-    # 1. LOAD MODEL + META
+    # 1. LOAD MODEL
     # ---------------------------------------------------------
     @classmethod
     def _load_artifacts(cls):
@@ -78,7 +77,12 @@ class CryptoQuantEngine:
         # Trend Strength
         ema9 = close.ewm(span=9).mean()
         ema21 = close.ewm(span=21).mean()
+        ema50 = close.ewm(span=50).mean()
+
         data['trend_strength'] = (ema9 - ema21) / close * 100
+        data['ema_9'] = ema9
+        data['ema_21'] = ema21
+        data['ema_50'] = ema50
 
         # ATR Ratio
         tr = pd.concat([
@@ -88,6 +92,7 @@ class CryptoQuantEngine:
         ], axis=1).max(axis=1)
         atr = tr.rolling(14).mean()
         data['atr_ratio'] = atr / close
+        data['atr'] = atr
 
         # Candle Body
         data['body_size'] = (close - data['open']).abs() / close
@@ -95,23 +100,36 @@ class CryptoQuantEngine:
         return data.fillna(0)
 
     # ---------------------------------------------------------
-    # 3. MAIN ANALYSIS
+    # 3. MICRO-STRUCTURE LAYER
+    # ---------------------------------------------------------
+    def _analyze_micro_structure(self, last_row):
+        close = float(last_row['close'])
+        ema21 = float(last_row['ema_21'])
+        ema50 = float(last_row['ema_50'])
+
+        if close > ema21 and ema21 > ema50:
+            bias = "LONG"
+        elif close < ema21 and ema21 < ema50:
+            bias = "SHORT"
+        else:
+            bias = "NEUTRAL"
+
+        return bias
+
+    # ---------------------------------------------------------
+    # 4. MAIN ANALYSIS
     # ---------------------------------------------------------
     def analyze(self, df: pd.DataFrame, trade_style: str = "SWING"):
         if df is None or df.empty:
             raise ValueError("Empty dataframe")
 
-        # A. Indicators
         features = self._calculate_indicators(df)
         last = features.iloc[-1]
-
-        # B. Load model + meta
         model, meta = self._load_artifacts()
 
-        # -----------------------------------------------------
-        # C. ML PROBABILITY
-        # -----------------------------------------------------
+        # --- LAYER 1: PRIMARY INTELLIGENCE ---
         ml_prob = 0.5
+
         if model:
             try:
                 row = pd.DataFrame([last])[self.ML_FEATURES].astype(float)
@@ -120,95 +138,107 @@ class CryptoQuantEngine:
             except Exception as e:
                 log.error(f"Prediction failed: {e}")
 
-        # -----------------------------------------------------
-        # 🔑 THRESHOLD ENFORCEMENT (THIS IS WHAT YOU ASKED)
-        # -----------------------------------------------------
-        best_threshold = 0.65  # fallback
-        if meta and isinstance(meta, dict):
-            best_threshold = meta.get("best_threshold", best_threshold)
+        raw_score = ml_prob * 100
 
-        if ml_prob < best_threshold:
-            return SimpleNamespace(
-                score=50,
-                bias="NEUTRAL",
-                entry=None,
-                target1=None,
-                target2=None,
-                target3=None,
-                stop=None,
-                rr_ratio=0.0,
-                expected_duration="Low Confidence",
-                regime="Low Confidence",
-                regime_color="gray",
-                whale_zscore=round(float(last.get("vol_z", 0)), 2),
-                whale_label="Normal",
-                sentiment_headline="Low confidence ML signal",
-                sentiment_score=0.0,
-                top_features=[],
-                model_metrics=meta.get("metrics", {}) if meta else {}
-            )
-
-        # -----------------------------------------------------
-        # D. SCORING
-        # -----------------------------------------------------
-        score = ml_prob * 100
-        trend_val = float(last.get('trend_strength', 0))
-        score += trend_val * 10
-        score = max(5, min(99, score))
-
-        if score >= 60:
-            bias = "LONG"
-        elif score <= 40:
-            bias = "SHORT"
+        # Determine Bias
+        if raw_score >= 60:
+            primary_bias = "LONG"
+            engine_mode = "PRIMARY_ML"
+        elif raw_score <= 40:
+            primary_bias = "SHORT"
+            engine_mode = "PRIMARY_ML"
         else:
-            bias = "NEUTRAL"
+            primary_bias = "NEUTRAL"
+            engine_mode = "NEUTRAL"
 
-        # -----------------------------------------------------
-        # E. LEVELS
-        # -----------------------------------------------------
+        # --- LAYER 2: LOGIC ROUTING ---
+        final_bias = primary_bias
+
+        # 🚀 NORMALIZATION FIX:
+        # If it's SHORT (e.g. 20%), the confidence is actually 80%.
+        # If it's LONG (e.g. 80%), the confidence is 80%.
+        if raw_score < 50:
+            conviction_score = 100 - raw_score
+        else:
+            conviction_score = raw_score
+
+        regime_label = "AI_SWING"
+        regime_color = "gray"
+        duration = "Wait"
+        signal_strength = "NONE"
+
+        if engine_mode == "PRIMARY_ML":
+            final_bias = primary_bias
+            regime_label = "STRONG_TREND"
+            regime_color = "green"
+            duration = "Swing (1-3 Days)"
+            signal_strength = "STRONG"
+
+        else:
+            # Primary is Neutral -> Check Micro-Structure
+            micro_bias = self._analyze_micro_structure(last)
+
+            if micro_bias != "NEUTRAL":
+                final_bias = micro_bias
+                # Speculative fixed score
+                conviction_score = 60.0
+                regime_label = "MICRO_SCALP"
+                regime_color = "yellow"
+                duration = "Scalp (15m - 4h)"
+                signal_strength = "SPECULATIVE"
+            else:
+                final_bias = "NEUTRAL"
+                conviction_score = 50.0
+                regime_label = "CONSOLIDATION"
+                duration = "Stand Aside"
+                signal_strength = "NONE"
+
+        # --- LAYER 3: LEVEL GENERATION ---
         price = float(df['close'].iloc[-1])
-        atr = price * 0.02 if last.get('atr_ratio', 0) == 0 else price * last['atr_ratio']
+        atr = float(last['atr'])
+        if atr == 0: atr = price * 0.01
 
-        if bias == "LONG":
-            stop = price - atr * 1.5
-            t1 = price + atr * 1.5
-            t2 = price + atr * 2.5
-            t3 = price + atr * 5
-        elif bias == "SHORT":
-            stop = price + atr * 1.5
-            t1 = price - atr * 1.5
-            t2 = price - atr * 2.5
-            t3 = price - atr * 5
+        if signal_strength == "STRONG":
+            stop_mult, t1_mult = 2.0, 2.0
+        elif signal_strength == "SPECULATIVE":
+            stop_mult, t1_mult = 1.0, 1.5
+        else:
+            stop_mult, t1_mult = 1.0, 1.0
+
+        if final_bias == "LONG":
+            stop = price - (atr * stop_mult)
+            t1 = price + (atr * t1_mult)
+            t2 = price + (atr * t1_mult * 2)
+            t3 = price + (atr * t1_mult * 3)
+        elif final_bias == "SHORT":
+            stop = price + (atr * stop_mult)
+            t1 = price - (atr * t1_mult)
+            t2 = price - (atr * t1_mult * 2)
+            t3 = price - (atr * t1_mult * 3)
         else:
             stop = price
             t1 = t2 = t3 = price
 
-        rr = abs(t1 - price) / abs(price - stop) if price != stop else 0
-
-        metrics = meta.get("metrics", {}) if meta else {}
+        rr = abs(t1 - price) / abs(price - stop) if price != stop else 0.0
 
         return SimpleNamespace(
-            score=round(score, 0),
-            bias=bias,
+            # 🚀 RETURN NORMALIZED CONVICTION SCORE (e.g. 78% instead of 22%)
+            score=round(conviction_score, 0),
+
+            bias=final_bias,
             entry=round(price, 4),
             target1=round(t1, 4),
             target2=round(t2, 4),
             target3=round(t3, 4),
             stop=round(stop, 4),
             rr_ratio=round(rr, 2),
-            expected_duration="6–72 HOURS",
-            regime="Trending" if abs(trend_val) > 0.2 else "Ranging",
-            regime_color="green" if trend_val > 0 else "red",
+            expected_duration=duration,
+            regime=regime_label.replace("_", " "),
+            regime_color=regime_color,
             whale_zscore=round(float(last.get("vol_z", 0)), 2),
-            whale_label="High Volume" if abs(last.get("vol_z", 0)) > 1.5 else "Normal",
-            sentiment_headline="ML + Quant Confirmed",
-            sentiment_score=round(ml_prob * 100, 1),
+            whale_label="High Vol" if abs(last.get("vol_z", 0)) > 2 else "Normal",
+            sentiment_headline=f"{regime_label.replace('_', ' ')} Detected",
+            sentiment_score=round(conviction_score, 1),
             top_features=[],
-            model_metrics={
-                "auc": metrics.get("auc"),
-                "win_rate": metrics.get("win_rate"),
-                "profit_factor": metrics.get("profit_factor"),
-                "best_threshold": best_threshold,
-                "trained_on": meta.get("trained_date") if meta else None
-            }
+            model_metrics=meta.get("metrics", {}) if meta else {}
         )
