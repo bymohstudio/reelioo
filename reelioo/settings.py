@@ -31,7 +31,7 @@ SECRET_KEY = os.getenv('SECRET_KEY','dev-secret')
 DEBUG = os.getenv('DEBUG','True') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS','localhost').split(',')
 
-CSRF_TRUSTED_ORIGINS = ["https://*.railway.app", "reelioo.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.railway.app", "https://reelioo.app"]
 
 
 # Application definition
