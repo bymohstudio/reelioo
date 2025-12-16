@@ -1,3 +1,5 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,9 +28,9 @@
     <meta name="twitter:description" content="Don't guess. Quantify. Access the same volatility vectors used by hedge funds.">
     <meta name="twitter:image" content="https://reelioo.app/static/og-social-card.jpg">
 
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
     <meta name="theme-color" content="#020202">
 
     <link rel="preconnect" href="https://cdn.tailwindcss.com">
