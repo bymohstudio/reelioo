@@ -2,108 +2,94 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-6 py-20 font-sans">
-
     <h1 class="text-3xl font-black text-white mb-2">Account Settings</h1>
-    <p class="text-sm text-slate-500 mb-10">Manage your profile and subscription preferences.</p>
 
     <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 mb-8">
-        <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">
-            Profile Details
-        </h3>
-
-        {% if form.errors %}
-            <div class="mb-6 bg-red-900/10 border border-red-500/20 p-4 rounded-lg hidden"></div>
-        {% endif %}
-
-        <form method="post" class="space-y-6">
-            {% csrf_token %}
-
-            <!-- Username -->
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Username
-                </label>
+       <form method="post" class="space-y-6">
+           {% csrf_token %}
+           <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Username</label>
                 {{ form.username }}
-
-                {% if form.username.errors %}
-                    <p class="mt-1 text-xs text-red-400 font-medium">
-                        {{ form.username.errors.0 }}
-                    </p>
-                {% endif %}
-            </div>
-
-            <!-- Email -->
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Email Address
-                </label>
+           </div>
+           <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Email</label>
                 {{ form.email }}
-
-                {% if form.email.errors %}
-                    <p class="mt-1 text-xs text-red-400 font-medium">
-                        {{ form.email.errors.0 }}
-                    </p>
-                {% endif %}
-            </div>
-
-            <!-- Country -->
-            <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Country
-                </label>
+           </div>
+           <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Country</label>
                 {{ form.country }}
-            </div>
-
-            <button type="submit"
-                class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
-                Save Changes
-            </button>
-        </form>
+           </div>
+           <button type="submit" class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">Save Changes</button>
+       </form>
     </div>
 
-    <!-- Subscription -->
     <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8">
         <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">
             Subscription
         </h3>
 
-        <div class="flex justify-between items-center">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="space-y-3">
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                     Current Status
                 </p>
 
-                {% if user.profile.is_premium %}
+                {# LOGIC: 1. Active Premium #}
+                {% if user.profile.is_premium and user.profile.subscription_status == 'active' %}
                     <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
                         <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                         SUPREME ACTIVE
                     </div>
-                    <p class="text-[10px] text-slate-600 font-mono">Auto-renews monthly</p>
-                {% else %}
-                    <div class="inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
-                        <div class="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-                        TRIAL ({{ user.profile.get_days_left }} DAYS LEFT)
+                    <p class="text-[10px] text-slate-600 font-mono">Renews automatically.</p>
+
+                {# LOGIC: 2. Cancellation Pending (Premium access still valid) #}
+                {% elif user.profile.subscription_status == 'cancellation_pending' %}
+                    <div class="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
+                        <div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                        CANCELLATION SCHEDULED
                     </div>
+                    <p class="text-[10px] text-slate-400 font-mono mt-1">
+                        Access valid until: <span class="text-white">{{ user.profile.subscription_end_date|date:"M d, Y" }}</span>
+                    </p>
+
+                {# LOGIC: 3. Trial #}
+                {% else %}
+                    {% if user.profile.is_trial_expired %}
+                        <div class="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
+                            TRIAL EXPIRED
+                        </div>
+                    {% else %}
+                        <div class="inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
+                            <div class="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                            TRIAL ({{ user.profile.get_days_left }} DAYS LEFT)
+                        </div>
+                    {% endif %}
                 {% endif %}
             </div>
 
-            {% if user.profile.is_premium %}
-                <button onclick="openCancelModal()" type="button"
-                    class="text-red-400 hover:text-red-300 text-[10px] font-bold border border-red-500/20 bg-red-500/5 px-4 py-2 rounded-lg transition hover:bg-red-500/10 uppercase tracking-widest">
-                    Cancel Plan
-                </button>
-            {% else %}
-                <a href="{% url 'pricing' %}"
-                    class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-lg shadow-blue-900/20 uppercase tracking-widest">
-                    Upgrade Now
-                </a>
-            {% endif %}
+            <div>
+                {% if user.profile.is_premium and user.profile.subscription_status == 'active' %}
+                    <button onclick="openCancelModal()" type="button"
+                        class="text-red-400 hover:text-red-300 text-[10px] font-bold border border-red-500/20 bg-red-500/5 px-4 py-2 rounded-lg transition hover:bg-red-500/10 uppercase tracking-widest">
+                        Cancel Plan
+                    </button>
+
+                {% elif user.profile.subscription_status == 'cancellation_pending' %}
+                    <button disabled class="text-slate-500 text-[10px] font-bold border border-white/5 bg-white/5 px-4 py-2 rounded-lg cursor-not-allowed uppercase tracking-widest">
+                        Plan Ending Soon
+                    </button>
+
+                {% else %}
+                    <a href="{% url 'pricing' %}"
+                        class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg transition shadow-lg shadow-blue-900/20 uppercase tracking-widest">
+                        Upgrade Now
+                    </a>
+                {% endif %}
+            </div>
         </div>
     </div>
-
 </div>
 
-<!-- Cancel Modal -->
 <div id="cancel-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.1)] relative">
 
@@ -113,7 +99,7 @@
 
         <h3 class="text-xl font-black text-white mb-2">Are you sure?</h3>
         <p class="text-slate-400 text-xs leading-relaxed mb-8">
-            You will lose access to the Neural Engine immediately.
+            This will schedule your plan to cancel at the end of the billing cycle.
         </p>
 
         <div class="grid grid-cols-2 gap-3">
@@ -133,51 +119,27 @@
     </div>
 </div>
 
-<!-- Fail Modal -->
 <div id="fail-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-scale-in">
-
         <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
             <i data-lucide="x" class="w-8 h-8 text-red-500"></i>
         </div>
-
         <h3 class="text-xl font-black text-white mb-2">Update Failed</h3>
-        <p class="text-slate-400 text-xs leading-relaxed mb-8">
-            Please fix the highlighted fields and try again.
-        </p>
-
-        <button onclick="closeFailModal()"
-            class="w-full py-3 bg-white text-black font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
-            Fix Errors
-        </button>
+        <p class="text-slate-400 text-xs leading-relaxed mb-8">Please fix the highlighted fields and try again.</p>
+        <button onclick="closeFailModal()" class="w-full py-3 bg-white text-black font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">Fix Errors</button>
     </div>
 </div>
 
 <style>
-    @keyframes scaleIn {
-        0% { opacity: 0; transform: scale(0.9); }
-        100% { opacity: 1; transform: scale(1); }
-    }
-    .animate-scale-in {
-        animation: scaleIn 0.3s ease-out forwards;
-    }
+    @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
 </style>
 
 <script>
     if (window.lucide) lucide.createIcons();
-
-    function openCancelModal() {
-        document.getElementById('cancel-modal').classList.remove('hidden');
-    }
-    function closeCancelModal() {
-        document.getElementById('cancel-modal').classList.add('hidden');
-    }
-    function closeFailModal() {
-        document.getElementById('fail-modal').classList.add('hidden');
-    }
-
-    {% if form.errors %}
-        document.getElementById('fail-modal').classList.remove('hidden');
-    {% endif %}
+    function openCancelModal() { document.getElementById('cancel-modal').classList.remove('hidden'); }
+    function closeCancelModal() { document.getElementById('cancel-modal').classList.add('hidden'); }
+    function closeFailModal() { document.getElementById('fail-modal').classList.add('hidden'); }
+    {% if form.errors %} document.getElementById('fail-modal').classList.remove('hidden'); {% endif %}
 </script>
 {% endblock %}

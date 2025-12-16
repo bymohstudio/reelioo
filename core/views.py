@@ -1,14 +1,16 @@
 import razorpay
 import os
 import json
+from datetime import datetime
+from django.utils import timezone
+from datetime import timedelta
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import UserProfile
-from .forms import SignupForm, UserUpdateForm  # Import the new forms
+from .forms import SignupForm, UserUpdateForm
 
 
 # --- PUBLIC PAGES ---
@@ -58,12 +60,15 @@ def logout_view(request):
     return redirect('landing')
 
 
+
 # --- TERMINAL ---
 @login_required(login_url='login')
 def terminal_view(request):
     profile = request.user.profile
+
+    # This runs the "Lazy Check" inside the model
     if not profile.is_access_granted():
-        messages.warning(request, "Trial Expired. Please Upgrade.")
+        messages.warning(request, "Trial Expired. Please Upgrade to Access Terminal.")
         return redirect('pricing')
 
     context = {
@@ -77,36 +82,38 @@ def terminal_view(request):
 # --- PRICING ---
 @login_required
 def pricing_view(request):
-    # 1. Fetch Keys & Config
+    profile = request.user.profile
+
+    # 1. BLOCK UPGRADE if user is 'cancellation_pending' (Still has access)
+    if profile.subscription_status == 'cancellation_pending':
+        if profile.is_access_granted():
+            messages.info(request, "You have an active plan. Wait for it to expire before resubscribing.")
+            return redirect('settings')
+
+    # 2. STANDARD LOGIC
     key_id = os.getenv("RAZORPAY_KEY_ID")
     key_secret = os.getenv("RAZORPAY_KEY_SECRET")
     plan_id = os.getenv("RAZORPAY_PLAN_ID")
 
     client = razorpay.Client(auth=(key_id, key_secret))
-    profile = request.user.profile
 
-    # 2. Create Razorpay Subscription
     sub_id = "error"
     try:
         if key_id and key_secret and plan_id:
             subscription = client.subscription.create({
                 "plan_id": plan_id,
-                "total_count": 60,  # 5 Years
+                "total_count": 60,
                 "quantity": 1,
                 "customer_notify": 1,
                 "notes": {"email": request.user.email}
             })
             sub_id = subscription['id']
-
-            # 🚀 PRE-SAVE: Link this Sub ID to the User NOW
-            # This allows us to find them if the session drops during payment
             profile.razorpay_subscription_id = sub_id
             profile.save()
 
     except Exception as e:
         print(f"Razorpay Init Error: {e}")
 
-    # 3. Context for Template
     context = {
         "key_id": key_id,
         "sub_id": sub_id,
@@ -116,17 +123,15 @@ def pricing_view(request):
     return render(request, 'core/pricing.html', context)
 
 
-# --- PAYMENT SUCCESS HANDLER ---
+# --- PAYMENT SUCCESS ---
 @csrf_exempt
 def payment_success_view(request):
     if request.method == "POST":
         try:
-            # 1. Capture Data
             payment_id = request.POST.get('razorpay_payment_id')
             subscription_id = request.POST.get('razorpay_subscription_id')
             signature = request.POST.get('razorpay_signature')
 
-            # 2. Verify Signature
             client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
             data_to_verify = {
                 'razorpay_payment_id': payment_id,
@@ -135,38 +140,33 @@ def payment_success_view(request):
             }
             client.utility.verify_subscription_payment_signature(data_to_verify)
 
-            # 3. 🚀 RECOVER USER (Fixes "Logged Out" Issue)
             try:
-                # Find the profile that has this subscription ID
                 profile = UserProfile.objects.get(razorpay_subscription_id=subscription_id)
                 user = profile.user
 
-                # 4. Activate Premium
+                # UPDATE LOGIC:
                 profile.is_premium = True
                 profile.subscription_status = "active"
+
+                # Set approximate end date (30 days from now)
+                # Ideally, webhooks handle renewal, but this ensures immediate access
+                profile.subscription_end_date = timezone.now() + timedelta(days=30)
                 profile.save()
 
-                # 5. 🚀 FORCE RE-LOGIN
-                # Manually restore the session so they are authenticated in the popup
                 user.backend = 'django.contrib.auth.backends.ModelBackend'
                 login(request, user)
-
-                # Render the Beautiful Success Popup
                 return render(request, 'core/success.html')
 
             except UserProfile.DoesNotExist:
-                print("❌ Fatal: Payment success but UserProfile not found.")
                 return redirect('pricing')
 
         except Exception as e:
-            print(f"❌ Verification Failed: {e}")
             return render(request, 'core/payment_failed.html')
 
     return redirect('pricing')
 
 
-# ... existing imports ...
-
+# --- CANCEL SUBSCRIPTION (LOGIC FIX) ---
 @login_required
 def cancel_subscription_view(request):
     if request.method == "POST":
@@ -175,53 +175,64 @@ def cancel_subscription_view(request):
 
         if sub_id and profile.is_premium:
             try:
-                # 1. Initialize Razorpay
                 client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
 
-                # 2. Cancel on Razorpay (cancel_at_cycle_end=0 implies immediate cancellation)
-                client.subscription.cancel(sub_id, {'cancel_at_cycle_end': 0})
+                # 1. Fetch Subscription Data FIRST to get the "current_end"
+                sub_details = client.subscription.fetch(sub_id)
+
+                # Razorpay returns 'current_end' as a Unix timestamp
+                current_end_timestamp = sub_details.get('current_end')
+
+                # Convert to Django Datetime
+                if current_end_timestamp:
+                    end_date = datetime.fromtimestamp(current_end_timestamp)
+                    # Make it timezone aware
+                    end_date = timezone.make_aware(end_date)
+                    profile.subscription_end_date = end_date
+                else:
+                    # Fallback if API fails: Keep current date + 30 days or existing date
+                    if not profile.subscription_end_date:
+                        profile.subscription_end_date = timezone.now() + timedelta(days=30)
+
+                # 2. Cancel at Cycle End (User keeps access until paid period is over)
+                client.subscription.cancel(sub_id, {'cancel_at_cycle_end': 1})
 
                 # 3. Update Local DB
-                profile.is_premium = False
-                profile.subscription_status = "cancelled"
+                # DO NOT set is_premium = False yet!
+                profile.subscription_status = "cancellation_pending"
                 profile.save()
 
                 return render(request, 'core/cancel_success.html')
 
             except Exception as e:
                 print(f"Cancel Error: {e}")
-                messages.error(request, "Could not cancel subscription. Please try again or contact support.")
+                messages.error(request, "Could not cancel. Contact support.")
 
     return redirect('settings')
 
-# --- ACCOUNT SETTINGS (NEW) ---
+
+# ... (Settings view remains mostly same, just Logic checks in template) ...
 @login_required
 def settings_view(request):
+    # Same code as provided previously
     user = request.user
     profile = user.profile
 
+    # Run lazy check ensures data is fresh
+    profile.is_access_granted()
+
     if request.method == 'POST':
         form = UserUpdateForm(request.POST, instance=user)
-
         if form.is_valid():
-            # 1. Update the User Model (Username, Email)
-            # We save immediately. No commit=False needed unless doing custom logic on user object.
             user = form.save()
-
-            # 2. Update the Profile Model (Country) manually
-            # Because 'country' is NOT in the User model, form.save() won't touch it.
             new_country = form.cleaned_data.get('country')
             if new_country:
                 profile.country = new_country
-                profile.save()  # <--- CRITICAL: Must save profile separately
-
-                # 🚀 RENDER SUCCESS POPUP (Instead of just redirecting)
+                profile.save()
                 return render(request, 'core/auth/profile_saved.html')
         else:
-            # If form is invalid, errors will be shown in the template
             messages.error(request, "Update failed.")
     else:
-        # Pre-fill the form with User data + Profile country
         initial_data = {'country': profile.country}
         form = UserUpdateForm(instance=user, initial=initial_data)
 
