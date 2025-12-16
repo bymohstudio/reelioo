@@ -19,22 +19,43 @@ class SignupForm(forms.ModelForm):
         model = User
         fields = ['username', 'email', 'password']
 
+    # --- FIX 1: CASE-INSENSITIVE EMAIL CHECK ---
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        # Use __iexact to check for duplicates regardless of Capital/lowercase
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("This email is already registered. Please login instead.")
+        return email
+
     def save(self, commit=True):
-        # Handle User Creation
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
-        # If no username provided, use email prefix or email itself
-        if not self.cleaned_data['username']:
-            user.username = user.email.split('@')[0]
-        else:
-            user.username = self.cleaned_data['username']
-
         user.set_password(self.cleaned_data['password'])
+
+        # --- FIX 2: SMART USERNAME GENERATION (Prevents "Already Exists" Crash) ---
+        if self.cleaned_data.get('username'):
+            base_username = self.cleaned_data['username']
+        else:
+            base_username = user.email.split('@')[0]
+
+        # Check if username exists and append number (john -> john1 -> john2)
+        username = base_username
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+
+        user.username = username
+        # -------------------------------------------------------------------------
 
         if commit:
             user.save()
-            # Update Profile
-            profile = user.profile
+            # Safely create/get profile
+            if hasattr(user, 'profile'):
+                profile = user.profile
+            else:
+                profile = UserProfile.objects.create(user=user)
+
             profile.country = self.cleaned_data['country']
             profile.terms_accepted = True
             profile.save()
