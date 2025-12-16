@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /pricing/
+Allow: /terms/
+Allow: /privacy/
+Allow: /contact/
+
+# Block Private App Areas
+Disallow: /terminal/
+Disallow: /settings/
+Disallow: /journal/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /accounts/
+
+# Sitemap Location
+Sitemap: https://reelioo.app/sitemap.xml

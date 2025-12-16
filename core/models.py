@@ -83,6 +83,48 @@ def create_user_profile(sender, instance, created, **kwargs):
         UserProfile.objects.get_or_create(user=instance)
 
 
+# core/models.py
+from django.db import models
+from django.contrib.auth.models import User
+
+
+# ... existing imports ...
+
+class JournalEntry(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('WIN', 'Win'),
+        ('LOSS', 'Loss'),
+        ('BREAKEVEN', 'Breakeven'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="journal_entries")
+    symbol = models.CharField(max_length=20)
+    bias = models.CharField(max_length=10)  # LONG or SHORT
+
+    # Price Data Snapshot
+    entry_price = models.FloatField()
+    stop_loss = models.FloatField()
+    target = models.FloatField()
+
+    # Metadata
+    confidence = models.FloatField(default=0.0)
+    leverage = models.CharField(max_length=20, default="Low")
+
+    # Outcome
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    pnl_percent = models.FloatField(default=0.0)  # Realized PnL
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.symbol} ({self.bias}) - {self.status}"
+
+
 
 # --- ANALYTICS MODELS (For future Admin Dashboard) ---
 class PredictionLog(models.Model):

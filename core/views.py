@@ -2,6 +2,10 @@ import razorpay
 import os
 import json
 from datetime import datetime
+
+from django.core.paginator import Paginator
+from django.http import JsonResponse, HttpResponse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import timedelta
 from django.shortcuts import render, redirect
@@ -9,8 +13,13 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
-from .models import UserProfile
+from .models import UserProfile, JournalEntry
 from .forms import SignupForm, UserUpdateForm
+from .services.marketdata_service import MarketService
+from django.core.mail import send_mail
+from django.conf import settings
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 
 # --- PUBLIC PAGES ---
@@ -25,10 +34,70 @@ def signup_view(request):
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
+            # 1. CRITICAL: Save User & Trigger Trial Logic
+            # This line creates the User. The signal in models.py immediately
+            # creates the UserProfile and sets 'trial_start_date'.
+            # Trial logic is now SECURE.
             user = form.save()
+
+            # 2. EMAIL LOGIC (Safe Mode)
+            # We wrap this in try/except so it NEVER blocks the signup process.
+            try:
+                subject = "Access Granted: Reelioo Neural Terminal Online"
+
+                # The HTML Content
+                html_message = f"""
+                <!DOCTYPE html>
+                <html>
+                <body style="background-color: #000; font-family: sans-serif; color: #ccc;">
+                    <div style="max-width: 600px; margin: auto; background: #050505; border: 1px solid #333; padding: 40px;">
+                        <h2 style="color: #fff;">REEL<span style="color: #2563eb;">IOO</span></h2>
+                        <h1 style="color: #fff;">Protocol Initialized.</h1>
+                        <p>Hello <strong>{user.username}</strong>,</p>
+                        <p>Your access to the Reelioo Neural Engine is confirmed. For the next 21 days, you have the visibility of an institutional trading desk.</p>
+                        <br>
+                        <a href="https://reelioo.app/login" style="background: #2563eb; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">LAUNCH TERMINAL</a>
+                        <br><br>
+                        <p><strong>Mission Directive:</strong><br>1. Go to Terminal.<br>2. Type 'BTC'.<br>3. Decode the Order Flow.</p>
+                        <hr style="border-color: #333;">
+                        <p style="text-align: center; color: #fff; font-weight: bold;">Trade Less. Win More.</p>
+                    </div>
+                </body>
+                </html>
+                """
+
+                # Plain text fallback for old email clients
+                plain_message = strip_tags(html_message)
+
+                # Send Welcome Email
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                    html_message=html_message,
+                    fail_silently=True,  # Keeps app running if email fails
+                )
+
+                # Send Admin Alert to You
+                send_mail(
+                    f"🚀 New Signup: {user.username}",
+                    f"Email: {user.email}\nCountry: {user.profile.country}",
+                    settings.DEFAULT_FROM_EMAIL,
+                    ['reeliooapp@gmail.com'],  # Your admin email
+                    fail_silently=True,
+                )
+
+            except Exception as e:
+                # Log error but DO NOT stop the user from logging in
+                print(f"⚠️ Email System Error: {e}")
+
+            # 3. Log In & Redirect
+            # This ensures the user enters the app immediately
             login(request, user)
             messages.success(request, "Account Initialized. 21-Day Trial Active.")
             return redirect('terminal')
+
     else:
         form = SignupForm()
     return render(request, 'core/auth/signup.html', {'form': form})
@@ -239,6 +308,117 @@ def settings_view(request):
     return render(request, 'core/auth/settings.html', {'form': form})
 
 
+@login_required
+def journal_view(request):
+    # Fetch user's entries
+    entries_list = JournalEntry.objects.filter(user=request.user)
+
+    # Pagination (10 per page)
+    paginator = Paginator(entries_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Calculate Stats
+    total_trades = entries_list.count()
+    wins = entries_list.filter(status='WIN').count()
+    losses = entries_list.filter(status='LOSS').count()
+    win_rate = round((wins / total_trades * 100), 1) if total_trades > 0 else 0
+
+    context = {
+        'page_obj': page_obj,
+        'total_trades': total_trades,
+        'win_rate': win_rate,
+        'active_pending': entries_list.filter(status='PENDING').count()
+    }
+    return render(request, 'core/journal.html', context)
+
+
+@login_required
+def add_journal_entry(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            # Create Entry
+            JournalEntry.objects.create(
+                user=request.user,
+                symbol=data.get('symbol'),
+                bias=data.get('bias'),
+                entry_price=float(data.get('entry')),
+                stop_loss=float(data.get('stop')),
+                target=float(data.get('target')),
+                confidence=float(data.get('confidence', 0)),
+                leverage=data.get('leverage', 'Low')
+            )
+            return JsonResponse({'status': 'success', 'message': 'Signal saved to Watchlist'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+
+@login_required
+def delete_journal_entry(request, entry_id):
+    if request.method == "DELETE":
+        try:
+            entry = JournalEntry.objects.get(id=entry_id, user=request.user)
+            entry.delete()
+            return JsonResponse({'status': 'success'})
+        except JournalEntry.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Not found'}, status=404)
+
+
+@login_required
+def refresh_journal_entry(request, entry_id):
+    if request.method == "POST":
+        try:
+            entry = JournalEntry.objects.get(id=entry_id, user=request.user)
+
+            # 1. Fetch Live Price using your MarketService
+            # Note: Ensure MarketService.get_historical_data is working correctly
+            df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
+
+            if df is None or df.empty:
+                return JsonResponse({'status': 'error', 'message': 'Market data unavailable'})
+
+            current_price = float(df['close'].iloc[-1])
+
+            # 2. Compare Price vs Targets
+            new_status = "PENDING"
+
+            if entry.bias == "LONG":
+                if current_price >= entry.target:
+                    new_status = "WIN"
+                elif current_price <= entry.stop_loss:
+                    new_status = "LOSS"
+            elif entry.bias == "SHORT":
+                if current_price <= entry.target:
+                    new_status = "WIN"
+                elif current_price >= entry.stop_loss:
+                    new_status = "LOSS"
+
+            # 3. Save Changes
+            if new_status != "PENDING":
+                entry.status = new_status
+                entry.save()
+
+            return JsonResponse({
+                'status': 'success',
+                'new_status': new_status,
+                'current_price': current_price
+            })
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid Method'}, status=405)
+
+def robots_view(request):
+    content = render_to_string('core/robots.txt')
+    return HttpResponse(content, content_type="text/plain")
+
+def sitemap_view(request):
+    content = render_to_string('core/sitemap.xml')
+    return HttpResponse(content, content_type="application/xml")
 
 # --- LEGAL PAGES ---
 def terms_view(request): return render(request, 'core/legal/terms.html')

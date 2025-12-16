@@ -133,6 +133,10 @@
                                     <i data-lucide="history" class="w-3 h-3"></i>
                                     VALIDATE STRATEGY
                                 </button>
+                                <button onclick="addToJournal()" id="btn-journal" class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-emerald-400 transition ml-2 border border-white/10 px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/10">
+                                <i data-lucide="bookmark" class="w-3 h-3"></i>
+                                    SAVE SIGNAL
+                                </button>
                             </div>
                         </div>
 
@@ -526,6 +530,69 @@
         document.getElementById('symbol-input').value = ticker;
         initScan();
     }
+
+    async function addToJournal() {
+    const btn = document.getElementById('btn-journal');
+    const originalText = btn.innerHTML;
+
+    // 1. Gather Data from the UI (since we already have it populated)
+    const symbol = document.getElementById('res-symbol').innerText;
+    const bias = document.getElementById('res-direction').innerText;
+    const priceText = document.getElementById('res-price').innerText.replace('$', '').replace(',', '');
+    const stopText = document.getElementById('res-stop').innerText.replace(',', '');
+    const targetText = document.getElementById('res-target2').innerText.replace(',', '');
+    const confText = document.getElementById('res-score').innerText.replace('%', '');
+    const levText = document.getElementById('res-leverage').innerText;
+
+    if(bias === "NEUTRAL" || symbol === "--") {
+        showError("CANNOT SAVE", "No valid signal generated yet.");
+        return;
+    }
+
+    btn.innerHTML = "SAVING...";
+    btn.disabled = true;
+
+    const payload = {
+        symbol: symbol,
+        bias: bias,
+        entry: priceText,
+        stop: stopText,
+        target: targetText,
+        confidence: confText,
+        leverage: levText
+    };
+
+    try {
+        const csrftoken = getCookie('csrftoken');
+        const res = await fetch("/api/journal/add/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrftoken
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if(res.ok) {
+            btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
+            btn.classList.add('text-emerald-400', 'border-emerald-500/50');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+                btn.disabled = false;
+                if(window.lucide) lucide.createIcons();
+            }, 3000);
+        } else {
+            throw new Error(data.message);
+        }
+    } catch(e) {
+        showError("SAVE FAILED", e.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
 
     async function initScan() {
         const input = document.getElementById('symbol-input');
