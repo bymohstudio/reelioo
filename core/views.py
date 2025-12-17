@@ -1,29 +1,29 @@
 import razorpay
 import os
 import json
-from datetime import datetime
+import requests
+import logging
+from datetime import datetime, timedelta
 
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from datetime import timedelta
+from django.utils.html import strip_tags
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
-from .models import UserProfile, JournalEntry
-from .forms import SignupForm, UserUpdateForm
-from .services.marketdata_service import MarketService
 from django.core.mail import send_mail
 from django.conf import settings
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
-import requests
 
+# --- SAFE IMPORTS (Services/Utils usually safe) ---
+from .services.marketdata_service import MarketService
 from .utils import analyze_market_data
 
+
+# NOTE: 'models' and 'forms' are imported inside functions to prevent Circular Import Recursion
 
 # --- PUBLIC PAGES ---
 def landing_view(request):
@@ -34,21 +34,17 @@ def landing_view(request):
 
 # --- AUTHENTICATION ---
 def signup_view(request):
+    # LAZY IMPORT to stop RecursionError
+    from .forms import SignupForm
+
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
-            # 1. CRITICAL: Save User & Trigger Trial Logic
-            # This line creates the User. The signal in models.py immediately
-            # creates the UserProfile and sets 'trial_start_date'.
-            # Trial logic is now SECURE.
             user = form.save()
 
-            # 2. EMAIL LOGIC (Safe Mode)
-            # We wrap this in try/except so it NEVER blocks the signup process.
+            # EMAIL LOGIC (Safe Mode)
             try:
                 subject = "Access Granted: Reelioo Neural Terminal Online"
-
-                # The HTML Content
                 html_message = f"""
                 <!DOCTYPE html>
                 <html>
@@ -68,35 +64,29 @@ def signup_view(request):
                 </body>
                 </html>
                 """
-
-                # Plain text fallback for old email clients
                 plain_message = strip_tags(html_message)
 
-                # Send Welcome Email
                 send_mail(
                     subject,
                     plain_message,
                     settings.DEFAULT_FROM_EMAIL,
                     [user.email],
                     html_message=html_message,
-                    fail_silently=True,  # Keeps app running if email fails
+                    fail_silently=True,
                 )
 
-                # Send Admin Alert to You
+                # Admin Alert
                 send_mail(
                     f"🚀 New Signup: {user.username}",
-                    f"Email: {user.email}\nCountry: {user.profile.country}",
+                    f"Email: {user.email}",
                     settings.DEFAULT_FROM_EMAIL,
-                    ['reeliooapp@gmail.com'],  # Your admin email
+                    ['reeliooapp@gmail.com'],
                     fail_silently=True,
                 )
 
             except Exception as e:
-                # Log error but DO NOT stop the user from logging in
                 print(f"⚠️ Email System Error: {e}")
 
-            # 3. Log In & Redirect
-            # This ensures the user enters the app immediately
             login(request, user)
             messages.success(request, "Account Initialized. 21-Day Trial Active.")
             return redirect('terminal')
@@ -121,7 +111,7 @@ def login_view(request):
                 return redirect('terminal')
             else:
                 messages.error(request, "Invalid credentials.")
-        except User.DoesNotExist:
+        except Exception:
             messages.error(request, "No account found.")
 
     return render(request, 'core/auth/login.html')
@@ -132,13 +122,11 @@ def logout_view(request):
     return redirect('landing')
 
 
-
 # --- TERMINAL ---
 @login_required(login_url='login')
 def terminal_view(request):
     profile = request.user.profile
 
-    # This runs the "Lazy Check" inside the model
     if not profile.is_access_granted():
         messages.warning(request, "Trial Expired. Please Upgrade to Access Terminal.")
         return redirect('pricing')
@@ -156,20 +144,18 @@ def terminal_view(request):
 def pricing_view(request):
     profile = request.user.profile
 
-    # 1. BLOCK UPGRADE if user is 'cancellation_pending' (Still has access)
     if profile.subscription_status == 'cancellation_pending':
         if profile.is_access_granted():
             messages.info(request, "You have an active plan. Wait for it to expire before resubscribing.")
             return redirect('settings')
 
-    # 2. STANDARD LOGIC
     key_id = os.getenv("RAZORPAY_KEY_ID")
     key_secret = os.getenv("RAZORPAY_KEY_SECRET")
     plan_id = os.getenv("RAZORPAY_PLAN_ID")
 
     client = razorpay.Client(auth=(key_id, key_secret))
-
     sub_id = "error"
+
     try:
         if key_id and key_secret and plan_id:
             subscription = client.subscription.create({
@@ -198,6 +184,8 @@ def pricing_view(request):
 # --- PAYMENT SUCCESS ---
 @csrf_exempt
 def payment_success_view(request):
+    from .models import UserProfile  # Lazy Import
+
     if request.method == "POST":
         try:
             payment_id = request.POST.get('razorpay_payment_id')
@@ -216,12 +204,8 @@ def payment_success_view(request):
                 profile = UserProfile.objects.get(razorpay_subscription_id=subscription_id)
                 user = profile.user
 
-                # UPDATE LOGIC:
                 profile.is_premium = True
                 profile.subscription_status = "active"
-
-                # Set approximate end date (30 days from now)
-                # Ideally, webhooks handle renewal, but this ensures immediate access
                 profile.subscription_end_date = timezone.now() + timedelta(days=30)
                 profile.save()
 
@@ -238,7 +222,7 @@ def payment_success_view(request):
     return redirect('pricing')
 
 
-# --- CANCEL SUBSCRIPTION (LOGIC FIX) ---
+# --- CANCEL SUBSCRIPTION ---
 @login_required
 def cancel_subscription_view(request):
     if request.method == "POST":
@@ -248,29 +232,18 @@ def cancel_subscription_view(request):
         if sub_id and profile.is_premium:
             try:
                 client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
-
-                # 1. Fetch Subscription Data FIRST to get the "current_end"
                 sub_details = client.subscription.fetch(sub_id)
-
-                # Razorpay returns 'current_end' as a Unix timestamp
                 current_end_timestamp = sub_details.get('current_end')
 
-                # Convert to Django Datetime
                 if current_end_timestamp:
                     end_date = datetime.fromtimestamp(current_end_timestamp)
-                    # Make it timezone aware
                     end_date = timezone.make_aware(end_date)
                     profile.subscription_end_date = end_date
                 else:
-                    # Fallback if API fails: Keep current date + 30 days or existing date
                     if not profile.subscription_end_date:
                         profile.subscription_end_date = timezone.now() + timedelta(days=30)
 
-                # 2. Cancel at Cycle End (User keeps access until paid period is over)
                 client.subscription.cancel(sub_id, {'cancel_at_cycle_end': 1})
-
-                # 3. Update Local DB
-                # DO NOT set is_premium = False yet!
                 profile.subscription_status = "cancellation_pending"
                 profile.save()
 
@@ -283,14 +256,13 @@ def cancel_subscription_view(request):
     return redirect('settings')
 
 
-# ... (Settings view remains mostly same, just Logic checks in template) ...
+# --- SETTINGS ---
 @login_required
 def settings_view(request):
-    # Same code as provided previously
+    from .forms import UserUpdateForm  # Lazy Import
+
     user = request.user
     profile = user.profile
-
-    # Run lazy check ensures data is fresh
     profile.is_access_granted()
 
     if request.method == 'POST':
@@ -311,20 +283,18 @@ def settings_view(request):
     return render(request, 'core/auth/settings.html', {'form': form})
 
 
+# --- JOURNAL ---
 @login_required
 def journal_view(request):
-    # Fetch user's entries
-    entries_list = JournalEntry.objects.filter(user=request.user)
+    from .models import JournalEntry  # Lazy Import
 
-    # Pagination (10 per page)
+    entries_list = JournalEntry.objects.filter(user=request.user)
     paginator = Paginator(entries_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Calculate Stats
     total_trades = entries_list.count()
     wins = entries_list.filter(status='WIN').count()
-    losses = entries_list.filter(status='LOSS').count()
     win_rate = round((wins / total_trades * 100), 1) if total_trades > 0 else 0
 
     context = {
@@ -338,11 +308,11 @@ def journal_view(request):
 
 @login_required
 def add_journal_entry(request):
+    from .models import JournalEntry  # Lazy Import
+
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-
-            # Create Entry
             JournalEntry.objects.create(
                 user=request.user,
                 symbol=data.get('symbol'),
@@ -361,6 +331,8 @@ def add_journal_entry(request):
 
 @login_required
 def delete_journal_entry(request, entry_id):
+    from .models import JournalEntry  # Lazy Import
+
     if request.method == "DELETE":
         try:
             entry = JournalEntry.objects.get(id=entry_id, user=request.user)
@@ -372,20 +344,17 @@ def delete_journal_entry(request, entry_id):
 
 @login_required
 def refresh_journal_entry(request, entry_id):
+    from .models import JournalEntry  # Lazy Import
+
     if request.method == "POST":
         try:
             entry = JournalEntry.objects.get(id=entry_id, user=request.user)
-
-            # 1. Fetch Live Price using your MarketService
-            # Note: Ensure MarketService.get_historical_data is working correctly
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
 
             if df is None or df.empty:
                 return JsonResponse({'status': 'error', 'message': 'Market data unavailable'})
 
             current_price = float(df['close'].iloc[-1])
-
-            # 2. Compare Price vs Targets
             new_status = "PENDING"
 
             if entry.bias == "LONG":
@@ -399,7 +368,6 @@ def refresh_journal_entry(request, entry_id):
                 elif current_price >= entry.stop_loss:
                     new_status = "LOSS"
 
-            # 3. Save Changes
             if new_status != "PENDING":
                 entry.status = new_status
                 entry.save()
@@ -415,40 +383,37 @@ def refresh_journal_entry(request, entry_id):
 
     return JsonResponse({'status': 'error', 'message': 'Invalid Method'}, status=405)
 
+
 def robots_view(request):
     content = render_to_string('core/robots.txt')
     return HttpResponse(content, content_type="text/plain")
+
 
 def sitemap_view(request):
     content = render_to_string('core/sitemap.xml')
     return HttpResponse(content, content_type="application/xml")
 
 
-# --- CRON JOB TRIGGER (WEBHOOK) ---
+# --- CRON JOB TRIGGER ---
 def cron_scan_trigger(request, secret_key):
-    # 1. Security Check via Settings
+    # This view does NOT need models or forms, so it's safe
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
 
-    # 2. Define Assets
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
     alerts_sent = 0
     scanned = 0
 
     try:
         for symbol in watchlist:
-            # Run AI Logic (Imported from utils)
             data = analyze_market_data(symbol)
-
-            # Check if valid data returned
             if not data or 'signal' not in data:
                 continue
 
             score = data.get('signal', {}).get('probability', 0)
             bias = data.get('signal', {}).get('bias', 'NEUTRAL')
 
-            # 3. SNIPER FILTER (>65%)
             if score >= 65 and bias != 'NEUTRAL':
                 send_discord_alert(data)
                 alerts_sent += 1
@@ -464,44 +429,44 @@ def cron_scan_trigger(request, secret_key):
 
 
 def send_discord_alert(data):
-    # Fetch URL from Env
     webhook_url = os.getenv('DISCORD_URL')
+    if not webhook_url: return
 
-    if not webhook_url:
-        print("Error: DISCORD_URL not found in .env")
-        return
-
-    # Logic to pick color (Green for Long, Red for Short)
     color = 5763719 if data['signal']['bias'] == 'LONG' else 15548997
-
     payload = {
         "username": "Reelioo Sniper Bot",
-        "avatar_url": "https://i.imgur.com/6Xy1sJ2.png",  # Generic bot icon
+        "avatar_url": "https://i.imgur.com/6Xy1sJ2.png",
         "embeds": [{
             "title": f"🚨 SNIPER SIGNAL: {data['symbol']}",
-            "description": f"**High Conviction Setup Detected.**\nThe AI has identified a precision entry zone.",
+            "description": f"**High Conviction Setup Detected.**",
             "color": color,
             "fields": [
                 {"name": "Bias", "value": f"**{data['signal']['bias']}**", "inline": True},
                 {"name": "Confidence", "value": f"**{data['signal']['probability']}%**", "inline": True},
-                {"name": "Entry Zone", "value": f"`${data['signal']['entry']}`", "inline": True},
-                {"name": "Stop Loss", "value": f"${data['signal']['stop']}", "inline": True},
+                {"name": "Entry", "value": f"`${data['signal']['entry']}`", "inline": True},
+                {"name": "Stop", "value": f"${data['signal']['stop']}", "inline": True},
                 {"name": "Target", "value": f"${data['signal']['target2']}", "inline": True}
             ],
-            "footer": {"text": "Reelioo Institutional Terminal • Time: Live"}
+            "footer": {"text": "Reelioo Institutional Terminal"}
         }]
     }
-
     try:
         requests.post(webhook_url, json=payload)
     except Exception as e:
         print(f"Discord Error: {e}")
 
+
 # --- LEGAL PAGES ---
 def terms_view(request): return render(request, 'core/legal/terms.html')
+
+
 def privacy_view(request): return render(request, 'core/legal/privacy.html')
+
+
 def refund_view(request): return render(request, 'core/legal/refund.html')
+
+
 def contact_view(request): return render(request, 'core/legal/contact.html')
+
+
 def pricing_footer_view(request): return render(request, 'core/legal/pricing_footer.html')
-
-
