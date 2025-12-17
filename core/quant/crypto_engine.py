@@ -5,7 +5,7 @@ import xgboost as xgb
 import os
 import json
 import logging
-from .feature_engineering import generate_features, FEATURES
+from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
 log = logging.getLogger(__name__)
 
