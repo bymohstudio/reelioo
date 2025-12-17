@@ -3,7 +3,7 @@
 {% block content %}
 <div class="relative font-sans text-slate-300 overflow-x-hidden">
 
-    <h1 class="sr-only">Reelioo: Institutional Crypto Quant Terminal & AI Trading Signals</h1>
+    <h1 class="sr-only">Reelioo: AI Crypto Trading Signals & Order Flow Analysis</h1>
 
     <section class="relative pt-32 pb-40 px-6 text-center max-w-7xl mx-auto z-10">
 
@@ -15,39 +15,39 @@
 
         <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 backdrop-blur-md text-[10px] font-bold uppercase tracking-widest mb-8 animate-fade-in-up">
             <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
-            System Status:Neural Engine Online
+            System Status: High Precision Mode Active
         </div>
 
         <h2 class="text-5xl md:text-8xl font-black text-white mb-6 leading-[0.9] tracking-tight animate-fade-in-up delay-100">
-            Stop Guessing.<br>
+            Trade Less.<br>
             <span class="text-blue-500">
-                Start Quant Trading.
+                Profit More.
             </span>
         </h2>
 
         <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed animate-fade-in-up delay-200">
-            Retail traders lose because they trade on noise. <br class="hidden md:block">
-            Reelioo decodes <strong>Whale Order Flow</strong> and <strong>Volatility Regimes</strong>
-            to show you exactly what the smart money is doing.
+            Most terminals scream "BUY" every 5 minutes. We don't. <br class="hidden md:block">
+            Reelioo filters out <strong>95% of Market Noise</strong> to show you only the
+            <strong>High-Conviction Setups</strong> that actually matter.
         </p>
 
         <div class="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-300">
             {% if user.is_authenticated %}
                 <a href="{% url 'terminal' %}" class="px-8 py-4 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-                    OPEN TERMINAL
+                    LAUNCH TERMINAL
                 </a>
             {% else %}
                 <a href="{% url 'signup' %}" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-[0_0_30px_rgba(37,99,235,0.3)]">
                     START 21-DAY FREE TRIAL
                 </a>
                 <a href="#how-it-works" class="px-8 py-4 bg-[#111] border border-white/10 text-slate-300 hover:text-white font-bold rounded-xl hover:bg-white/5 transition">
-                    HOW IT WORKS
+                    SEE THE LOGIC
                 </a>
             {% endif %}
         </div>
 
         <p class="mt-6 text-[10px] text-slate-500 uppercase tracking-widest">
-            <i data-lucide="shield-check" class="w-3 h-3 inline mr-1"></i> No Credit Card Required
+            <i data-lucide="shield-check" class="w-3 h-3 inline mr-1"></i> 100% Risk-Free Trial · Cancel Anytime
         </p>
 
     </section>
@@ -60,29 +60,30 @@
                 <div class="relative bg-[#0a0a0a] border border-red-500/20 p-8 rounded-2xl shadow-2xl transform md:-rotate-2">
                     <div class="flex items-center gap-3 mb-4 border-b border-white/5 pb-4">
                         <i data-lucide="activity" class="text-red-500"></i>
-                        <h3 class="text-lg font-bold text-white">The Retail Trap</h3>
+                        <h3 class="text-lg font-bold text-white">The "Overtrading" Trap</h3>
                     </div>
                     <ul class="space-y-4 text-sm text-slate-400">
-                        <li class="flex gap-3"><span class="text-red-500">✖</span> Trading on gut feeling & FOMO</li>
-                        <li class="flex gap-3"><span class="text-red-500">✖</span> Blind to Dark Pool liquidity</li>
-                        <li class="flex gap-3"><span class="text-red-500">✖</span> Getting liquidated by volatility spikes</li>
-                        <li class="flex gap-3"><span class="text-red-500">✖</span> Staring at charts for 12 hours a day</li>
+                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Chasing green candles (FOMO)</li>
+                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Getting chopped up in sideways markets</li>
+                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Entering "Speculative" setups</li>
+                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Staring at charts for 12 hours</li>
                     </ul>
                 </div>
-
             </div>
 
             <div>
-                <span class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Problem</span>
-                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">You Are Bringing a Knife to a Gunfight.</h2>
+                <span class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Philosophy</span>
+                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">Silence is Profitable.</h2>
                 <p class="text-slate-400 leading-relaxed mb-6">
-                    95% of retail traders fail because they are fighting <strong>High-Frequency Algorithms</strong> and <strong>Institutional Whales</strong>.
+                    Amateurs look for action. Professionals look for <strong>Probability</strong>.
                 </p>
                 <p class="text-slate-400 leading-relaxed mb-8">
-                    While you look at RSI and MACD, institutions are looking at <strong>Order Flow</strong>, <strong>Delta Divergence</strong>, and <strong>Liquidity Heatmaps</strong>.
+                    Our AI isn't designed to find <em>every</em> trade. It's designed to reject the bad ones.
+                    If the <strong>Conviction Score is below 65%</strong>, the terminal stays dark.
+                    We save you capital by keeping you out of the casino.
                 </p>
                 <div class="pl-4 border-l-2 border-blue-500">
-                    <p class="text-white italic font-medium">"Reelioo levels the playing field by giving you the same data vectors hedge funds use, simplified into a single confidence score."</p>
+                    <p class="text-white italic font-medium">"Reelioo is the discipline you wish you had. It waits for the perfect alignment of Price, Volume, and Order Flow before it speaks."</p>
                 </div>
             </div>
 
@@ -92,73 +93,71 @@
     <section id="features" class="py-32 px-6 max-w-7xl mx-auto">
         <div class="text-center mb-20">
             <span class="text-emerald-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Technology</span>
-            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Institutional Intelligence. <br>Simplified.</h2>
-            <p class="text-slate-400 max-w-2xl mx-auto">We process terabytes of exchange data in real-time so you don't have to.</p>
+            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Deep Conviction Engine.</h2>
+            <p class="text-slate-400 max-w-2xl mx-auto">We process terabytes of exchange data to answer one simple question: <br><strong>Is the edge in your favor?</strong></p>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-blue-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-6 border border-blue-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="waves" class="w-6 h-6 text-blue-400"></i>
+                    <i data-lucide="filter" class="w-6 h-6 text-blue-400"></i>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">Whale Tracking</h3>
+                <h3 class="text-xl font-bold text-white mb-3">Aggressive Noise Filtering</h3>
                 <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    Detect hidden accumulation before price moves. We monitor large wallet inflows and iceberg orders that retail traders can't see.
+                    The engine ignores 99% of market movement. If it doesn't meet our strict <strong>Volatility & Volume</strong> criteria, it's noise. We only alert you on the 1% that matters.
                 </p>
-
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-purple-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 border border-purple-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="brain-circuit" class="w-6 h-6 text-purple-400"></i>
+                    <i data-lucide="target" class="w-6 h-6 text-purple-400"></i>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">Neural Quant Engine</h3>
+                <h3 class="text-xl font-bold text-white mb-3">0-100% Conviction Score</h3>
                 <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    Our model analyzes 50+ factors (Volatility, Volume, Delta) to assign a <strong>0-100% Probability Score</strong> to every setup.
+                    No vague signals. Every asset gets a precise score based on <strong>Institutional Order Flow</strong>. <br>
+                    <span class="text-purple-400 font-bold">> 65%</span> = Execution Ready. <br>
+                    <span class="text-slate-500">< 65%</span> = Stay Away.
                 </p>
-
-
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-emerald-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-6 border border-emerald-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="bar-chart-2" class="w-6 h-6 text-emerald-400"></i>
+                    <i data-lucide="crosshair" class="w-6 h-6 text-emerald-400"></i>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">Regime Filtering</h3>
+                <h3 class="text-xl font-bold text-white mb-3">Limit Entry Precision</h3>
                 <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    Stop trading in chop. The engine identifies the current market regime (Trending vs. Ranging) and filters out low-quality signals automatically.
+                    High conviction isn't enough. We calculate the exact <strong>Entry Zone</strong> to maximize Risk/Reward. We don't chase pumps; we let the price come to us.
                 </p>
-
             </div>
         </div>
     </section>
 
     <section id="how-it-works" class="py-24 bg-gradient-to-b from-[#050505] to-black border-y border-white/5">
         <div class="max-w-5xl mx-auto px-6">
-            <h2 class="text-3xl font-black text-white mb-16 text-center">How to Use Reelioo</h2>
+            <h2 class="text-3xl font-black text-white mb-16 text-center">The Precision Workflow</h2>
 
             <div class="relative">
                 <div class="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-blue-900 to-transparent -translate-y-1/2 z-0"></div>
 
                 <div class="grid md:grid-cols-3 gap-12 relative z-10">
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10">
+                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
                         <div class="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">1</div>
-                        <h4 class="text-white font-bold mb-2">Scan the Market</h4>
-                        <p class="text-xs text-slate-500">Type any Crypto asset (e.g. BTC) to instantly pull institutional data vectors.</p>
+                        <h4 class="text-white font-bold mb-2">Scan & Filter</h4>
+                        <p class="text-xs text-slate-500">The AI scans the crypto market instantly, filtering out low-quality "Chop" and "Speculative" setups.</p>
                     </div>
 
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10">
+                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
                         <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">2</div>
-                        <h4 class="text-white font-bold mb-2">Check the Score</h4>
+                        <h4 class="text-white font-bold mb-2">Check Conviction</h4>
                         <p class="text-xs text-slate-500">
-                            If Confidence is <strong>>75%</strong> and Whales are active, the trade has a high probability of success.
+                            Look for the Green Score <strong>(>65%)</strong>. This confirms Institutional Whales are backing the move.
                         </p>
                     </div>
 
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10">
+                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
                         <div class="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">3</div>
-                        <h4 class="text-white font-bold mb-2">Execute & Manage</h4>
-                        <p class="text-xs text-slate-500">Use the provided Entry, Stop Loss, and Target levels to manage risk effortlessly.</p>
+                        <h4 class="text-white font-bold mb-2">Wait for the Zone</h4>
+                        <p class="text-xs text-slate-500">Don't market buy. Set your Limit Order at our <strong>Smart Entry Level</strong> and let the trade execute automatically.</p>
                     </div>
                 </div>
             </div>
@@ -172,30 +171,30 @@
                 <thead>
                     <tr class="border-b border-white/10">
                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Feature</th>
-                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">TradingView/Generic</th>
-                        <th class="p-4 text-xs font-bold text-blue-400 uppercase bg-blue-900/10 rounded-t-xl">Reelioo Quant</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Standard Indicators</th>
+                        <th class="p-4 text-xs font-bold text-blue-400 uppercase bg-blue-900/10 rounded-t-xl">Reelioo Engine</th>
                     </tr>
                 </thead>
                 <tbody class="text-sm text-slate-300">
                     <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Data Source</td>
-                        <td class="p-4 text-slate-500">Price & Volume only</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Order Flow + Dark Pools</td>
+                        <td class="p-4 font-bold">Signal Quality</td>
+                        <td class="p-4 text-slate-500">Noisy (Too many signals)</td>
+                        <td class="p-4 bg-blue-900/5 font-bold text-white">Curated (Low Frequency)</td>
                     </tr>
                     <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Analysis Type</td>
-                        <td class="p-4 text-slate-500">Lagging Indicators (RSI, MACD)</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Predictive ML Models</td>
+                        <td class="p-4 font-bold">Market Chop</td>
+                        <td class="p-4 text-slate-500">Generates false signals</td>
+                        <td class="p-4 bg-blue-900/5 font-bold text-white">Automatically Filtered</td>
                     </tr>
                     <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Signal Filter</td>
-                        <td class="p-4 text-slate-500">None (Noisy)</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Confidence Thresholds</td>
+                        <td class="p-4 font-bold">Entry Strategy</td>
+                        <td class="p-4 text-slate-500">"Buy Now" (FOMO)</td>
+                        <td class="p-4 bg-blue-900/5 font-bold text-white">Limit Order Zones</td>
                     </tr>
                     <tr>
-                        <td class="p-4 font-bold">Risk Management</td>
-                        <td class="p-4 text-slate-500">Manual Calculation</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Auto-calculated R:R</td>
+                        <td class="p-4 font-bold">Risk Reward</td>
+                        <td class="p-4 text-slate-500">Unknown / Manual</td>
+                        <td class="p-4 bg-blue-900/5 font-bold text-white">Optimized for 1:2+</td>
                     </tr>
                 </tbody>
             </table>
@@ -205,13 +204,11 @@
     <section class="max-w-7xl mx-auto px-6 pb-32 pt-10">
         <div class="text-center mb-16">
             <h2 class="text-4xl font-black text-white mb-4">Invest in Clarity.</h2>
-            <p class="text-slate-400 max-w-xl mx-auto">Access the same data vectors as institutional desks, for less than the cost of one bad trade.</p>
+            <p class="text-slate-400 max-w-xl mx-auto">Access the same precision data vectors as institutional desks, for less than the cost of one bad trade.</p>
         </div>
 
         <div class="max-w-sm mx-auto relative group">
-
             <div class="absolute -inset-0.5 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-700"></div>
-
             <div class="relative bg-[#050505] rounded-2xl p-1 overflow-hidden">
                 <div class="bg-[#0a0a0a] rounded-xl p-8 border border-white/5 relative z-10 h-full flex flex-col">
 
@@ -230,29 +227,22 @@
                         <div class="flex items-start gap-3">
                             <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
                             <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Unlimited AI Scans</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Full access to Neural Engine</p>
+                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Smart Noise Filtration</h5>
+                                <p class="text-[10px] text-slate-500 leading-snug">Never see a bad setup again</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
                             <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
                             <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Whale Order Flow</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Real-time dark pool tracking</p>
+                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Precision Entry Zones</h5>
+                                <p class="text-[10px] text-slate-500 leading-snug">Calculated risk levels</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
                             <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
                             <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Full Trade Journal</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Automated performance metrics</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
-                            <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Regime Filtering</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Avoid high-risk volatility</p>
+                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Whale Confirmation</h5>
+                                <p class="text-[10px] text-slate-500 leading-snug">See the flow behind the move</p>
                             </div>
                         </div>
                     </div>
