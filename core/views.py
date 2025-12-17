@@ -20,6 +20,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+import requests
+
+from .utils import analyze_market_data
 
 
 # --- PUBLIC PAGES ---
@@ -419,6 +422,80 @@ def robots_view(request):
 def sitemap_view(request):
     content = render_to_string('core/sitemap.xml')
     return HttpResponse(content, content_type="application/xml")
+
+
+# --- CRON JOB TRIGGER (WEBHOOK) ---
+def cron_scan_trigger(request, secret_key):
+    # 1. Security Check via Settings
+    required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
+    if secret_key != required_secret:
+        return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
+
+    # 2. Define Assets
+    watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
+    alerts_sent = 0
+    scanned = 0
+
+    try:
+        for symbol in watchlist:
+            # Run AI Logic (Imported from utils)
+            data = analyze_market_data(symbol)
+
+            # Check if valid data returned
+            if not data or 'signal' not in data:
+                continue
+
+            score = data.get('signal', {}).get('probability', 0)
+            bias = data.get('signal', {}).get('bias', 'NEUTRAL')
+
+            # 3. SNIPER FILTER (>65%)
+            if score >= 65 and bias != 'NEUTRAL':
+                send_discord_alert(data)
+                alerts_sent += 1
+            scanned += 1
+
+        return JsonResponse({
+            'status': 'success',
+            'scanned': scanned,
+            'alerts_sent': alerts_sent
+        })
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def send_discord_alert(data):
+    # Fetch URL from Env
+    webhook_url = os.getenv('DISCORD_URL')
+
+    if not webhook_url:
+        print("Error: DISCORD_URL not found in .env")
+        return
+
+    # Logic to pick color (Green for Long, Red for Short)
+    color = 5763719 if data['signal']['bias'] == 'LONG' else 15548997
+
+    payload = {
+        "username": "Reelioo Sniper Bot",
+        "avatar_url": "https://i.imgur.com/6Xy1sJ2.png",  # Generic bot icon
+        "embeds": [{
+            "title": f"🚨 SNIPER SIGNAL: {data['symbol']}",
+            "description": f"**High Conviction Setup Detected.**\nThe AI has identified a precision entry zone.",
+            "color": color,
+            "fields": [
+                {"name": "Bias", "value": f"**{data['signal']['bias']}**", "inline": True},
+                {"name": "Confidence", "value": f"**{data['signal']['probability']}%**", "inline": True},
+                {"name": "Entry Zone", "value": f"`${data['signal']['entry']}`", "inline": True},
+                {"name": "Stop Loss", "value": f"${data['signal']['stop']}", "inline": True},
+                {"name": "Target", "value": f"${data['signal']['target2']}", "inline": True}
+            ],
+            "footer": {"text": "Reelioo Institutional Terminal • Time: Live"}
+        }]
+    }
+
+    try:
+        requests.post(webhook_url, json=payload)
+    except Exception as e:
+        print(f"Discord Error: {e}")
 
 # --- LEGAL PAGES ---
 def terms_view(request): return render(request, 'core/legal/terms.html')

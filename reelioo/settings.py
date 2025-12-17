@@ -191,3 +191,5 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = f'Reelioo Intelligence <{EMAIL_HOST_USER}>'
 
+CRON_SECRET = "super-secret-password-123"
+

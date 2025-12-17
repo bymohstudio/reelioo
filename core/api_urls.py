@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from .api_views import AnalyzeCryptoView, BacktestCryptoView, SearchCryptoView
-from .views import robots_view, sitemap_view
+from .views import robots_view, sitemap_view, cron_scan_trigger
 
 urlpatterns = [
     # API
@@ -36,4 +36,7 @@ urlpatterns = [
     path('api/journal/add/', views.add_journal_entry, name='add_journal_entry'),
     path('api/journal/delete/<int:entry_id>/', views.delete_journal_entry, name='delete_journal_entry'),
     path('api/journal/refresh/<int:entry_id>/', views.refresh_journal_entry, name='refresh_journal_entry'),
+
+
+    path('api/cron/trigger/<str:secret_key>/', cron_scan_trigger),
 ]
