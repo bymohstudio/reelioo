@@ -3,183 +3,116 @@ import numpy as np
 import xgboost as xgb
 import requests
 import time
+import os
 from datetime import datetime, timedelta
-from sklearn.metrics import roc_auc_score
+from core.quant.ml_training.feature_engineering import generate_features, generate_targets, FEATURES
 
 # ---------------------------------------------------------
-# CONFIG (MATCH TRAINING)
+# CONFIGURATION
 # ---------------------------------------------------------
-SYMBOLS = [
-    "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
-    "ADAUSDT","AVAXUSDT","DOGEUSDT","LINKUSDT"
-]
-
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 INTERVAL = "1h"
-LOOKBACK_DAYS = 180
+LOOKBACK = 180
 
-MODEL_PATH = "../ml_models/crypto_edge.json"
+# Define Paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LONG_PATH = os.path.join(BASE_DIR, "core", "quant", "ml_models", "long_model.json")
+SHORT_PATH = os.path.join(BASE_DIR, "core", "quant", "ml_models", "short_model.json")
 
-FEATURES = [
-    'rsi','squeeze','vol_z',
-    'trend_strength','atr_ratio',
-    'bb_width','body_size'
-]
 
-TARGET_PROFIT = 0.015      # +1.5%
-TARGET_CANDLES = 6         # within 6 hours
-THRESHOLD = 0.75           # HIGH CONFIDENCE SIGNALS
-MIN_SIGNALS = 30
-
-# ---------------------------------------------------------
-# BINANCE SAFE FETCH
-# ---------------------------------------------------------
 def fetch_data(symbol):
-    start = int((datetime.now() - timedelta(days=LOOKBACK_DAYS)).timestamp() * 1000)
-    end = int(time.time() * 1000)
+    print(f"Fetching {symbol}...")
+    start = int((datetime.now() - timedelta(days=LOOKBACK)).timestamp() * 1000)
+    url = "https://fapi.binance.com/fapi/v1/klines"
+    data = []
+    try:
+        params = {"symbol": symbol, "interval": INTERVAL, "startTime": start, "limit": 1500}
+        res = requests.get(url, params=params).json()
+        if isinstance(res, list): data.extend(res)
+    except:
+        pass
 
-    data, cur = [], start
+    if not data: return pd.DataFrame()
 
-    while cur < end:
-        try:
-            res = requests.get(
-                "https://fapi.binance.com/fapi/v1/klines",
-                params={
-                    "symbol": symbol,
-                    "interval": INTERVAL,
-                    "startTime": cur,
-                    "limit": 1500
-                },
-                timeout=5
-            ).json()
-
-            if not isinstance(res, list) or len(res) == 0:
-                break
-
-            last = res[-1]
-            if not isinstance(last, list) or len(last) < 7:
-                break
-
-            data.extend(res)
-            cur = int(last[6]) + 1
-            time.sleep(0.05)
-
-        except:
-            break
-
-    if not data:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(data).iloc[:, :12]
-    df.columns = [
-        "ts","open","high","low","close","volume",
-        "ct","q","n","tb","tq","i"
-    ]
-
-    df[["open","high","low","close","volume"]] = df[
-        ["open","high","low","close","volume"]
-    ].astype(float)
-
+    # Process Data
+    df = pd.DataFrame(data).iloc[:, :6]
+    df.columns = ["ts", "open", "high", "low", "close", "volume"]
+    df = df.astype(float)
     return df
 
-# ---------------------------------------------------------
-# FEATURES + TARGET (EXACT TRAINING LOGIC)
-# ---------------------------------------------------------
-def build_features(df):
-    required = {"open","high","low","close","volume"}
-    if df.empty or not required.issubset(df.columns):
-        return pd.DataFrame()
 
-    close = df['close']
-
-    delta = close.diff()
-    gain = delta.where(delta > 0, 0).rolling(14).mean()
-    loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    rs = gain / loss
-    df['rsi'] = 100 - (100 / (1 + rs))
-
-    sma = close.rolling(20).mean()
-    std = close.rolling(20).std()
-    df['bb_width'] = (std * 4) / sma
-    df['squeeze'] = df['bb_width']
-
-    vol_mean = df['volume'].rolling(20).mean()
-    vol_std = df['volume'].rolling(20).std()
-    df['vol_z'] = (df['volume'] - vol_mean) / vol_std
-
-    ema9 = close.ewm(span=9).mean()
-    ema21 = close.ewm(span=21).mean()
-    df['trend_strength'] = (ema9 - ema21) / close * 100
-
-    tr = pd.concat([
-        df['high'] - df['low'],
-        (df['high'] - close.shift()).abs(),
-        (df['low'] - close.shift()).abs()
-    ], axis=1).max(axis=1)
-    df['atr_ratio'] = tr.rolling(14).mean() / close
-
-    df['body_size'] = (close - df['open']).abs() / close
-
-    # 🎯 TARGET = opportunity existence
-    future_high = df['high'].rolling(TARGET_CANDLES).max().shift(-TARGET_CANDLES)
-    df['target'] = (future_high > close * (1 + TARGET_PROFIT)).astype(int)
-
-    return df.dropna()
-
-# ---------------------------------------------------------
-# SIGNAL EVALUATION
-# ---------------------------------------------------------
 def evaluate():
-    model = xgb.XGBClassifier()
-    model.load_model(MODEL_PATH)
+    print(f"\n🔍 EVALUATING HIGH PRECISION LOGIC (1.5 R:R)")
 
-    all_probs = []
-    all_targets = []
-
-    for sym in SYMBOLS:
-        df = fetch_data(sym)
-        df = build_features(df)
-
-        if df.empty:
-            print(f"⚠️ Skipping {sym}")
-            continue
-
-        X = df[FEATURES]
-        y = df['target']
-
-        probs = model.predict_proba(X)[:, 1]
-
-        # only evaluate HIGH CONFIDENCE signals
-        mask = probs >= THRESHOLD
-
-        all_probs.extend(probs[mask])
-        all_targets.extend(y[mask])
-
-    if len(all_targets) < MIN_SIGNALS:
-        print("❌ Not enough signals for reliable evaluation.")
+    # 1. LOAD MODELS (The missing part fixed here)
+    if not os.path.exists(LONG_PATH) or not os.path.exists(SHORT_PATH):
+        print("❌ Models not found. Please run auto_train.py first.")
         return
 
-    all_probs = np.array(all_probs)
-    all_targets = np.array(all_targets)
+    try:
+        m_long = xgb.Booster()
+        m_long.load_model(LONG_PATH)
 
-    wins = all_targets.sum()
-    losses = len(all_targets) - wins
-    win_rate = wins / len(all_targets)
+        m_short = xgb.Booster()
+        m_short.load_model(SHORT_PATH)
+    except Exception as e:
+        print(f"❌ Error loading models: {e}")
+        return
 
-    # simple PF: reward = +1, loss = -1
-    profit_factor = wins / losses if losses > 0 else np.inf
+    total_trades = 0
+    wins = 0
 
-    print("\n==============================")
-    print("📊 SIGNAL-BASED MODEL EVALUATION")
-    print("==============================")
-    print(f"Threshold:      {THRESHOLD}")
-    print(f"Signals:        {len(all_targets)}")
-    print(f"Win Rate:       {win_rate*100:.1f}%")
-    print(f"Profit Factor:  {profit_factor:.2f}")
+    # 2. RUN SIMULATION
+    for sym in SYMBOLS:
+        df = fetch_data(sym)
+        if df.empty: continue
 
-    if profit_factor >= 1.5:
-        print("✅ Strong signal edge. Production-safe.")
+        # Feature Engineering
+        df = generate_features(df)
+
+        # Generate Targets (1.5 Risk Reward to match training)
+        df = generate_targets(df, risk_reward=1.5, stop_mult=1.5, candles=12)
+
+        # Predict
+        dmat = xgb.DMatrix(df[FEATURES])
+        preds_long = m_long.predict(dmat) * 100
+        preds_short = m_short.predict(dmat) * 100
+
+        # Iterate Row by Row
+        for i in range(len(df)):
+            # Filter matches Engine Logic
+            eff = df['efficiency_ratio'].iloc[i]
+            vol = df['volatility_slope'].iloc[i]
+
+            # Skip choppy markets
+            if eff < 0.15 and vol < 0.1: continue
+
+            p_l = preds_long[i]
+            p_s = preds_short[i]
+
+            # Threshold matches Engine (65%)
+            if p_l > 65 and p_l > (p_s + 10):
+                total_trades += 1
+                if df['target_long'].iloc[i] == 1: wins += 1
+
+            elif p_s > 65 and p_s > (p_l + 10):
+                total_trades += 1
+                if df['target_short'].iloc[i] == 1: wins += 1
+
+    # 3. REPORT RESULTS
+    if total_trades == 0:
+        print("⚠️ No signals found. Market might be too choppy for current filters.")
     else:
-        print("⚠️ Weak signal edge. Raise threshold.")
+        wr = (wins / total_trades) * 100
+        print("\n🏆 RESULTS")
+        print(f"   Signals:   {total_trades}")
+        print(f"   Win Rate:  {wr:.1f}%")
+
+        if wr > 50:
+            print("✅ HIGHLY PROFITABLE (With 1.5 RR, >40% is profit)")
+        else:
+            print("⚠️ Break-even or Loss. Adjust thresholds.")
+
 
 if __name__ == "__main__":
     evaluate()

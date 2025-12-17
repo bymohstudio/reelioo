@@ -16,71 +16,56 @@ log = logging.getLogger(__name__)
 
 
 class AnalyzeCryptoView(APIView):
-    """
-    Main Analysis Endpoint (The "Scan" Button).
-    Protected: Only logged-in users can access.
-    """
-    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            # FIX: Use DRF's request.data instead of parsing raw body
             body = request.data
+            symbol = body.get("symbol", "BTCUSDT").upper().replace("-", "")
+            trade_style = body.get("trade_style", "INTRADAY")
 
-            # 1. Clean & Parse Inputs
-            # Defaults to BTCUSDT only if input is missing. Otherwise uses USER INPUT.
-            raw_symbol = body.get("symbol", "BTCUSDT")
-            symbol = raw_symbol.upper().replace("/", "").replace("-", "").replace("_", "")
+            # 1. Fetch Data (Timeframe handled by Service)
+            df = MarketService.get_historical_data(symbol, "AUTO", trade_style)
 
-            trade_style = body.get("trade_style", "SWING")
-            market_type = body.get("market_type", "AUTO")  # SPOT or PERP
+            if df.empty:
+                return Response({"error": "No Data"}, status=400)
 
-            # 2. Fetch Market Data (Binance)
-            df = MarketService.get_historical_data(symbol, market_type, trade_style)
-
-            if df is None or df.empty:
-                return Response({"error": f"No market data found for {symbol}"}, status=400)
-
-            # 3. AI Insights (OpenAI)
-            # Replaces the old 'get_news' with the new GPT-4 Engine
-            ai_intel = NewsService.get_smart_insights(symbol)
-
-            # 4. Run Quant Engine (XGBoost Analysis)
+            # 2. Run Engine
             engine = CryptoQuantEngine()
-            result = engine.analyze(df, trade_style)
+            res = engine.analyze(df, trade_style)
 
-            # 5. Build Response
-            response = {
+            # 3. Volatility Filter (Prevent Scalping in dead markets)
+            if trade_style == "SCALP":
+                last_open = float(df['open'].iloc[-1])
+                last_close = float(df['close'].iloc[-1])
+                move_pct = abs(last_close - last_open) / last_close
+                if move_pct < 0.002:  # < 0.2% movement
+                    res.bias = "NEUTRAL"
+                    res.regime = "LOW VOLATILITY"
+                    res.regime_color = "gray"
+                    res.score = 50
+
+            # 4. Response
+            return Response({
                 "symbol": symbol,
-                "price": float(df["close"].iloc[-1]),
+                "price": res.entry,
                 "signal": {
-                    "bias": result.bias,
-                    "probability": int(result.score),
+                    "bias": res.bias,
+                    "probability": res.score,
                     "style": trade_style,
-                    "entry": result.entry,
-                    "target1": result.target1,
-                    "target2": result.target2,
-                    "target3": result.target3,
-                    "stop": result.stop,
-                    "rr": result.rr_ratio,
-                    "duration": result.expected_duration
+                    "entry": res.entry,
+                    "stop": res.stop,
+                    "target1": res.target1,
+                    "target2": res.target2,
+                    "target3": res.target3,
+                    "rr": res.rr_ratio,
+                    "duration": res.expected_duration
                 },
-                "regime": {
-                    "phase": result.regime,
-                    "color": result.regime_color
-                },
-                "whales": {
-                    "zscore": result.whale_zscore,
-                    "label": result.whale_label
-                },
-                "sentiment": {
-                    "headline": "AI Neural Analysis",
-                    "news_feed": ai_intel  # Sends OpenAI bullets to UI
-                },
-                "explainability": result.top_features
-            }
-            return Response(response)
+                "regime": {"phase": res.regime, "color": res.regime_color},
+                "whales": {"zscore": res.whale_zscore, "label": res.whale_label},
+                # Optional: Fetch News
+                "sentiment": {"headline": "AI Active", "news_feed": []}
+            })
 
         except Exception as e:
             traceback.print_exc()
@@ -89,27 +74,22 @@ class AnalyzeCryptoView(APIView):
 
 class BacktestCryptoView(APIView):
     """
-    Backtest Endpoint (The "Validate Strategy" Button).
+    Backtest Endpoint.
     """
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            # FIX: Use DRF's request.data
             body = request.data
-
-            # Fully Dynamic: Uses whatever symbol is sent from frontend
             symbol = body.get("symbol", "BTCUSDT").upper()
-
-            # We force INTRADAY data for backtesting accuracy
-            # But we allow market_type to be passed (e.g. PERP backtesting)
             market_type = body.get("market_type", "SPOT")
 
+            # Always backtest on 1H data for speed/accuracy balance
             df = MarketService.get_historical_data(symbol, market_type, trade_style="INTRADAY")
 
             if df is None or df.empty:
-                return Response({"error": "Insufficient historical data for backtest"}, status=404)
+                return Response({"error": "Insufficient historical data"}, status=404)
 
             engine = CryptoBacktestEngine(df, symbol)
             results = engine.run()
@@ -117,16 +97,10 @@ class BacktestCryptoView(APIView):
             return Response(results)
 
         except Exception as e:
-            traceback.print_exc()
             return Response({"error": str(e)}, status=500)
 
 
 class SearchCryptoView(APIView):
-    """
-    Autosuggest Endpoint.
-    Publicly accessible to allow smooth UX before hitting enter.
-    """
-
     def get(self, request):
         q = request.GET.get("q", "")
         return Response(MarketService.search_assets(q))

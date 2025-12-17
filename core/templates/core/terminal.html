@@ -53,6 +53,17 @@
 
             <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg hidden z-50 shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"></div>
         </div>
+
+        <div class="mt-6 flex items-center gap-3 animate-fade-in opacity-90 hover:opacity-100 transition">
+             <div class="px-3 py-1 rounded-full bg-emerald-900/30 border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                <span class="relative flex h-1.5 w-1.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-[9px] font-bold text-emerald-400 tracking-[0.15em] uppercase">Sniper Mode Active</span>
+            </div>
+            <span class="text-[9px] text-slate-500 font-mono tracking-wide hidden sm:inline-block">Scanning for A+ Setups Only. Patience Pays.</span>
+        </div>
     </div>
 
     <div class="w-full max-w-5xl mx-auto mb-16 px-2">
@@ -673,9 +684,11 @@
             // Signal Logic
             const score = data.signal.probability;
             const rawBias = data.signal.bias;
-            let isTradeGrade = score >= 75;
-            let isWatchGrade = score >= 60 && score < 75;
-            let isNoTrade = score < 60;
+
+            // --- FIXED THRESHOLDS FOR SNIPER MODE ---
+            let isTradeGrade = score >= 65; // Matches backend's "High Confidence"
+            let isWatchGrade = score >= 55 && score < 65;
+            let isNoTrade = score < 55;
 
             const dirEl = document.getElementById('res-direction');
             const glow = document.getElementById('signal-glow');
