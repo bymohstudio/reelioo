@@ -1,78 +1,153 @@
 import pandas as pd
 import numpy as np
+import xgboost as xgb
+import lightgbm as lgb
+from catboost import CatBoostClassifier
+import os
+import logging
+from core.quant.ml_training.feature_engineering import generate_features, FEATURES
+
+log = logging.getLogger(__name__)
 
 
 class CryptoBacktestEngine:
     """
-    Titanium Backtester (Layered Intelligence).
-    Validates both 'Strong Trend' (Expansion) and 'Micro Scalp' (Flow) logic.
-    Mirrors the risk management of the live crypto_engine.py.
+    Ensemble Backtester (XGB + LGB + CAT).
+    Validates the exact 3-model voting logic used in the live environment.
     """
+    # Adjust path to find the ml_models folder relative to this file
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
+
+    PATHS = {
+        "xgb_long": os.path.join(MODEL_DIR, "xgb_long.json"),
+        "xgb_short": os.path.join(MODEL_DIR, "xgb_short.json"),
+        "lgb_long": os.path.join(MODEL_DIR, "lgb_long.txt"),
+        "lgb_short": os.path.join(MODEL_DIR, "lgb_short.txt"),
+        "cat_long": os.path.join(MODEL_DIR, "cat_long.cbm"),
+        "cat_short": os.path.join(MODEL_DIR, "cat_short.cbm"),
+    }
 
     def __init__(self, df, symbol):
         self.df = df
         self.symbol = symbol
         self.trades = []
+        self.models = {}
 
-        # Calculate Indicators immediately
-        self._prepare_indicators()
+        # Load models immediately
+        self._load_models()
 
-    def _prepare_indicators(self):
+    def _load_models(self):
+        """Loads all available models for the ensemble."""
+        try:
+            # XGBoost
+            if os.path.exists(self.PATHS['xgb_long']):
+                self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
+                self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
+
+            # LightGBM
+            if os.path.exists(self.PATHS['lgb_long']):
+                self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
+                self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
+
+            # CatBoost
+            if os.path.exists(self.PATHS['cat_long']):
+                self.models['cat_long'] = CatBoostClassifier()
+                self.models['cat_long'].load_model(self.PATHS['cat_long'])
+                self.models['cat_short'] = CatBoostClassifier()
+                self.models['cat_short'].load_model(self.PATHS['cat_short'])
+
+        except Exception as e:
+            log.error(f"Backtest Model Load Error: {e}")
+
+    def _generate_predictions(self):
         """
-        Calculates the exact Technical Indicators used by the live engine.
+        Vectorized prediction: Runs models on the entire dataframe at once.
+        This is much faster than running prediction inside the loop.
         """
-        # 1. EMAs for Trend Flow
-        self.df['ema_9'] = self.df['close'].ewm(span=9).mean()
-        self.df['ema_21'] = self.df['close'].ewm(span=21).mean()
-        self.df['ema_50'] = self.df['close'].ewm(span=50).mean()
+        if self.df.empty: return self.df
 
-        # 2. ATR for Dynamic Stops
-        self.df['tr'] = np.maximum(
-            self.df['high'] - self.df['low'],
-            np.maximum(
-                abs(self.df['high'] - self.df['close'].shift(1)),
-                abs(self.df['low'] - self.df['close'].shift(1))
-            )
-        )
-        self.df['atr'] = self.df['tr'].rolling(14).mean()
+        # 1. Generate Features (Same as Live)
+        df_feat = generate_features(self.df)
+        X = df_feat[FEATURES]
 
-        # 3. Volatility Z-Score (Approximating AI "Expansion" Feature)
-        vol_mean = self.df['volume'].rolling(20).mean()
-        vol_std = self.df['volume'].rolling(20).std()
-        self.df['vol_z'] = (self.df['volume'] - vol_mean) / (vol_std + 1e-9)
+        # Initialize probabilities
+        self.df['ens_long'] = 0.0
+        self.df['ens_short'] = 0.0
 
-        # 4. Trend Strength
-        self.df['trend_strength'] = (self.df['ema_9'] - self.df['ema_21']) / self.df['close'] * 100
+        # XGBoost Prediction
+        if 'xgb_long' in self.models:
+            dmat = xgb.DMatrix(X)
+            self.df['xgb_l'] = self.models['xgb_long'].predict(dmat)
+            self.df['xgb_s'] = self.models['xgb_short'].predict(dmat)
+        else:
+            self.df['xgb_l'] = self.df['xgb_s'] = 0.0
 
-        # Fill NaNs
-        self.df.fillna(0, inplace=True)
+        # LightGBM Prediction
+        if 'lgb_long' in self.models:
+            self.df['lgb_l'] = self.models['lgb_long'].predict(X)
+            self.df['lgb_s'] = self.models['lgb_short'].predict(X)
+        else:
+            self.df['lgb_l'] = self.df['lgb_s'] = 0.0
 
-    def run(self):
+        # CatBoost Prediction (Slower, but accurate)
+        if 'cat_long' in self.models:
+            self.df['cat_l'] = self.models['cat_long'].predict_proba(X)[:, 1]
+            self.df['cat_s'] = self.models['cat_short'].predict_proba(X)[:, 1]
+        else:
+            self.df['cat_l'] = self.df['cat_s'] = 0.0
+
+        # ENSEMBLE AVERAGE (Voting Logic)
+        self.df['ens_long'] = (self.df['xgb_l'] + self.df['lgb_l'] + self.df['cat_l']) / 3.0 * 100
+        self.df['ens_short'] = (self.df['xgb_s'] + self.df['lgb_s'] + self.df['cat_s']) / 3.0 * 100
+
+        # Add Filter Columns needed for logic
+        self.df['efficiency_ratio'] = df_feat['efficiency_ratio']
+        self.df['volatility_slope'] = df_feat['volatility_slope']
+
+        return self.df
+
+    def run(self, trade_style="INTRADAY"):
         """
-        Simulates the 'Layered Intelligence' strategy on historical data.
+        Simulates the strategy with Dynamic Logic based on trade_style.
         """
+        # 1. Pre-calculate all AI scores
+        self._generate_predictions()
+
+        # 2. Set Dynamic Thresholds (Must match crypto_engine.py)
+        if trade_style == "SCALP":
+            min_conf = 60.0
+            min_efficiency = 0.05
+            stop_mult, target_mult = 1.0, 1.5
+        elif trade_style == "SWING":
+            min_conf = 70.0
+            min_efficiency = 0.15
+            stop_mult, target_mult = 1.5, 2.5
+        else:  # INTRADAY
+            min_conf = 65.0
+            min_efficiency = 0.10
+            stop_mult, target_mult = 1.5, 2.25
+
         position = None
         entry_price = 0.0
         stop_loss = 0.0
         take_profit = 0.0
-        signal_type = "NONE"
 
-        # Skip warm-up period for EMAs
-        start_idx = 50
+        start_idx = 50  # Skip warm-up
 
         for i in range(start_idx, len(self.df)):
             curr = self.df.iloc[i]
-            # prev = self.df.iloc[i - 1] # Can use for crossovers if needed
-
             price = float(curr['close'])
-            atr = float(curr['atr']) if curr['atr'] > 0 else price * 0.01
+
+            # Simple ATR calc if missing
+            tr = max(curr['high'] - curr['low'], abs(curr['high'] - curr['close']))
+            atr = tr if tr > 0 else price * 0.01
 
             # --- 1. EXIT LOGIC ---
             if position:
                 exit_price = 0.0
                 result = ""
 
-                # LONG EXIT
                 if position == 'LONG':
                     if curr['low'] <= stop_loss:
                         exit_price = stop_loss
@@ -81,7 +156,6 @@ class CryptoBacktestEngine:
                         exit_price = take_profit
                         result = "WIN"
 
-                # SHORT EXIT
                 elif position == 'SHORT':
                     if curr['high'] >= stop_loss:
                         exit_price = stop_loss
@@ -90,96 +164,59 @@ class CryptoBacktestEngine:
                         exit_price = take_profit
                         result = "WIN"
 
-                # Process Trade Record
                 if exit_price != 0.0:
-                    if position == 'LONG':
-                        pnl = (exit_price - entry_price) / entry_price
-                    else:
-                        # Short PnL: (Entry - Exit) / Entry
-                        pnl = (entry_price - exit_price) / entry_price
+                    pnl = (exit_price - entry_price) / entry_price if position == 'LONG' else (
+                                                                                                          entry_price - exit_price) / entry_price
 
                     self.trades.append({
                         "type": position,
-                        "style": signal_type,  # 'STRONG' or 'SCALP'
+                        "style": trade_style,
                         "entry": round(entry_price, 4),
                         "exit": round(exit_price, 4),
                         "pnl": round(pnl * 100, 2),
                         "result": result,
                         "date": str(curr.name)
                     })
-
-                    # Reset
                     position = None
-                    signal_type = "NONE"
                     continue
 
-            # --- 2. ENTRY LOGIC (Matching Live Engine) ---
+            # --- 2. ENTRY LOGIC (AI ENSEMBLE) ---
             if position is None:
+                # A. Filter Checks
+                is_clean = curr['efficiency_ratio'] > min_efficiency or curr['volatility_slope'] > 0.1
+                if not is_clean: continue
 
-                # A. STRONG TREND (Expansion Mode)
-                # Logic: High Momentum (Trend Strength) + Volume Expansion (Vol Z)
-                # This proxies the "ML High Confidence" signal
-                is_strong_trend_up = (curr['trend_strength'] > 0.5) and (curr['vol_z'] > 1.0)
-                is_strong_trend_down = (curr['trend_strength'] < -0.5) and (curr['vol_z'] > 1.0)
+                # B. Vote Checks
+                p_long = curr['ens_long']
+                p_short = curr['ens_short']
 
-                # B. MICRO SCALP (Flow Mode)
-                # Logic: Price respecting EMA hierarchy (Layer 2)
-                # This proxies the "Speculative" signal
-                is_flow_up = (curr['close'] > curr['ema_21']) and (curr['ema_21'] > curr['ema_50'])
-                is_flow_down = (curr['close'] < curr['ema_21']) and (curr['ema_21'] < curr['ema_50'])
-
-                # --- DECISION TREE ---
-
-                # 1. LONG SIGNALS
-                if is_strong_trend_up:
+                if p_long > min_conf and p_long > (p_short + 5):
                     position = 'LONG'
-                    signal_type = "STRONG"
-                    stop_mult, target_mult = 2.0, 3.0  # Wide levels for Strong Trend
-                elif is_flow_up:
-                    position = 'LONG'
-                    signal_type = "SCALP"
-                    stop_mult, target_mult = 1.0, 1.5  # Tight levels for Scalp
-
-                # 2. SHORT SIGNALS
-                elif is_strong_trend_down:
-                    position = 'SHORT'
-                    signal_type = "STRONG"
-                    stop_mult, target_mult = 2.0, 3.0
-                elif is_flow_down:
-                    position = 'SHORT'
-                    signal_type = "SCALP"
-                    stop_mult, target_mult = 1.0, 1.5
-
-                # Execute Entry
-                if position:
+                    stop_loss = price - (atr * stop_mult)
+                    take_profit = price + (atr * target_mult)
                     entry_price = price
-                    if position == 'LONG':
-                        stop_loss = price - (atr * stop_mult)
-                        take_profit = price + (atr * target_mult)
-                    else:
-                        stop_loss = price + (atr * stop_mult)
-                        take_profit = price - (atr * target_mult)
+
+                elif p_short > min_conf and p_short > (p_long + 5):
+                    position = 'SHORT'
+                    stop_loss = price + (atr * stop_mult)
+                    take_profit = price - (atr * target_mult)
+                    entry_price = price
 
         return self._generate_stats()
 
     def _generate_stats(self):
         total = len(self.trades)
         if total == 0:
-            return {
-                "win_rate": 0, "profit_factor": 0, "total_trades": 0, "trades_log": []
-            }
+            return {"win_rate": 0, "profit_factor": 0, "total_trades": 0, "trades_log": []}
 
         wins = [t for t in self.trades if t['pnl'] > 0]
         losses = [t for t in self.trades if t['pnl'] <= 0]
 
         win_rate = round((len(wins) / total) * 100, 1)
-
         gross_profit = sum(t['pnl'] for t in wins)
         gross_loss = abs(sum(t['pnl'] for t in losses))
-
         pf = round(gross_profit / gross_loss, 2) if gross_loss > 0 else 99.9
 
-        # Return stats + log (Latest trades first)
         return {
             "win_rate": win_rate,
             "profit_factor": pf,

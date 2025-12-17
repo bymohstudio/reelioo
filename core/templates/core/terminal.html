@@ -25,10 +25,11 @@
     </div>
 
     <div class="flex flex-col items-center justify-center mb-10 px-2">
-        <div class="w-full max-w-2xl relative group z-20">
+        <div class="w-full max-w-3xl relative group z-20">
             <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
 
             <div class="relative flex flex-col sm:flex-row items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-2 shadow-2xl gap-2">
+
                 <div class="flex items-center w-full sm:w-auto flex-grow bg-transparent sm:border-r border-white/5 pr-2">
                     <span class="pl-3 pr-2 text-emerald-500 font-bold text-lg">></span>
                     <input id="symbol-input" type="text" placeholder="SCAN ASSET..."
@@ -37,17 +38,25 @@
                 </div>
 
                 <div class="flex w-full sm:w-auto gap-2">
-                    <div class="relative w-full sm:w-auto">
-                        <select id="market-type" class="appearance-none bg-[#151515] text-[10px] font-bold text-slate-400 border border-white/10 rounded px-8 py-3 sm:py-2 cursor-pointer hover:bg-white/5 transition focus:ring-0 uppercase tracking-wider h-full w-full text-center">
+
+                    <div class="relative w-1/2 sm:w-auto">
+                        <select id="market-type" class="appearance-none bg-[#151515] text-[10px] font-bold text-slate-400 border border-white/10 rounded px-4 py-3 sm:py-2 cursor-pointer hover:bg-white/5 transition focus:ring-0 uppercase tracking-wider h-full w-full text-center">
                             <option value="SPOT">SPOT</option>
                             <option value="PERP" selected>PERP</option>
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
                     </div>
 
-                    <button onclick="initScan()" id="btn-scan" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 px-6 rounded text-xs tracking-widest transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap">SCAN</button>
+                    <div class="relative w-1/2 sm:w-auto">
+                        <select id="trade-style" class="appearance-none bg-[#151515] text-[10px] font-bold text-blue-400 border border-blue-500/30 rounded px-4 py-3 sm:py-2 cursor-pointer hover:bg-white/5 transition focus:ring-0 uppercase tracking-wider h-full w-full text-center">
+                            <option value="SCALP">⚡ SCALP</option>
+                            <option value="INTRADAY" selected>⚖️ DAY</option>
+                            <option value="SWING">🎯 SWING</option>
+                        </select>
+                    </div>
+
+                    <button onclick="initScan()" id="btn-scan" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 sm:py-2 px-6 rounded text-xs tracking-widest transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap">
+                        SCAN
+                    </button>
                 </div>
             </div>
 
@@ -60,7 +69,7 @@
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                 </span>
-                <span class="text-[9px] font-bold text-emerald-400 tracking-[0.15em] uppercase">Sniper Mode Active</span>
+                <span class="text-[9px] font-bold text-emerald-400 tracking-[0.15em] uppercase">Sniper Logic Active</span>
             </div>
             <span class="text-[9px] text-slate-500 font-mono tracking-wide hidden sm:inline-block">Low Frequency. High Precision. Patience Pays.</span>
         </div>
@@ -658,21 +667,30 @@
         const loader = document.getElementById('processing-ui');
         const logText = document.getElementById('loading-text');
 
+        // --- NEW: GRAB USER PREFERENCES ---
+        const marketType = document.getElementById('market-type').value;
+        const tradeStyle = document.getElementById('trade-style').value; // SCALP | DAY | SWING
+
         dash.classList.add('hidden');
         dash.classList.add('opacity-0');
         loader.classList.remove('hidden');
 
-        logText.innerHTML = `<p class="text-slate-300">>> INITIALIZING SECURE GATEWAY...</p>`;
+        logText.innerHTML = `<p class="text-slate-300">>> INITIALIZING ${tradeStyle} PROTOCOL...</p>`;
         setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> AGGREGATING ORDER BOOK DEPTH FOR ${raw}...</p>`); }, 400);
-        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> SCANNING DARK POOL LIQUIDITY...</p>`); }, 1200);
-        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-blue-400 animate-pulse">>> DETECTING INSTITUTIONAL FLOW...</p>`); }, 2500);
+        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> ACTIVATING ENSEMBLE MODELS...</p>`); }, 1200);
+        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-blue-400 animate-pulse">>> CALCULATING CONVICTION VECTORS...</p>`); }, 2500);
 
         try {
             const csrftoken = getCookie('csrftoken');
             const res = await fetch("/api/analyze/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify({ symbol: raw, market_type: "AUTO" })
+                // SEND THE STYLE
+                body: JSON.stringify({
+                    symbol: raw,
+                    market_type: marketType,
+                    trade_style: tradeStyle
+                })
             });
 
             if (!res.ok) throw new Error("Connection Failed");
@@ -681,6 +699,8 @@
             // Populate Basic Data
             safeSetText('res-symbol', data.symbol);
             safeSetText('res-price', `$${formatPrice(data.price)}`);
+
+            // DURATION IS SET HERE
             safeSetText('res-duration', data.signal.duration || "1-3 DAYS");
 
             // Handle Regime Tag
@@ -729,6 +749,13 @@
             let isTradeGrade = score >= 65;
             let isWatchGrade = score >= 55 && score < 65;
             let isNoTrade = score < 55;
+
+            // Adjust threshold for SCALP mode in UI feedback
+            if(tradeStyle === "SCALP") {
+                isTradeGrade = score >= 60;
+                isWatchGrade = score >= 50 && score < 60;
+                isNoTrade = score < 50;
+            }
 
             const dirEl = document.getElementById('res-direction');
             const glow = document.getElementById('signal-glow');
@@ -938,10 +965,14 @@
 
         try {
             const csrftoken = getCookie('csrftoken');
+            // Grab the style from the dropdown
+            const tradeStyle = document.getElementById('trade-style').value;
+
             const res = await fetch("/api/backtest/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify({ symbol: raw })
+                // Send trade_style so the backtest matches your selection
+                body: JSON.stringify({ symbol: raw, trade_style: tradeStyle })
             });
 
             if (!res.ok) throw new Error("Backtest Error");

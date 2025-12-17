@@ -45,7 +45,17 @@ class AnalyzeCryptoView(APIView):
                     res.regime_color = "gray"
                     res.score = 50
 
-            # 4. Response
+            # 4. GET NEWS (CONNECTED)
+            # We try to get AI insights. If it fails, NewsService has its own fallback,
+            # but we wrap it here just in case.
+            news_data = []
+            try:
+                news_data = NewsService.get_smart_insights(symbol)
+            except Exception as e:
+                log.error(f"News Service Error: {e}")
+                news_data = [] # Empty list will trigger JS simulation in frontend
+
+            # 5. Response
             return Response({
                 "symbol": symbol,
                 "price": res.entry,
@@ -63,8 +73,8 @@ class AnalyzeCryptoView(APIView):
                 },
                 "regime": {"phase": res.regime, "color": res.regime_color},
                 "whales": {"zscore": res.whale_zscore, "label": res.whale_label},
-                # Optional: Fetch News
-                "sentiment": {"headline": "AI Active", "news_feed": []}
+                # Pass the real news data
+                "sentiment": {"headline": "AI Active", "news_feed": news_data}
             })
 
         except Exception as e:
@@ -75,6 +85,7 @@ class AnalyzeCryptoView(APIView):
 class BacktestCryptoView(APIView):
     """
     Backtest Endpoint.
+    Now accepts 'trade_style' to simulate SCALP/DAY/SWING logic.
     """
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
@@ -84,15 +95,19 @@ class BacktestCryptoView(APIView):
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper()
             market_type = body.get("market_type", "SPOT")
+            # Get the user's selected style (Default to INTRADAY)
+            trade_style = body.get("trade_style", "INTRADAY")
 
             # Always backtest on 1H data for speed/accuracy balance
+            # We fetch more data (1000 candles) for better backtest depth
             df = MarketService.get_historical_data(symbol, market_type, trade_style="INTRADAY")
 
             if df is None or df.empty:
                 return Response({"error": "Insufficient historical data"}, status=404)
 
             engine = CryptoBacktestEngine(df, symbol)
-            results = engine.run()
+            # Pass the style to the engine
+            results = engine.run(trade_style=trade_style)
 
             return Response(results)
 

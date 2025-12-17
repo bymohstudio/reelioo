@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import numpy as np
 import xgboost as xgb
+import lightgbm as lgb
+from catboost import CatBoostClassifier, Pool
 import requests
 import json
 import time
@@ -21,9 +23,9 @@ LOOKBACK_DAYS = 500
 # PATHS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "core", "quant", "ml_models")
-LONG_MODEL_PATH = os.path.join(MODEL_DIR, "long_model.json")
-SHORT_MODEL_PATH = os.path.join(MODEL_DIR, "short_model.json")
 META_PATH = os.path.join(MODEL_DIR, "edge_meta.json")
+
+if not os.path.exists(MODEL_DIR): os.makedirs(MODEL_DIR)
 
 
 class DeepDataLoader:
@@ -54,86 +56,112 @@ class DeepDataLoader:
         return df
 
 
-def train_specialist(X, y, name="Model"):
-    print(f"\n🏋️ Training {name} Specialist...")
+# --- TRAINING FUNCTIONS ---
 
-    # 1. FIXED: Conservative Weighting
-    # Instead of full imbalance (6.0), we use a softer cap (3.0)
-    # This reduces False Positives drastically.
-    pos_ratio = (len(y) - y.sum()) / y.sum()
-    scale = min(pos_ratio, 3.0)
-
-    print(f"   - Class Balance: {y.sum()} Wins / {len(y) - y.sum()} Fails")
-    print(f"   - Scale Weight: {scale:.2f} (Capped for Precision)")
-
-    # 2. FIXED: High-Precision Hyperparameters
+def train_xgboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
+    print(f"   🚀 Training XGBoost ({name})...")
     params = {
-        "objective": "binary:logistic",
-        "eval_metric": "auc",
-        "max_depth": 6,  # Slightly deeper for complex patterns
-        "eta": 0.02,  # Very slow learning (High precision)
-        "subsample": 0.6,  # More randomness to avoid overfitting
-        "colsample_bytree": 0.6,
-        "scale_pos_weight": scale,
-        "min_child_weight": 10,  # Require strong evidence
-        "gamma": 0.2  # Prune weak leaves (Noise reduction)
+        "objective": "binary:logistic", "eval_metric": "auc", "max_depth": 6,
+        "eta": 0.02, "subsample": 0.6, "colsample_bytree": 0.6,
+        "scale_pos_weight": scale_pos_weight, "min_child_weight": 10, "nthread": 4
     }
-
-    split = int(len(X) * 0.85)
-    X_train, X_test = X.iloc[:split], X.iloc[split:]
-    y_train, y_test = y.iloc[:split], y.iloc[split:]
-
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dtest = xgb.DMatrix(X_test, label=y_test)
-
-    model = xgb.train(params, dtrain, num_boost_round=1000, evals=[(dtest, "Test")], early_stopping_rounds=50,
-                      verbose_eval=False)
-
-    preds = model.predict(dtest)
-    # Check Precision at Trade Threshold
-    high_conf = (preds > 0.65).astype(int)
-    prec = precision_score(y_test, high_conf, zero_division=0)
-    print(f"   ✅ {name} Precision @ 65% Conf: {prec * 100:.1f}%")
-
+    model = xgb.train(params, dtrain, num_boost_round=800, evals=[(dtest, "Test")],
+                      early_stopping_rounds=50, verbose_eval=False)
+    model.save_model(os.path.join(MODEL_DIR, f"xgb_{name.lower()}.json"))
     return model
 
 
-def run_training():
-    if not os.path.exists(MODEL_DIR): os.makedirs(MODEL_DIR)
+def train_lightgbm(X_train, y_train, X_test, y_test, name, scale_pos_weight):
+    print(f"   🍃 Training LightGBM ({name})...")
+    dtrain = lgb.Dataset(X_train, label=y_train)
+    dtest = lgb.Dataset(X_test, label=y_test, reference=dtrain)
+    params = {
+        "objective": "binary", "metric": "auc", "boosting_type": "gbdt",
+        "num_leaves": 31, "learning_rate": 0.03, "feature_fraction": 0.7,
+        "bagging_fraction": 0.7, "bagging_freq": 5, "scale_pos_weight": scale_pos_weight,
+        "verbose": -1, "nthread": 4
+    }
+    model = lgb.train(params, dtrain, num_boost_round=800, valid_sets=[dtest],
+                      callbacks=[lgb.early_stopping(50), lgb.log_evaluation(0)])
+    model.save_model(os.path.join(MODEL_DIR, f"lgb_{name.lower()}.txt"))
+    return model
 
+
+def train_catboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
+    print(f"   🐱 Training CatBoost ({name})...")
+    train_pool = Pool(X_train, y_train)
+    test_pool = Pool(X_test, y_test)
+    model = CatBoostClassifier(
+        iterations=800, learning_rate=0.03, depth=6, scale_pos_weight=scale_pos_weight,
+        eval_metric='AUC', verbose=0, allow_writing_files=False, thread_count=4
+    )
+    model.fit(train_pool, eval_set=test_pool, early_stopping_rounds=50)
+    model.save_model(os.path.join(MODEL_DIR, f"cat_{name.lower()}.cbm"))
+    return model
+
+
+def evaluate_ensemble(xgb_m, lgb_m, cat_m, X_test, y_test, threshold=0.60):
+    p_xgb = xgb_m.predict(xgb.DMatrix(X_test))
+    p_lgb = lgb_m.predict(X_test)
+    p_cat = cat_m.predict_proba(X_test)[:, 1]
+    avg_prob = (p_xgb + p_lgb + p_cat) / 3.0
+    preds = (avg_prob > threshold).astype(int)
+    return precision_score(y_test, preds, zero_division=0)
+
+
+def run_training():
     master_df = []
+    print("⏳ Loading Data...")
     for sym in SYMBOLS:
         df = DeepDataLoader.fetch(sym)
         if df.empty: continue
-
         df = generate_features(df)
-
-        # 3. CRITICAL: Easier Targets = Higher Win Rate
-        # Risk: 1.5 ATR | Reward: 2.25 ATR (1:1.5 Ratio)
-        # This is much easier to hit than the previous 1:2
+        # Using 1.5 R:R Targets (Good balance for all styles)
         df = generate_targets(df, risk_reward=1.5, stop_mult=1.5, candles=12)
         master_df.append(df)
 
     full_data = pd.concat(master_df).dropna()
 
-    # Filter Noise (Keep clean trends)
+    # RELAXED FILTERING: Allow more "Active" markets, not just perfect trends
+    # This ensures models learn to trade "Small Moves" too.
     print(f"\n🧹 Filtering Noise... (Original: {len(full_data)})")
     clean_data = full_data[
-        (full_data['efficiency_ratio'] > 0.12) |
-        (full_data['volatility_slope'] > 0.5)
+        (full_data['efficiency_ratio'] > 0.08) |  # Lowered from 0.12
+        (full_data['volatility_slope'] > 0.3)  # Lowered from 0.5
         ]
-    print(f"📊 Training on Active Markets: {len(clean_data)} Rows")
+    print(f"📊 Training set size: {len(clean_data)} Rows")
 
-    long_model = train_specialist(clean_data[FEATURES], clean_data['target_long'], "LONG")
-    if long_model: long_model.save_model(LONG_MODEL_PATH)
+    split = int(len(clean_data) * 0.85)
+    X = clean_data[FEATURES]
 
-    short_model = train_specialist(clean_data[FEATURES], clean_data['target_short'], "SHORT")
-    if short_model: short_model.save_model(SHORT_MODEL_PATH)
+    # Train Longs
+    y_long = clean_data['target_long']
+    scale_long = min((len(y_long) - y_long.sum()) / y_long.sum(), 3.0)
+    X_train, X_test = X.iloc[:split], X.iloc[split:]
+    y_train_l, y_test_l = y_long.iloc[:split], y_long.iloc[split:]
+
+    print("\n🔹 TRAINING LONG ENSEMBLE")
+    xgb_l = train_xgboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
+    lgb_l = train_lightgbm(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
+    cat_l = train_catboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
+    print(f"✅ LONG Ensemble Precision: {evaluate_ensemble(xgb_l, lgb_l, cat_l, X_test, y_test_l) * 100:.1f}%")
+
+    # Train Shorts
+    y_short = clean_data['target_short']
+    scale_short = min((len(y_short) - y_short.sum()) / y_short.sum(), 3.0)
+    y_train_s, y_test_s = y_short.iloc[:split], y_short.iloc[split:]
+
+    print("\n🔸 TRAINING SHORT ENSEMBLE")
+    xgb_s = train_xgboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
+    lgb_s = train_lightgbm(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
+    cat_s = train_catboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
+    print(f"✅ SHORT Ensemble Precision: {evaluate_ensemble(xgb_s, lgb_s, cat_s, X_test, y_test_s) * 100:.1f}%")
 
     with open(META_PATH, 'w') as f:
         json.dump({"updated": str(datetime.now()), "features": FEATURES}, f)
-
-    print("\n💾 HIGH-PRECISION MODELS SAVED.")
+    print("\n💾 ALL MODELS SAVED.")
 
 
 if __name__ == "__main__":
