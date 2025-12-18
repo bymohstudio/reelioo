@@ -20,7 +20,7 @@ from django.conf import settings
 
 # --- SAFE IMPORTS (Services/Utils usually safe) ---
 from .services.marketdata_service import MarketService
-from .utils import analyze_market_data
+from core.utils import analyze_market_data
 
 
 # NOTE: 'models' and 'forms' are imported inside functions to prevent Circular Import Recursion
