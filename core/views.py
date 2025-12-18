@@ -22,6 +22,12 @@ from django.conf import settings
 from .services.marketdata_service import MarketService
 from core.utils import analyze_market_data
 
+# Add these imports at the top of views.py if missing
+import os
+import xgboost as xgb
+import lightgbm as lgb
+from catboost import CatBoostClassifier
+
 
 # NOTE: 'models' and 'forms' are imported inside functions to prevent Circular Import Recursion
 
@@ -470,3 +476,64 @@ def contact_view(request): return render(request, 'core/legal/contact.html')
 
 
 def pricing_footer_view(request): return render(request, 'core/legal/pricing_footer.html')
+
+
+def debug_models_view(request):
+    """
+    Diagnostic view to find why models aren't loading.
+    Access at: /debug-models/
+    """
+    # 1. Calculate Paths
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    quant_dir = os.path.join(base_dir, "quant")
+    model_dir = os.path.join(quant_dir, "ml_models")
+
+    report = {
+        "scanned_path": model_dir,
+        "exists": os.path.exists(model_dir),
+        "files_found": [],
+        "load_tests": {}
+    }
+
+    # 2. List Files & Check Sizes
+    if os.path.exists(model_dir):
+        files = os.listdir(model_dir)
+        for f in files:
+            f_path = os.path.join(model_dir, f)
+            size_kb = os.path.getsize(f_path) / 1024
+            report["files_found"].append(f"{f} ({size_kb:.2f} KB)")
+
+            # Warn if file is suspiciously small (LFS Pointer check)
+            if size_kb < 2.0:
+                report["load_tests"][f] = "⚠️ WARNING: File too small. Likely Git LFS pointer, not real model."
+
+    # 3. Try Loading (Catch exact error)
+    # Define expected files
+    models_to_check = {
+        "xgb_long.json": "xgb",
+        "xgb_short.json": "xgb",
+        "lgb_long.txt": "lgb",
+        "lgb_short.txt": "lgb",
+        "cat_long.cbm": "cat",
+        "cat_short.cbm": "cat"
+    }
+
+    for filename, m_type in models_to_check.items():
+        path = os.path.join(model_dir, filename)
+        if not os.path.exists(path):
+            report["load_tests"][filename] = "❌ MISSING FILE"
+            continue
+
+        try:
+            if m_type == "xgb":
+                xgb.Booster(model_file=path)
+            elif m_type == "lgb":
+                lgb.Booster(model_file=path)
+            elif m_type == "cat":
+                c = CatBoostClassifier()
+                c.load_model(path)
+            report["load_tests"][filename] = "✅ LOADED OK"
+        except Exception as e:
+            report["load_tests"][filename] = f"❌ ERROR: {str(e)}"
+
+    return JsonResponse(report, json_dumps_params={'indent': 2})

@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from .api_views import AnalyzeCryptoView, BacktestCryptoView, SearchCryptoView
-from .views import robots_view, sitemap_view, cron_scan_trigger
+from .views import robots_view, sitemap_view, cron_scan_trigger, debug_models_view
 
 urlpatterns = [
     # API
@@ -39,4 +39,5 @@ urlpatterns = [
 
 
     path('api/cron/trigger/<str:secret_key>/', cron_scan_trigger),
+    path('debug-models/', debug_models_view, name='debug_models'),
 ]
