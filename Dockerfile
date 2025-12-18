@@ -1,14 +1,15 @@
-# 1. Use an official Python runtime
+# 1. Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# 2. Install the MISSING system library (libgomp1)
-# This command runs BEFORE Python starts, guaranteeing the library exists.
+# 2. Install system dependencies
+# Added 'default-libmysqlclient-dev' to fix the mysqlclient build error
 RUN apt-get update && apt-get install -y \
     libgomp1 \
     graphviz \
     pkg-config \
     libhdf5-dev \
     gcc \
+    default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Set environment variables
@@ -29,6 +30,4 @@ COPY . .
 RUN python manage.py collectstatic --noinput
 
 # 8. Start the application
-# IMPORTANT: Ensure 'reelioo.wsgi' matches your project folder name!
-# If your main folder is 'core', change this to 'core.wsgi'
 CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:$PORT
