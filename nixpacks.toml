@@ -1,0 +1,13 @@
+# nixpacks.toml
+
+[phases.setup]
+# This forces the system to install the C++ libraries required by LightGBM and Graphviz
+aptPkgs = ["libgomp1", "graphviz", "pkg-config", "libhdf5-dev"]
+
+[phases.build]
+# We explicitly call the install command to ensure compiled extensions work
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+# Your startup command (adjust if you use a different command)
+cmd = "gunicorn reelioo.wsgi:application --log-file -"
