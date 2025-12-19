@@ -465,9 +465,12 @@ def send_discord_alert(symbol, data, alert_type="SNIPER"):
         title = f"👀 WATCH ALERT: {symbol}"
         desc = "*Bias detected. Waiting for volatility confirmation.*"
 
+
+    avatar = "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"
+
     payload = {
-        "username": "Reelioo Sniper Bot",
-        "avatar_url": "https://i.imgur.com/6Xy1sJ2.png",
+        "username": "Reelioo Terminal Bot",
+        "avatar_url": avatar,
         "embeds": [{
             "title": title,
             "description": desc,
