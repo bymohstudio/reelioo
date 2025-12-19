@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 from django.conf import settings
 
+from .quant.crypto_engine import CryptoQuantEngine
 # --- SAFE IMPORTS (Services/Utils usually safe) ---
 from .services.marketdata_service import MarketService
 from core.utils import analyze_market_data
