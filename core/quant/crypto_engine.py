@@ -53,15 +53,19 @@ class CryptoQuantEngine:
 
         models = self._load_models()
 
-        pL = (float(models['xgb_long'].predict(xgb.DMatrix(row_df))[0]) +
-              float(models['lgb_long'].predict(row_df)[0]) +
-              float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
+        # Prediction Logic
+        if 'xgb_long' in models:
+            pL = (float(models['xgb_long'].predict(xgb.DMatrix(row_df))[0]) +
+                  float(models['lgb_long'].predict(row_df)[0]) +
+                  float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
 
-        pS = (float(models['xgb_short'].predict(xgb.DMatrix(row_df))[0]) +
-              float(models['lgb_short'].predict(row_df)[0]) +
-              float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
+            pS = (float(models['xgb_short'].predict(xgb.DMatrix(row_df))[0]) +
+                  float(models['lgb_short'].predict(row_df)[0]) +
+                  float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
+        else:
+            pL, pS = 50.0, 50.0
 
-        # ---- Relaxed thresholds ----
+        # ---- Thresholds ----
         if trade_style == "SCALP":
             min_conf = 58.0
             min_eff = 0.08
@@ -78,10 +82,10 @@ class CryptoQuantEngine:
         bias = "NEUTRAL"
         score = max(pL, pS)
 
-        eff = last['efficiency_ratio']
-        vol = last['volatility_slope']
+        eff = float(last['efficiency_ratio'])
+        vol_slope = float(last['volatility_slope'])
 
-        market_ok = (eff > min_eff) or (vol > 0.1)
+        market_ok = (eff > min_eff) or (vol_slope > 0.1)
 
         if market_ok:
             if pL > min_conf and pL > (pS + 5):
@@ -120,9 +124,60 @@ class CryptoQuantEngine:
         whale_z = float(last.get('vol_z', 0))
         whale_label = "High Vol" if abs(whale_z) > 2 else "Normal"
 
+        # ---- 6. CALCULATE LOGIC VECTORS (Updated Names) ----
+        drivers = []
+
+        # Driver A: Efficiency (Trend Quality)
+        eff = float(last.get('efficiency_ratio', 0))
+        if eff > 0.1:
+            drivers.append({
+                "feature": "Trend Efficiency",
+                "desc": "CLEAN PRICE PATH",  # Matches Screenshot
+                "importance": min(eff * 200, 95)
+            })
+
+        # Driver B: Whale Volume (Institutional Action)
+        whale_z = float(last.get('vol_z', 0))
+        if abs(whale_z) > 1.2:
+            drivers.append({
+                "feature": "Whale Volume",
+                "desc": "WHALE ACCUMULATION",  # Matches Screenshot
+                "importance": min(abs(whale_z) * 20, 92)
+            })
+
+        # Driver C: Momentum (Trend Strength)
+        trend = float(last.get('trend_strength', 0))
+        if abs(trend) > 0.5:
+            drivers.append({
+                "feature": "Momentum Trend",
+                "desc": "TREND MOMENTUM",  # Matches Screenshot
+                "importance": 85.0
+            })
+
+        # Driver D: Squeeze (Volatility Compression)
+        if float(last.get('ttm_squeeze', 0)) > 0:
+            drivers.append({
+                "feature": "TTM Squeeze",
+                "desc": "VOLATILITY SQUEEZE",
+                "importance": 88.0
+            })
+
+        # Driver E: Velocity (High Return)
+        if float(last.get('ret_3', 0)) > 0.05:  # > 5% move
+            drivers.append({
+                "feature": "Velocity",
+                "desc": "VELOCITY HIGH",  # Matches Screenshot
+                "importance": 90.0
+            })
+
+        # Sort by importance and take Top 3
+        drivers.sort(key=lambda x: x['importance'], reverse=True)
+        top_vectors = drivers[:3]
+
         return SimpleNamespace(
-            bias=bias,
+            # ... (Existing fields like bias, score, entry, etc.) ...
             score=int(round(score)),
+            bias=bias,
             entry=price,
             stop=round(stop, 4),
             target1=round(t1, 4),
@@ -133,5 +188,6 @@ class CryptoQuantEngine:
             regime=regime,
             regime_color=regime_color,
             whale_zscore=round(whale_z, 2),
-            whale_label=whale_label
+            whale_label=whale_label,
+            top_features=top_vectors  # This is critical
         )

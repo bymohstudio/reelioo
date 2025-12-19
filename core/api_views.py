@@ -1,3 +1,5 @@
+# core/api_views.py
+
 import json
 import traceback
 import logging
@@ -24,7 +26,7 @@ class AnalyzeCryptoView(APIView):
             symbol = body.get("symbol", "BTCUSDT").upper().replace("-", "")
             trade_style = body.get("trade_style", "INTRADAY")
 
-            # 1. Fetch Data (Timeframe handled by Service)
+            # 1. Fetch Data
             df = MarketService.get_historical_data(symbol, "AUTO", trade_style)
 
             if df.empty:
@@ -46,14 +48,12 @@ class AnalyzeCryptoView(APIView):
                     res.score = 50
 
             # 4. GET NEWS (CONNECTED)
-            # We try to get AI insights. If it fails, NewsService has its own fallback,
-            # but we wrap it here just in case.
             news_data = []
             try:
                 news_data = NewsService.get_smart_insights(symbol)
             except Exception as e:
                 log.error(f"News Service Error: {e}")
-                news_data = [] # Empty list will trigger JS simulation in frontend
+                news_data = []
 
             # 5. Response
             return Response({
@@ -73,7 +73,10 @@ class AnalyzeCryptoView(APIView):
                 },
                 "regime": {"phase": res.regime, "color": res.regime_color},
                 "whales": {"zscore": res.whale_zscore, "label": res.whale_label},
-                # Pass the real news data
+
+                # --- NEW: SEND LOGIC VECTORS TO FRONTEND ---
+                "explainability": res.top_features,
+
                 "sentiment": {"headline": "AI Active", "news_feed": news_data}
             })
 

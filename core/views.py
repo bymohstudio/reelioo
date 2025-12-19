@@ -402,7 +402,7 @@ def sitemap_view(request):
 
 # --- CRON JOB TRIGGER ---
 def cron_scan_trigger(request, secret_key):
-    # This view does NOT need models or forms, so it's safe
+    # 1. Security Check
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
@@ -410,28 +410,54 @@ def cron_scan_trigger(request, secret_key):
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
     alerts_sent = 0
     scanned = 0
+    logs = []
 
     try:
+        # 2. Initialize Engine DIRECTLY (Bypassing utils.py to avoid errors)
+        engine = CryptoQuantEngine()
+
         for symbol in watchlist:
-            data = analyze_market_data(symbol)
-            if not data or 'signal' not in data:
+            # A. Fetch Data
+            df = MarketService.get_historical_data(symbol, "AUTO", "INTRADAY")
+            if df is None or df.empty:
+                logs.append(f"{symbol}: No Data")
                 continue
 
-            score = data.get('signal', {}).get('probability', 0)
-            bias = data.get('signal', {}).get('bias', 'NEUTRAL')
+            # B. Analyze (Returns SimpleNamespace)
+            res = engine.analyze(df, "INTRADAY")
 
-            if score >= 65 and bias != 'NEUTRAL':
-                send_discord_alert(data)
+            # C. Check Threshold (65% for Intraday)
+            if res.score >= 65 and res.bias != 'NEUTRAL':
+                # D. Convert Namespace to Dictionary for Discord Function
+                discord_payload = {
+                    "symbol": symbol,
+                    "signal": {
+                        "bias": res.bias,
+                        "probability": res.score,
+                        "entry": res.entry,
+                        "stop": res.stop,
+                        "target2": res.target2
+                    }
+                }
+
+                send_discord_alert(discord_payload)
                 alerts_sent += 1
+                logs.append(f"{symbol}: ALERT SENT ({res.score}%)")
+            else:
+                logs.append(f"{symbol}: Low Score ({res.score}%)")
+
             scanned += 1
 
         return JsonResponse({
             'status': 'success',
             'scanned': scanned,
-            'alerts_sent': alerts_sent
+            'alerts_sent': alerts_sent,
+            'logs': logs
         })
+
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        import traceback
+        return JsonResponse({'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}, status=500)
 
 
 def send_discord_alert(data):
