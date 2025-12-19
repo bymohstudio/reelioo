@@ -4,7 +4,9 @@ import os
 import logging
 import pandas as pd
 import xgboost as xgb
-from .ml_training.feature_engineering import compute_indicators, FEATURES
+
+# FIXED IMPORT (correct module + correct function)
+from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
 log = logging.getLogger(__name__)
 
@@ -32,21 +34,19 @@ class MLBridge:
                 cls._SHORT_MODEL.load_model(cls.SHORT_PATH)
 
             return cls._LONG_MODEL, cls._SHORT_MODEL
+
         except Exception as e:
             log.error(f"ML Model Load Failed: {e}")
             return None, None
 
     @classmethod
     def get_signal(cls, df: pd.DataFrame) -> dict:
-        """
-        Returns the Dual-Model verdict:
-        { "bias": "LONG"|"SHORT"|"NEUTRAL", "score": 0-100 }
-        """
-        if df.empty: return {"bias": "NEUTRAL", "score": 50}
 
-        # Ensure features are calculated
-        if "vol_z" not in df.columns:
-            df = compute_indicators(df)
+        if df.empty:
+            return {"bias": "NEUTRAL", "score": 50}
+
+        # Use correct feature engineering
+        df = generate_features(df)
 
         m_long, m_short = cls._load_models()
         if not m_long or not m_short:
@@ -59,13 +59,16 @@ class MLBridge:
             p_long = float(m_long.predict(dmat)[0]) * 100
             p_short = float(m_short.predict(dmat)[0]) * 100
 
-            # Strict 70% Logic
-            if p_long > 70 and p_long > p_short:
-                return {"bias": "LONG", "score": p_long}
-            elif p_short > 70 and p_short > p_long:
-                return {"bias": "SHORT", "score": p_short}
-            else:
-                return {"bias": "NEUTRAL", "score": 50}
+            CONF = 60  # relaxed threshold
+
+            if p_long > CONF and p_long > p_short:
+                return {"bias": "LONG", "score": round(p_long, 2)}
+
+            if p_short > CONF and p_short > p_long:
+                return {"bias": "SHORT", "score": round(p_short, 2)}
+
+            # return real score instead of 50
+            return {"bias": "NEUTRAL", "score": round(max(p_long, p_short), 2)}
 
         except Exception as e:
             log.error(f"Bridge Prediction Error: {e}")

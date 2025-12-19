@@ -1,3 +1,5 @@
+# core/quant/crypto_engine.py
+
 from __future__ import annotations
 from types import SimpleNamespace
 import pandas as pd
@@ -5,7 +7,6 @@ import xgboost as xgb
 import lightgbm as lgb
 from catboost import CatBoostClassifier
 import os
-import json
 import logging
 from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
@@ -29,128 +30,108 @@ class CryptoQuantEngine:
         self.models = {}
 
     def _load_models(self):
-        if self.models: return self.models
+        if self.models:
+            return self.models
         try:
-            # XGBoost
             self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
             self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
-            # LightGBM
             self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
             self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
-            # CatBoost
             self.models['cat_long'] = CatBoostClassifier()
             self.models['cat_long'].load_model(self.PATHS['cat_long'])
             self.models['cat_short'] = CatBoostClassifier()
             self.models['cat_short'].load_model(self.PATHS['cat_short'])
         except Exception as e:
-            log.warning(f"Model Load Error (Partial?): {e}")
+            log.warning(f"Model Load Error: {e}")
         return self.models
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "SWING"):
-        if df.empty: raise ValueError("Empty Data")
 
-        # 1. Feature Engineering
         df = generate_features(df)
         last = df.iloc[-1]
         row_df = pd.DataFrame([last])[FEATURES].astype(float)
 
-        # 2. Ensemble Prediction
         models = self._load_models()
-        prob_long, prob_short = 0.0, 0.0
 
-        # --- VOTING LOGIC ---
-        if 'xgb_long' in models and 'lgb_long' in models:
-            # Longs
-            xl = float(models['xgb_long'].predict(xgb.DMatrix(row_df))[0])
-            ll = float(models['lgb_long'].predict(row_df)[0])
-            cl = float(models['cat_long'].predict_proba(row_df)[0][1])
-            prob_long = ((xl + ll + cl) / 3.0) * 100
+        pL = (float(models['xgb_long'].predict(xgb.DMatrix(row_df))[0]) +
+              float(models['lgb_long'].predict(row_df)[0]) +
+              float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
 
-            # Shorts
-            xs = float(models['xgb_short'].predict(xgb.DMatrix(row_df))[0])
-            ls = float(models['lgb_short'].predict(row_df)[0])
-            cs = float(models['cat_short'].predict_proba(row_df)[0][1])
-            prob_short = ((xs + ls + cs) / 3.0) * 100
+        pS = (float(models['xgb_short'].predict(xgb.DMatrix(row_df))[0]) +
+              float(models['lgb_short'].predict(row_df)[0]) +
+              float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
 
-        # 3. DYNAMIC TRADING LOGIC (The "Retail Friendly" Part)
-        # Adjust thresholds based on User Preference
-
+        # ---- Relaxed thresholds ----
         if trade_style == "SCALP":
-            # SCALP: Wants frequent trades, smaller moves.
-            min_conf = 60.0  # Lower threshold (Retail wants action)
-            min_efficiency = 0.05  # Accepts messier markets
+            min_conf = 58.0
+            min_eff = 0.08
             duration = "15m - 2h"
-            regime_prefix = "SCALP"
-
         elif trade_style == "SWING":
-            # SWING: Wants precision, bigger moves.
-            min_conf = 70.0  # High threshold
-            min_efficiency = 0.15  # Needs cleaner trends
+            min_conf = 60.0
+            min_eff = 0.08
             duration = "1 - 3 Days"
-            regime_prefix = "SWING"
-
-        else:  # INTRADAY
-            min_conf = 65.0
-            min_efficiency = 0.10
+        else:
+            min_conf = 60.0
+            min_eff = 0.08
             duration = "4h - 24h"
-            regime_prefix = "DAY"
 
-        # 4. Final Decision
-        final_bias = "NEUTRAL"
-        score = 50.0
-        regime = "WAIT"
-        color = "gray"
+        bias = "NEUTRAL"
+        score = max(pL, pS)
 
-        # Check Market Quality (Efficiency Filter)
-        # We use the dynamic 'min_efficiency' from above
-        is_clean = last['efficiency_ratio'] > min_efficiency or last['volatility_slope'] > 0.1
+        eff = last['efficiency_ratio']
+        vol = last['volatility_slope']
 
-        if is_clean:
-            if prob_long > min_conf and prob_long > (prob_short + 5):
-                final_bias = "LONG"
-                score = prob_long
-                regime = f"{regime_prefix} BUY"
-                color = "green"
-            elif prob_short > min_conf and prob_short > (prob_long + 5):
-                final_bias = "SHORT"
-                score = prob_short
-                regime = f"{regime_prefix} SELL"
-                color = "red"
+        market_ok = (eff > min_eff) or (vol > 0.1)
 
-        # 5. Risk Levels (ATR Based)
+        if market_ok:
+            if pL > min_conf and pL > (pS + 5):
+                bias = "LONG"
+                score = pL
+            elif pS > min_conf and pS > (pL + 5):
+                bias = "SHORT"
+                score = pS
+
         price = float(last['close'])
         atr = float(last.get('atr_14', price * 0.01))
 
-        # Adjust Risk/Reward for Scalping
-        if trade_style == "SCALP":
-            stop_mult, target_mult = 1.0, 1.5  # Tighter stops for scalping
-        else:
-            stop_mult, target_mult = 1.5, 2.5  # Wider room for swings
+        stop_mult = 1.0 if trade_style == "SCALP" else 1.5
+        tgt_mult = 1.5 if trade_style == "SCALP" else 2.5
 
-        if final_bias == "LONG":
+        if bias == "LONG":
             stop = price - (atr * stop_mult)
-            t1 = price + (atr * target_mult)
-        elif final_bias == "SHORT":
+            t1 = price + (atr * tgt_mult)
+        elif bias == "SHORT":
             stop = price + (atr * stop_mult)
-            t1 = price - (atr * target_mult)
+            t1 = price - (atr * tgt_mult)
         else:
-            stop = t1 = price
+            stop = price
+            t1 = price
 
         dist = abs(t1 - price)
 
+        # ---- Regime & Whale context ----
+        if score >= 60:
+            regime = "ACTIVE"
+            regime_color = "green" if bias == "LONG" else "red"
+        else:
+            regime = "WAIT"
+            regime_color = "gray"
+
+        whale_z = float(last.get('vol_z', 0))
+        whale_label = "High Vol" if abs(whale_z) > 2 else "Normal"
+
         return SimpleNamespace(
-            score=int(score),
-            bias=final_bias,
+            bias=bias,
+            score=int(round(score)),
             entry=price,
             stop=round(stop, 4),
             target1=round(t1, 4),
             target2=round(t1 + (dist * 0.5), 4),
             target3=round(t1 + dist, 4),
-            rr_ratio=round(target_mult / stop_mult, 1),
+            rr_ratio=round(tgt_mult / stop_mult, 1),
             expected_duration=duration,
             regime=regime,
-            regime_color=color,
-            whale_zscore=round(float(last.get('vol_z', 0)), 2),
-            whale_label="High Vol" if abs(last.get('vol_z', 0)) > 2 else "Normal",
-            top_features=[]
+            regime_color=regime_color,
+            whale_zscore=round(whale_z, 2),
+            whale_label=whale_label
         )
