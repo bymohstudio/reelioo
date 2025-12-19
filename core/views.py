@@ -403,7 +403,6 @@ def sitemap_view(request):
 
 # --- CRON JOB TRIGGER ---
 def cron_scan_trigger(request, secret_key):
-    # 1. Security Check
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
@@ -414,71 +413,71 @@ def cron_scan_trigger(request, secret_key):
     logs = []
 
     try:
-        # 2. Initialize Engine DIRECTLY (Bypassing utils.py to avoid errors)
         engine = CryptoQuantEngine()
 
         for symbol in watchlist:
-            # A. Fetch Data
             df = MarketService.get_historical_data(symbol, "AUTO", "INTRADAY")
-            if df is None or df.empty:
-                logs.append(f"{symbol}: No Data")
-                continue
+            if df is None or df.empty: continue
 
-            # B. Analyze (Returns SimpleNamespace)
             res = engine.analyze(df, "INTRADAY")
 
-            # C. Check Threshold (65% for Intraday)
-            if res.score >= 65 and res.bias != 'NEUTRAL':
-                # D. Convert Namespace to Dictionary for Discord Function
-                discord_payload = {
-                    "symbol": symbol,
-                    "signal": {
-                        "bias": res.bias,
-                        "probability": res.score,
-                        "entry": res.entry,
-                        "stop": res.stop,
-                        "target2": res.target2
-                    }
-                }
+            # --- TIERED LOGIC ---
 
-                send_discord_alert(discord_payload)
+            # TIER 1: SNIPER SIGNAL (The 65% "Kill Shot")
+            if res.score >= 65 and res.bias != 'NEUTRAL':
+                send_discord_alert(symbol, res, alert_type="SNIPER")
                 alerts_sent += 1
-                logs.append(f"{symbol}: ALERT SENT ({res.score}%)")
+                logs.append(f"{symbol}: SNIPER SENT ({res.score}%)")
+
+            # TIER 2: WATCH SIGNAL (The 60-64% "Heads Up")
+            # We alert ONLY if it's "Active" (60%) but not yet "Sniper" (65%)
+            elif res.score >= 60 and res.bias != 'NEUTRAL':
+                send_discord_alert(symbol, res, alert_type="WATCH")
+                alerts_sent += 1
+                logs.append(f"{symbol}: WATCH SENT ({res.score}%)")
+
             else:
                 logs.append(f"{symbol}: Low Score ({res.score}%)")
 
             scanned += 1
 
-        return JsonResponse({
-            'status': 'success',
-            'scanned': scanned,
-            'alerts_sent': alerts_sent,
-            'logs': logs
-        })
+        return JsonResponse({'status': 'success', 'scanned': scanned, 'alerts_sent': alerts_sent, 'logs': logs})
 
     except Exception as e:
         import traceback
-        return JsonResponse({'status': 'error', 'message': str(e), 'trace': traceback.format_exc()}, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-def send_discord_alert(data):
+# UPDATED DISCORD FUNCTION TO HANDLE TIERS
+def send_discord_alert(symbol, data, alert_type="SNIPER"):
     webhook_url = os.getenv('DISCORD_URL')
     if not webhook_url: return
 
-    color = 5763719 if data['signal']['bias'] == 'LONG' else 15548997
+    # COLORS
+    if alert_type == "SNIPER":
+        # Green for Long, Red for Short
+        color = 5763719 if data.bias == 'LONG' else 15548997
+        title = f"🚨 SNIPER SIGNAL: {symbol}"
+        desc = "**HIGH CONVICTION SETUP CONFIRMED.**"
+    else:
+        # Yellow for Watch
+        color = 16776960
+        title = f"👀 WATCH ALERT: {symbol}"
+        desc = "*Bias detected. Waiting for volatility confirmation.*"
+
     payload = {
         "username": "Reelioo Sniper Bot",
         "avatar_url": "https://i.imgur.com/6Xy1sJ2.png",
         "embeds": [{
-            "title": f"🚨 SNIPER SIGNAL: {data['symbol']}",
-            "description": f"**High Conviction Setup Detected.**",
+            "title": title,
+            "description": desc,
             "color": color,
             "fields": [
-                {"name": "Bias", "value": f"**{data['signal']['bias']}**", "inline": True},
-                {"name": "Confidence", "value": f"**{data['signal']['probability']}%**", "inline": True},
-                {"name": "Entry", "value": f"`${data['signal']['entry']}`", "inline": True},
-                {"name": "Stop", "value": f"${data['signal']['stop']}", "inline": True},
-                {"name": "Target", "value": f"${data['signal']['target2']}", "inline": True}
+                {"name": "Bias", "value": f"**{data.bias}**", "inline": True},
+                {"name": "Confidence", "value": f"**{data.score}%**", "inline": True},
+                {"name": "Price", "value": f"`${data.entry}`", "inline": True},
+                {"name": "Stop", "value": f"${data.stop}", "inline": True},
+                {"name": "Target", "value": f"${data.target2}", "inline": True}
             ],
             "footer": {"text": "Reelioo Institutional Terminal"}
         }]
