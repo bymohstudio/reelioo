@@ -20,7 +20,7 @@
         <div class="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-black to-transparent z-10"></div>
         <div class="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-black to-transparent z-10"></div>
         <div class="marquee-track flex items-center gap-12 sm:gap-16 py-3 whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-widest text-slate-500" id="live-marquee">
-            <span class="flex items-center gap-2 animate-pulse">LOADING MARKET DATA...</span>
+            <span class="flex items-center gap-2 animate-pulse">ESTABLISHING UPLINK...</span>
         </div>
     </div>
 
@@ -38,7 +38,6 @@
                 </div>
 
                 <div class="flex w-full sm:w-auto gap-2">
-
                     <div class="relative w-1/2 sm:w-auto">
                         <select id="market-type" class="appearance-none bg-[#151515] text-[10px] font-bold text-slate-400 border border-white/10 rounded px-4 py-3 sm:py-2 cursor-pointer hover:bg-white/5 transition focus:ring-0 uppercase tracking-wider h-full w-full text-center">
                             <option value="SPOT">SPOT</option>
@@ -71,7 +70,7 @@
                 </span>
                 <span class="text-[9px] font-bold text-emerald-400 tracking-[0.15em] uppercase">Sniper Logic Active</span>
             </div>
-            <span class="text-[9px] text-slate-500 font-mono tracking-wide hidden sm:inline-block">Low Frequency. High Precision. Patience Pays.</span>
+            <span class="text-[9px] text-slate-500 font-mono tracking-wide hidden sm:inline-block">System Status: HUNTING.</span>
         </div>
     </div>
 
@@ -99,7 +98,7 @@
                 <div class="flex justify-between items-start mb-3 relative z-10">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-white/5"><i data-lucide="zap" class="w-4 h-4 text-purple-500"></i></div>
-                        <div><h3 class="text-sm font-bold text-white leading-none">SOL/USDT</h3><span class="text-[9px] text-slate-500 font-mono">High Volatility</span></div>
+                        <div><h3 class="text-sm font-bold text-white leading-none">SOL/USDT</h3><span class="text-[9px] text-slate-500 font-mono">High Velocity</span></div>
                     </div>
                     <span class="text-[9px] bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition">SCAN</span>
                 </div>
@@ -110,7 +109,7 @@
                 <div class="flex justify-between items-start mb-3 relative z-10">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-white/5"><i data-lucide="layers" class="w-4 h-4 text-blue-500"></i></div>
-                        <div><h3 class="text-sm font-bold text-white leading-none">ETH/USDT</h3><span class="text-[9px] text-slate-500 font-mono">Smart Money Flow</span></div>
+                        <div><h3 class="text-sm font-bold text-white leading-none">ETH/USDT</h3><span class="text-[9px] text-slate-500 font-mono">Smart Money</span></div>
                     </div>
                     <span class="text-[9px] bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition">SCAN</span>
                 </div>
@@ -196,7 +195,7 @@
                                     <div id="no-trade-info" class="hidden relative group/tooltip cursor-help">
                                         <i data-lucide="info" class="w-3 h-3 text-slate-600 hover:text-slate-400"></i>
                                         <div class="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 border border-slate-700 text-[10px] text-slate-300 rounded shadow-xl hidden group-hover/tooltip:block z-50">
-                                            No volatility expansion detected. Professional traders typically remain inactive during these conditions.
+                                            The market is too choppy. The Sniper AI has activated safety filters to prevent capital loss.
                                         </div>
                                     </div>
                                     <div id="exec-dot" class="w-2 h-2 rounded-full bg-slate-600"></div>
@@ -243,6 +242,7 @@
         </div>
 
         <div class="col-span-1 lg:col-span-4 space-y-6">
+
             <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
                 <div class="flex items-center gap-2 mb-6">
                     <div class="w-1 h-4 bg-blue-500"></div>
@@ -252,17 +252,28 @@
                 </div>
             </div>
 
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden">
                 <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] uppercase tracking-widest text-slate-500">Volume Profile</span>
-                    <i data-lucide="waves" class="w-4 h-4 text-blue-500 animate-pulse"></i>
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <h4 class="text-sm font-bold text-white uppercase tracking-widest">Scanner Log</h4>
+                    </div>
+                    <span class="text-[8px] text-slate-500 font-mono">LIVE FEED</span>
                 </div>
-                <div class="flex justify-between items-end mb-2">
-                    <span id="txt-whale" class="text-lg font-bold text-white leading-none">--</span>
-                    <span id="txt-whale-z" class="text-[10px] font-mono text-slate-400">σ: 0.0</span>
+                <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 h-40 overflow-y-auto custom-scrollbar border-l border-white/5 pl-3 flex flex-col justify-end">
+                    </div>
+            </div>
+
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 max-h-[420px] flex flex-col">
+                <div class="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
+                    <span class="text-[10px] uppercase tracking-widest text-slate-500">Intel Feed</span>
+                    <span class="text-[9px] bg-red-900/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20 animate-pulse">LIVE</span>
                 </div>
-                <div class="w-full bg-[#111] h-1 rounded-full overflow-hidden">
-                    <div id="bar-whale" class="h-full bg-blue-500 w-0 transition-all duration-1000 shadow-[0_0_10px_#3b82f6]"></div>
+                <div id="news-feed" class="space-y-3 overflow-y-auto custom-scrollbar max-h-[300px]">
+                    <div class="text-xs text-slate-600 italic">Waiting for uplink...</div>
                 </div>
             </div>
 
@@ -289,14 +300,63 @@
                 </div>
             </div>
 
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 max-h-[420px] flex flex-col">
-                <div class="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
-                    <span class="text-[10px] uppercase tracking-widest text-slate-500">Intel Feed</span>
-                    <span class="text-[9px] bg-red-900/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20 animate-pulse">LIVE</span>
+        </div>
+    </div>
+
+    <div id="guide-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-[#0a0a0a] border border-blue-500/20 rounded-2xl max-w-2xl w-full p-8 shadow-[0_0_50px_rgba(59,130,246,0.1)] relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <button onclick="closeGuide()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                    <i data-lucide="crosshair" class="w-5 h-5 text-blue-400"></i>
                 </div>
-                <div id="news-feed" class="space-y-3 overflow-y-auto custom-scrollbar max-h-[300px]">
-                    <div class="text-xs text-slate-600 italic">Waiting for uplink...</div>
+                <div>
+                    <h3 class="text-xl font-bold text-white">Sniper Protocol: Field Manual</h3>
+                    <p class="text-[10px] text-slate-500 uppercase tracking-widest">Trade Less. Win More.</p>
                 </div>
+            </div>
+
+            <div class="space-y-8">
+                <div class="border-l-2 border-blue-500 pl-4">
+                    <h4 class="text-sm font-bold text-white mb-2">1. The Green Light (65%+)</h4>
+                    <p class="text-xs text-slate-400 mb-3 leading-relaxed">
+                        Think of this like a traffic light. The AI analyzes millions of data points to find <strong>Institutional Momentum</strong>.
+                    </p>
+                    <ul class="text-xs text-slate-400 space-y-2 list-disc list-inside">
+                        <li><strong>Under 60%?</strong> Stay Cash. The market is just noise.</li>
+                        <li><strong>Yellow (60-64%)?</strong> Get Ready. A move is building.</li>
+                        <li><strong>Green (65%+)?</strong> <span class="text-emerald-400 font-bold">EXECUTE.</span> The odds are mathematically in your favor.</li>
+                    </ul>
+                </div>
+
+                <div class="border-l-2 border-purple-500 pl-4">
+                    <h4 class="text-sm font-bold text-white mb-2">2. Why is it silent?</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed mb-2">
+                        Most traders lose money because they trade "Chop" (sideways markets).
+                    </p>
+                    <div class="bg-[#111] p-3 rounded border border-white/5">
+                        <p class="text-[10px] text-slate-300 italic">
+                            "If the Scanner is silent, it is protecting your capital. It only speaks when there is a kill shot."
+                        </p>
+                    </div>
+                </div>
+
+                <div class="border-l-2 border-red-500 pl-4">
+                    <h4 class="text-sm font-bold text-white mb-2">3. The 24-Hour Rule</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        Time is Money. If a trade doesn't hit the target within <strong>24 Hours</strong>, the edge is gone. The system will mark it as "TIMEOUT".
+                        <br><br>
+                        <strong>Your Job:</strong> Close the trade at Breakeven. Don't hope. Move to the next target.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-white/10 text-center">
+                <button onclick="closeGuide()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded text-xs tracking-widest transition shadow-lg shadow-blue-900/20">
+                    ACKNOWLEDGE MISSION
+                </button>
             </div>
         </div>
     </div>
@@ -316,7 +376,10 @@
 
     <div id="backtest-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-md w-full p-6 relative shadow-2xl">
-            <button onclick="closeBacktest()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <button onclick="closeBacktest()" class="absolute top-3 right-3 p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition z-50 cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
             <div class="flex items-center gap-2 mb-1">
                 <h3 class="text-lg font-bold text-white">Strategy Validation</h3>
                 <span class="text-[9px] bg-gradient-to-r from-emerald-500 to-emerald-700 text-white px-2 py-0.5 rounded font-bold uppercase">Titanium Grade</span>
@@ -332,15 +395,15 @@
                 <div class="grid grid-cols-3 gap-3 mb-6">
                     <div class="bg-[#111] p-3 rounded text-center border border-emerald-500/10">
                         <span class="text-[9px] text-slate-500 block mb-1">WIN RATE</span>
-                        <span id="bt-winrate" class="text-lg font-bold text-emerald-400">81.4%</span>
+                        <span id="bt-winrate" class="text-lg font-bold text-emerald-400">--</span>
                     </div>
                     <div class="bg-[#111] p-3 rounded text-center border border-white/5">
                         <span class="text-[9px] text-slate-500 block mb-1">R:R RATIO</span>
-                        <span id="bt-pnl" class="text-lg font-bold text-blue-400">1.5</span>
+                        <span id="bt-pnl" class="text-lg font-bold text-blue-400">--</span>
                     </div>
                     <div class="bg-[#111] p-3 rounded text-center border border-white/5">
                         <span class="text-[9px] text-slate-500 block mb-1">SIGNALS</span>
-                        <span id="bt-trades" class="text-lg font-bold text-white">97</span>
+                        <span id="bt-trades" class="text-lg font-bold text-white">--</span>
                     </div>
                 </div>
                 <div class="border-t border-white/5 pt-4">
@@ -354,100 +417,17 @@
         </div>
     </div>
 
-    <div id="guide-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-[#0a0a0a] border border-blue-500/20 rounded-2xl max-w-2xl w-full p-8 shadow-[0_0_50px_rgba(59,130,246,0.1)] relative max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onclick="closeGuide()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                    <i data-lucide="crosshair" class="w-5 h-5 text-blue-400"></i>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-white">Sniper Mode: Operational Guide</h3>
-                    <p class="text-[10px] text-slate-500 uppercase tracking-widest">Low Frequency. High Conviction.</p>
-                </div>
-            </div>
-
-            <div class="space-y-8">
-                <div class="border-l-2 border-blue-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">1. The Sniper Score</h4>
-                    <p class="text-xs text-slate-400 mb-3 leading-relaxed">
-                        The score represents <strong>AI Conviction</strong>. In Sniper Mode, we filter out 99% of "Speculative" noise. If the parameters aren't perfect, the system remains neutral.
-                    </p>
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                        <div class="bg-[#111] p-3 rounded border border-emerald-500/20">
-                            <span class="text-lg font-bold text-emerald-400 block">> 65%</span>
-                            <span class="text-[9px] text-slate-500 uppercase">Execution Ready</span>
-                        </div>
-                        <div class="bg-[#111] p-3 rounded border border-yellow-500/20">
-                            <span class="text-lg font-bold text-yellow-400 block">55% - 65%</span>
-                            <span class="text-[9px] text-slate-500 uppercase">Watchlist</span>
-                        </div>
-                        <div class="bg-[#111] p-3 rounded border border-white/5">
-                            <span class="text-lg font-bold text-slate-500 block">&lt; 55%</span>
-                            <span class="text-[9px] text-slate-600 uppercase">Noise / Ignore</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-l-2 border-purple-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">2. Sniper Logic</h4>
-                    <div class="space-y-3">
-                        <div class="bg-[#111] p-3 rounded border border-white/5">
-                            <div class="flex items-center gap-2 mb-1">
-                                <i data-lucide="clock" class="w-3 h-3 text-purple-400"></i>
-                                <span class="text-xs font-bold text-slate-300">"Why are there so few signals?"</span>
-                            </div>
-                            <p class="text-[10px] text-slate-500 ml-5 leading-relaxed">
-                                <strong>Quality over Quantity.</strong> We target an 80%+ Win Rate. This requires filtering out choppy markets. Expect signals every 24-48 hours, not every 5 minutes.
-                            </p>
-                        </div>
-                        <div class="bg-[#111] p-3 rounded border border-white/5">
-                            <div class="flex items-center gap-2 mb-1">
-                                <i data-lucide="help-circle" class="w-3 h-3 text-purple-400"></i>
-                                <span class="text-xs font-bold text-slate-300">"Does Green Score always mean BUY?"</span>
-                            </div>
-                            <p class="text-[10px] text-slate-500 ml-5 leading-relaxed">
-                                <strong>No.</strong> The color indicates <strong>Signal Strength</strong>.
-                                <br>
-                                • Green Score + <span class="text-emerald-400">LONG</span> bias = Buying Strength.
-                                <br>
-                                • Green Score + <span class="text-red-400">SHORT</span> bias = Selling Strength.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="border-l-2 border-emerald-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">3. Market Regimes</h4>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <span class="text-[10px] font-bold text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 rounded uppercase">MOMENTUM</span>
-                            <p class="text-[10px] text-slate-500 mt-1">Volume expansion. Trend following setup.</p>
-                        </div>
-                        <div>
-                            <span class="text-[10px] font-bold text-yellow-400 border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 rounded uppercase">MEAN REVERSION</span>
-                            <p class="text-[10px] text-slate-500 mt-1">Price over-extended. Playing the snap-back.</p>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="mt-8 pt-6 border-t border-white/10 text-center">
-                <button onclick="closeGuide()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded text-xs tracking-widest transition shadow-lg shadow-blue-900/20">
-                    ACKNOWLEDGE
-                </button>
-            </div>
-        </div>
-    </div>
-
 </div>
 
 <style>
     @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     .marquee-track { animation: marquee 60s linear infinite; }
     .marquee-track:hover { animation-play-state: paused; }
+
+    /* MISSING FADE-IN FIX FOR SCANNER LOG */
+    @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+    .animate-fade-in { animation: fade-in 0.5s forwards; }
+
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
@@ -463,6 +443,7 @@
 </style>
 
 <script>
+    // --- UTILITIES ---
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -496,7 +477,7 @@
         return num < 1.0 ? num.toFixed(5) : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    // --- REVISED DRIVER LOGIC TO MATCH SCREENSHOTS EXACTLY ---
+    // --- REVISED DRIVER LOGIC ---
     function updateDrivers(explanation, show) {
         const container = document.getElementById("shap-box");
         container.innerHTML = "";
@@ -507,51 +488,37 @@
         }
 
         explanation.slice(0, 3).forEach((item, i) => {
-            // 1. Define Colors directly (Hex codes for accuracy)
-            let mainColor = "#94a3b8"; // Slate (Default)
+            let mainColor = "#94a3b8";
             let bgColor = "rgba(148, 163, 184, 0.1)";
             let icon = "📊";
 
             const desc = item.desc ? item.desc.toUpperCase() : "";
             const feature = item.feature ? item.feature.toUpperCase() : "";
 
-            // 2. Logic Mapping
             if (desc.includes("WHALE") || desc.includes("ACCUMULATION") || feature.includes("WHALE")) {
-                mainColor = "#22d3ee"; // Cyan-400
-                bgColor = "rgba(34, 211, 238, 0.1)"; // Cyan tint
-                icon = "🐋";
+                mainColor = "#22d3ee"; bgColor = "rgba(34, 211, 238, 0.1)"; icon = "🐋";
             }
             else if (desc.includes("TREND") || desc.includes("MOMENTUM") || desc.includes("VELOCITY") || desc.includes("CLEAN")) {
-                mainColor = "#60a5fa"; // Blue-400
-                bgColor = "rgba(96, 165, 250, 0.1)"; // Blue tint
-                icon = "💎";
+                mainColor = "#60a5fa"; bgColor = "rgba(96, 165, 250, 0.1)"; icon = "💎";
             }
             else if (desc.includes("SQUEEZE") || desc.includes("VOLATILITY")) {
-                mainColor = "#c084fc"; // Purple-400
-                bgColor = "rgba(192, 132, 252, 0.1)"; // Purple tint
-                icon = "⚡";
+                mainColor = "#c084fc"; bgColor = "rgba(192, 132, 252, 0.1)"; icon = "⚡";
             }
             else if (desc.includes("EFFICIENCY")) {
-                mainColor = "#34d399"; // Emerald-400
-                bgColor = "rgba(52, 211, 153, 0.1)"; // Emerald tint
-                icon = "✨";
+                mainColor = "#34d399"; bgColor = "rgba(52, 211, 153, 0.1)"; icon = "✨";
             }
 
-            // 3. Render with INLINE STYLES (Guarantees the look)
             const card = `
                 <div class="p-4 rounded-xl relative group transition hover:scale-[1.02] duration-300 mb-3"
                      style="background-color: ${bgColor}; border: 1px solid ${mainColor}40;">
-
                     <div class="flex justify-between items-center mb-3">
                         <span class="text-[9px] uppercase font-bold text-slate-500 tracking-widest">DRIVER 0${i+1}</span>
                         <span class="text-xs font-mono font-bold" style="color: ${mainColor}">${item.importance.toFixed(1)}</span>
                     </div>
-
                     <div class="flex items-center gap-3 mb-4">
                         <span class="text-xl filter drop-shadow-md transform group-hover:scale-110 transition">${icon}</span>
                         <h5 class="text-xs font-bold uppercase tracking-wider" style="color: ${mainColor}">${item.desc}</h5>
                     </div>
-
                     <div class="w-full bg-black/40 h-1.5 rounded-full overflow-hidden border border-white/5">
                         <div class="h-full transition-all duration-1000 ease-out"
                              style="width: ${Math.min(item.importance, 100)}%; background-color: ${mainColor}; box-shadow: 0 0 15px ${mainColor};">
@@ -562,6 +529,58 @@
         });
     }
 
+    // --- HEARTBEAT LOGIC (PERSISTENT FEED) ---
+    function logMessage(msg, colorClass="text-slate-500") {
+        const log = document.getElementById('scanner-log');
+        if(!log) return;
+
+        const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        // Added animate-fade-in class support in CSS
+        const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`;
+
+        log.insertAdjacentHTML('beforeend', row);
+
+        // Auto Scroll to bottom
+        log.scrollTop = log.scrollHeight;
+
+        // Keep max 50 lines to prevent DOM lag
+        if(log.children.length > 50) log.firstElementChild.remove();
+    }
+
+    function initMaintenanceLoop() {
+        const idleMessages = [
+            "Monitoring Order Flow...",
+            "Scanning 24h Volume Profile...",
+            "Calculating Volatility Drift...",
+            "Checking Whale Wallet Movement...",
+            "System Idle. Awaiting Volatility...",
+            "Updating Moving Averages...",
+            "Analyzing Funding Rates...",
+            "Network Stable. Latency < 20ms.",
+            "Filtering Noise. Protecting Capital."
+        ];
+
+        // Random check every 3-6 seconds
+        setInterval(() => {
+            const dash = document.getElementById('dashboard');
+            // Only log idle messages if dashboard is visible
+            if(dash && !dash.classList.contains('hidden')) {
+                const randomMsg = idleMessages[Math.floor(Math.random() * idleMessages.length)];
+                logMessage(randomMsg, "text-slate-600");
+            }
+        }, 4000);
+    }
+
+    // Start loop on load
+    document.addEventListener("DOMContentLoaded", () => {
+        initMaintenanceLoop();
+        // Initial "Boot Sequence"
+        setTimeout(() => logMessage(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
+        setTimeout(() => logMessage(">> CONNECTING TO NEURAL NET...", "text-slate-400"), 1200);
+        setTimeout(() => logMessage(">> SYSTEM ONLINE. READY TO SCAN.", "text-emerald-500 font-bold"), 2000);
+    });
+
+    // --- NEWS FEED (REAL ONLY) ---
     function updateNews(newsData) {
         const box = document.getElementById('news-feed');
         box.innerHTML = '';
@@ -582,29 +601,8 @@
         });
         if (window.lucide) lucide.createIcons();
     }
-    function injectFakeNews(symbol) {
-        const box = document.getElementById('news-feed');
-        box.innerHTML = '';
-        const baseSym = symbol.replace("USDT", "");
-        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        const headlines = [
-            `Institutional inflow detected on ${baseSym} derivatives.`,
-            `${baseSym} social volume hits 7-day high.`,
-            `Short liquidations increasing near resistance.`,
-            `Whale wallet alert: large movement to exchange.`
-        ];
-        headlines.forEach(news => {
-            const item = `
-                <div class="pb-2 border-b border-white/5 last:border-0">
-                    <p class="text-[10px] text-slate-300 font-medium leading-relaxed mb-1">${news}</p>
-                    <div class="flex gap-2">
-                        <span class="text-[9px] text-slate-600 font-mono">${time}</span>
-                        <span class="text-[8px] text-blue-900/50 text-blue-500">AI_GENERATED</span>
-                    </div>
-                </div>`;
-            box.insertAdjacentHTML('beforeend', item);
-        });
-    }
+
+    // Removed injectFakeNews() - Real Data Only
 
     function resetPositionSizingUI() {
         const cap = document.getElementById("cap-input");
@@ -621,67 +619,60 @@
     }
 
     async function addToJournal() {
-    const btn = document.getElementById('btn-journal');
-    const originalText = btn.innerHTML;
+        const btn = document.getElementById('btn-journal');
+        const originalText = btn.innerHTML;
+        const symbol = document.getElementById('res-symbol').innerText;
+        const bias = document.getElementById('res-direction').innerText;
+        const priceText = document.getElementById('res-price').innerText.replace('$', '').replace(',', '');
+        const stopText = document.getElementById('res-stop').innerText.replace(',', '');
+        const targetText = document.getElementById('res-target2').innerText.replace(',', '');
+        const confText = document.getElementById('res-score').innerText.replace('%', '');
+        const levText = document.getElementById('res-leverage').innerText;
 
-    // 1. Gather Data from the UI (since we already have it populated)
-    const symbol = document.getElementById('res-symbol').innerText;
-    const bias = document.getElementById('res-direction').innerText;
-    const priceText = document.getElementById('res-price').innerText.replace('$', '').replace(',', '');
-    const stopText = document.getElementById('res-stop').innerText.replace(',', '');
-    const targetText = document.getElementById('res-target2').innerText.replace(',', '');
-    const confText = document.getElementById('res-score').innerText.replace('%', '');
-    const levText = document.getElementById('res-leverage').innerText;
-
-    if(bias === "NEUTRAL" || symbol === "--") {
-        showError("CANNOT SAVE", "No valid signal generated yet.");
-        return;
-    }
-
-    btn.innerHTML = "SAVING...";
-    btn.disabled = true;
-
-    const payload = {
-        symbol: symbol,
-        bias: bias,
-        entry: priceText,
-        stop: stopText,
-        target: targetText,
-        confidence: confText,
-        leverage: levText
-    };
-
-    try {
-        const csrftoken = getCookie('csrftoken');
-        const res = await fetch("/api/journal/add/", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrftoken
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if(res.ok) {
-            btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
-            btn.classList.add('text-emerald-400', 'border-emerald-500/50');
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
-                btn.disabled = false;
-                if(window.lucide) lucide.createIcons();
-            }, 3000);
-        } else {
-            throw new Error(data.message);
+        if(bias === "NEUTRAL" || symbol === "--") {
+            showError("CANNOT SAVE", "No valid signal generated yet.");
+            return;
         }
-    } catch(e) {
-        showError("SAVE FAILED", e.message);
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+
+        btn.innerHTML = "SAVING...";
+        btn.disabled = true;
+
+        const payload = {
+            symbol: symbol,
+            bias: bias,
+            entry: priceText,
+            stop: stopText,
+            target: targetText,
+            confidence: confText,
+            leverage: levText
+        };
+
+        try {
+            const csrftoken = getCookie('csrftoken');
+            const res = await fetch("/api/journal/add/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(res.ok) {
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
+                btn.classList.add('text-emerald-400', 'border-emerald-500/50');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+                    btn.disabled = false;
+                    if(window.lucide) lucide.createIcons();
+                }, 3000);
+            } else {
+                throw new Error(data.message);
+            }
+        } catch(e) {
+            showError("SAVE FAILED", e.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
-}
 
     async function initScan() {
         const input = document.getElementById('symbol-input');
@@ -696,9 +687,11 @@
         const loader = document.getElementById('processing-ui');
         const logText = document.getElementById('loading-text');
 
-        // --- NEW: GRAB USER PREFERENCES ---
+        // Note: We do NOT clear the log anymore. Persistence is key.
+        logMessage(`>> INITIATING SCAN: ${raw}...`, "text-blue-400 font-bold");
+
         const marketType = document.getElementById('market-type').value;
-        const tradeStyle = document.getElementById('trade-style').value; // SCALP | DAY | SWING
+        const tradeStyle = document.getElementById('trade-style').value;
 
         dash.classList.add('hidden');
         dash.classList.add('opacity-0');
@@ -714,25 +707,19 @@
             const res = await fetch("/api/analyze/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                // SEND THE STYLE
-                body: JSON.stringify({
-                    symbol: raw,
-                    market_type: marketType,
-                    trade_style: tradeStyle
-                })
+                body: JSON.stringify({ symbol: raw, market_type: marketType, trade_style: tradeStyle })
             });
 
             if (!res.ok) throw new Error("Connection Failed");
             const data = await res.json();
 
-            // Populate Basic Data
+            logMessage(`>> DATA RECEIVED. PARSING...`, "text-emerald-500");
+
             safeSetText('res-symbol', data.symbol);
             safeSetText('res-price', `$${formatPrice(data.price)}`);
-
-            // DURATION IS SET HERE
             safeSetText('res-duration', data.signal.duration || "1-3 DAYS");
 
-            // Handle Regime Tag
+            // Regime Tag logic...
             const regTag = document.getElementById('res-regime-tag');
             let regText = "ANALYZING";
             let regColor = "gray";
@@ -760,7 +747,7 @@
                 }
             }
 
-            // Handle Whale Tag
+            // Whale Tag
             const whaleLabel = (data.whales && data.whales.label) ? data.whales.label : (data.whale_label || "--");
             const whaleZ = (data.whales && data.whales.zscore) ? data.whales.zscore : (data.whale_zscore || 0);
 
@@ -774,12 +761,10 @@
             const score = data.signal.probability;
             const rawBias = data.signal.bias;
 
-            // --- THRESHOLDS SET TO SNIPER LEVEL (65%) ---
             let isTradeGrade = score >= 65;
             let isWatchGrade = score >= 55 && score < 65;
             let isNoTrade = score < 55;
 
-            // Adjust threshold for SCALP mode in UI feedback
             if(tradeStyle === "SCALP") {
                 isTradeGrade = score >= 60;
                 isWatchGrade = score >= 50 && score < 60;
@@ -802,12 +787,14 @@
                 sigBox.className = "rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500 bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
                 glow.className = "absolute inset-0 bg-emerald-500/10 blur-xl transition-opacity";
                 statusBar.className = "h-1 w-full bg-gradient-to-r from-emerald-900 via-emerald-500 to-emerald-900 animate-pulse";
+                logMessage(`>> BIAS DETECTED: LONG (Score ${score}%)`, "text-emerald-400");
             } else if (rawBias === "SHORT" && !isNoTrade) {
                 dirEl.className = "text-3xl font-black text-red-400 relative z-10 tracking-wide";
                 sigLabel.className = "text-[10px] uppercase tracking-widest mb-1 relative z-10 font-bold text-red-300 opacity-80";
                 sigBox.className = "rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500 bg-red-900/10 border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]";
                 glow.className = "absolute inset-0 bg-red-500/10 blur-xl transition-opacity";
                 statusBar.className = "h-1 w-full bg-gradient-to-r from-red-900 via-red-500 to-red-900 animate-pulse";
+                logMessage(`>> BIAS DETECTED: SHORT (Score ${score}%)`, "text-red-400");
             } else {
                 dirEl.className = "text-3xl font-black text-slate-500 relative z-10 tracking-wide";
                 sigLabel.className = "text-[10px] uppercase tracking-widest mb-1 relative z-10 font-bold text-slate-600";
@@ -834,10 +821,15 @@
                 execStatus.className = "text-sm font-bold text-slate-500";
                 execDot.className = "w-2 h-2 rounded-full bg-slate-700";
                 noTradeInfo.classList.remove('hidden');
+
+                // Explicit Reject log
+                logMessage(`>> REJECTED: Efficiency Low. Capital Protected.`, "text-red-400 font-bold");
+
             } else if (isWatchGrade) {
                 execStatus.innerText = "WATCH - BIAS ACTIVE";
                 execStatus.className = "text-sm font-bold text-yellow-500";
                 execDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
+                logMessage(`>> WATCHLIST: Volatility Building...`, "text-yellow-400");
             } else {
                 const currentPrice = data.price;
                 const entryPrice = data.signal.entry;
@@ -864,11 +856,9 @@
 
             updateDrivers(data.explainability, isTradeGrade);
 
-            // FIX: Check length before calling updateNews
+            // REAL NEWS ONLY (removed else condition)
             if (data.sentiment && data.sentiment.news_feed && data.sentiment.news_feed.length > 0) {
                 updateNews(data.sentiment.news_feed);
-            } else {
-                injectFakeNews(data.symbol);
             }
 
             loader.classList.add('hidden');
@@ -878,6 +868,7 @@
         } catch (e) {
             loader.classList.add('hidden');
             showError("CONNECTION INTERRUPTION", e.message || "Unable to establish neural link.");
+            logMessage(`!! CONNECTION ERROR !!`, "text-red-600 font-black");
         }
     }
 
@@ -1008,9 +999,15 @@
 
             if (!res.ok) throw new Error("Backtest Error");
             const data = await res.json();
-            safeSetText('bt-winrate', data.win_rate + "%");
-            safeSetText('bt-pnl', data.profit_factor);
-            safeSetText('bt-trades', data.total_trades);
+
+            // --- FIX FOR UNDEFINED ERROR ---
+            const winRate = data.win_rate !== undefined ? data.win_rate : 0;
+            const pf = data.profit_factor !== undefined ? data.profit_factor : 0;
+            const total = data.total_trades !== undefined ? data.total_trades : 0;
+
+            safeSetText('bt-winrate', winRate + "%");
+            safeSetText('bt-pnl', pf);
+            safeSetText('bt-trades', total);
 
             const logBox = document.getElementById('bt-log');
             logBox.innerHTML = "";

@@ -356,8 +356,26 @@ def refresh_journal_entry(request, entry_id):
     if request.method == "POST":
         try:
             entry = JournalEntry.objects.get(id=entry_id, user=request.user)
-            df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
 
+            # 1. STRICT 24-HOUR RULE (Institutional Velocity)
+            # If a trade is pending > 24h, it is dead capital. Close it.
+            now = timezone.now()
+            duration = now - entry.created_at
+            hours_open = duration.total_seconds() / 3600
+
+            MAX_DURATION = 24  # STRICT LIMIT
+
+            if entry.status == "PENDING" and hours_open > MAX_DURATION:
+                entry.status = "TIMEOUT"
+                entry.save()
+                return JsonResponse({
+                    'status': 'success',
+                    'new_status': "TIMEOUT",
+                    'message': f"Trade Closed: Velocity Limit Exceeded ({int(hours_open)}h). Dead capital released."
+                })
+
+            # 2. Check Price Targets
+            df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
             if df is None or df.empty:
                 return JsonResponse({'status': 'error', 'message': 'Market data unavailable'})
 
