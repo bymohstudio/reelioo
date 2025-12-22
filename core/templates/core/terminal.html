@@ -319,9 +319,9 @@
 
             <div class="space-y-8">
                 <div class="border-l-2 border-blue-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">1. The Green Light (65%+)</h4>
+                    <h4 class="text-sm font-bold text-white mb-2">1. The Green Light</h4>
                     <p class="text-xs text-slate-400 mb-3 leading-relaxed">
-                        Think of this like a traffic light. The AI analyzes millions of data points to find <strong>Institutional Momentum</strong>.
+                        Think of this like a traffic light. The AI scans millions of data points to find <strong>Institutional Momentum</strong>.
                     </p>
                     <ul class="text-xs text-slate-400 space-y-2 list-disc list-inside">
                         <li><strong>Under 60%?</strong> Stay Cash. The market is just noise.</li>
@@ -337,7 +337,7 @@
                     </p>
                     <div class="bg-[#111] p-3 rounded border border-white/5">
                         <p class="text-[10px] text-slate-300 italic">
-                            "If the Scanner is silent, it is protecting your capital. It only speaks when there is a kill shot."
+                            "If the Scanner is silent, it is saving your money. It only speaks when there is a clear shot."
                         </p>
                     </div>
                 </div>
@@ -719,7 +719,7 @@
             safeSetText('res-price', `$${formatPrice(data.price)}`);
             safeSetText('res-duration', data.signal.duration || "1-3 DAYS");
 
-            // Regime Tag logic...
+            // Regime Tag
             const regTag = document.getElementById('res-regime-tag');
             let regText = "ANALYZING";
             let regColor = "gray";
@@ -816,7 +816,7 @@
             const execDot = document.getElementById('exec-dot');
             noTradeInfo.classList.add('hidden');
 
-            if (isNoTrade || rawBias === "NEUTRAL") {
+            if (isNoTrade || rawBias === "NEUTRAL" || rawBias === "HOLD") {
                 execStatus.innerText = "MARKET NOT READY";
                 execStatus.className = "text-sm font-bold text-slate-500";
                 execDot.className = "w-2 h-2 rounded-full bg-slate-700";

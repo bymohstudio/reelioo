@@ -83,7 +83,7 @@ class CryptoQuantEngine:
             duration = "4h - 24h"
 
         score = max(pL, pS)
-        bias = "NEUTRAL"
+        bias = "HOLD"  # Default is now HOLD
 
         eff = float(last['efficiency_ratio'])
         vol = float(last['volatility_slope'])
@@ -98,6 +98,12 @@ class CryptoQuantEngine:
             elif pS > min_conf and pS > pL + 5:
                 bias = "SHORT"
                 score = pS
+        else:
+            # --- FORCE HOLD IF FILTERED ---
+            # If market is choppy, we force "HOLD" and reset score to 50
+            # This prevents seeing "70% Confidence" when the trade is actually blocked.
+            score = 50
+            bias = "HOLD"
 
         price = float(last['close'])
         atr = float(last.get('atr_14', price * 0.01))
