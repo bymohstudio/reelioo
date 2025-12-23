@@ -1,6 +1,5 @@
 import requests
 import pandas as pd
-import time
 import logging
 from django.core.cache import cache
 
@@ -21,8 +20,10 @@ class MarketService:
         if cached: return cached
 
         try:
-            spot = requests.get(f"{MarketService.BASE_SPOT}/exchangeInfo", timeout=5).json()
-            fut = requests.get(f"{MarketService.BASE_FUT}/exchangeInfo", timeout=5).json()
+            # HEADERS ARE CRITICAL TO PREVENT 403 ERRORS
+            headers = {"User-Agent": "Mozilla/5.0"}
+            spot = requests.get(f"{MarketService.BASE_SPOT}/exchangeInfo", headers=headers, timeout=5).json()
+            fut = requests.get(f"{MarketService.BASE_FUT}/exchangeInfo", headers=headers, timeout=5).json()
             results = []
 
             # SPOT
@@ -57,7 +58,7 @@ class MarketService:
         return matches[:10]
 
     # -------------------------
-    #  3. HISTORICAL DATA
+    #  3. HISTORICAL DATA (FIXED)
     # -------------------------
     @staticmethod
     def get_historical_data(symbol_input, market_type="SPOT", trade_style="SWING"):
@@ -69,18 +70,17 @@ class MarketService:
             raw = str(symbol_input).upper().strip().replace("/", "").replace("-", "")
             symbol = f"{raw}USDT" if "USDT" not in raw else raw
 
-        # 2. Map Timeframe to Trading Style
-        # This makes the engine "Universal"
+        # 2. Map Timeframe
         interval_map = {
-            "SCALP": "15m",  # Fast signals
-            "INTRADAY": "1h",  # Balanced
-            "SWING": "4h",  # Major trends
+            "SCALP": "15m",
+            "INTRADAY": "1h",
+            "SWING": "4h",
             "POSITION": "1d"
         }
         interval = interval_map.get(trade_style, "1h")
         limit = 1000
 
-        cache_key = f"kline:{symbol}:{interval}:{market_type}"
+        cache_key = f"kline_v3:{symbol}:{interval}:{market_type}"
         cached_df = cache.get(cache_key)
         if cached_df is not None: return cached_df
 
@@ -89,26 +89,55 @@ class MarketService:
 
         try:
             params = {"symbol": symbol, "interval": interval, "limit": limit}
-            resp = requests.get(f"{base_url}/klines", params=params, timeout=5)
+            # HEADERS REQUIRED FOR BINANCE (Bypasses 403 Forbidden)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+
+            print(f"🔄 Fetching Data: {symbol} [{interval}] from {base_url}...")
+
+            resp = requests.get(f"{base_url}/klines", params=params, headers=headers, timeout=10)
+
+            if resp.status_code != 200:
+                print(f"❌ Binance Error {resp.status_code}: {resp.text}")
+                log.error(f"Binance API Error {resp.status_code}: {resp.text}")
+                return pd.DataFrame()
+
             data = resp.json()
 
-            if isinstance(data, dict) and "code" in data: return pd.DataFrame()
+            if isinstance(data, dict) and "code" in data:
+                print(f"❌ API Error Code: {data}")
+                return pd.DataFrame()
 
+            if not data or len(data) == 0:
+                print("❌ No data returned from API")
+                return pd.DataFrame()
+
+            # --- CRITICAL FIX: INCLUDE TAKER BUY VOLUME ---
+            # Index 9 is 'Taker buy base asset volume' - Required for Order Flow Features
             df = pd.DataFrame(data, columns=[
                 "open_time", "open", "high", "low", "close", "volume",
                 "close_time", "q_vol", "trades", "taker_base", "taker_quote", "ignore"
             ])
 
-            cols = ["open", "high", "low", "close", "volume"]
-            df[cols] = df[cols].astype(float)
+            # Keep taker_base so Feature Engineering can calculate CVD
+            cols_to_keep = ["open", "high", "low", "close", "volume", "taker_base"]
+
+            df[cols_to_keep] = df[cols_to_keep].astype(float)
             df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
             df.set_index("timestamp", inplace=True)
 
-            final_df = df[cols]
-            if not final_df.empty: cache.set(cache_key, final_df, timeout=300)
+            # RENAME taker_base -> taker_buy_base to match feature_engineering.py
+            df = df.rename(columns={"taker_base": "taker_buy_base"})
+
+            final_df = df[["open", "high", "low", "close", "volume", "taker_buy_base"]]
+
+            if not final_df.empty:
+                print(f"✅ Data Success: {len(final_df)} candles")
+                cache.set(cache_key, final_df, timeout=300)
 
             return final_df
 
         except Exception as e:
+            print(f"❌ Exception in MarketService: {e}")
             log.error(f"Data Fetch Error: {e}")
             return pd.DataFrame()

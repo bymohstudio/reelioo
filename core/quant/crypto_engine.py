@@ -52,6 +52,9 @@ class CryptoQuantEngine:
 
         models = self._load_models()
 
+        # ML PREDICTION: PROBABILITY OF VOLATILITY EXPLOSION (REGIME)
+        # pL = Prob of Upside Explosion
+        # pS = Prob of Downside Explosion
         pL = (float(models['xgb_long'].predict(xgb.DMatrix(row_df))[0]) +
               float(models['lgb_long'].predict(row_df)[0]) +
               float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
@@ -60,53 +63,48 @@ class CryptoQuantEngine:
               float(models['lgb_short'].predict(row_df)[0]) +
               float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
 
-        # ===== RESILIENT HUNTER CONFIG =====
-        trade_style = trade_style.upper()
+        # === HYBRID EXECUTION LOGIC (TIER 4) ===
+        # 1. ML says "Storm Coming" (High Prob)
+        # 2. Physics says "Wind Blowing East" (EMA Trend)
+
+        bias = "HOLD"
+        score = 50
+
+        # Trend Physics
+        ema_20 = last['ema_20']
+        ema_50 = last['ema_50']
+        price = last['close']
+
+        is_uptrend = (price > ema_20) and (ema_20 > ema_50)
+        is_downtrend = (price < ema_20) and (ema_20 < ema_50)
+
+        # Thresholds
+        CONF_THRESH = 65.0
+
+        if pL > CONF_THRESH and is_uptrend:
+            bias = "LONG"
+            score = pL
+        elif pS > CONF_THRESH and is_downtrend:
+            bias = "SHORT"
+            score = pS
+        else:
+            # If signals conflict (e.g., ML says Up but Trend is Down), we HOLD.
+            # This is the "Safety Valve" preventing fakeouts.
+            bias = "HOLD"
+            score = max(pL, pS) if max(pL, pS) < 60 else 55  # Show mild interest but no execute
+
+        # Stop/Target Logic (Volatility Based)
+        atr = float(last.get('atr_14', price * 0.01))
 
         if trade_style == "SCALP":
-            min_conf = 55  # Faster trigger
-            min_eff = 0.05  # Allow noise
             stop_mult, tgt_mult = 1.0, 1.5
             duration = "15m - 2h"
-
         elif trade_style == "SWING":
-            min_conf = 65
-            min_eff = 0.08
-            stop_mult, tgt_mult = 2.5, 4.0  # Deep swing
+            stop_mult, tgt_mult = 2.5, 4.0
             duration = "1 - 3 Days"
-
-        else:  # DAY / INTRADAY (The Fix)
-            # We lowered thresholds to get signals, but WIDENED stops to survive volatility.
-            min_conf = 60  # Lowered from 65 to catch moves early
-            min_eff = 0.09  # Lowered from 0.15 to allow normal market flow
-            stop_mult = 2.0  # Increased from 1.5 to prevent "Wick Outs"
-            tgt_mult = 3.0  # Aim for 3R to pay for losses
+        else:  # DAY
+            stop_mult, tgt_mult = 2.0, 3.0
             duration = "4h - 24h"
-
-        score = max(pL, pS)
-        bias = "HOLD"  # Default state is now HOLD
-
-        eff = float(last['efficiency_ratio'])
-        vol = float(last['volatility_slope'])
-
-        # FILTER: Relaxed check
-        # We allow trades if Efficiency is decent (>0.09) OR Volatility is waking up (>0.2)
-        market_ok = (eff > min_eff) or (vol > 0.2)
-
-        if market_ok:
-            if pL > min_conf and pL > pS + 5:
-                bias = "LONG"
-                score = pL
-            elif pS > min_conf and pS > pL + 5:
-                bias = "SHORT"
-                score = pS
-        else:
-            # If market is bad, force HOLD and drop score to avoid confusion
-            score = 50
-            bias = "HOLD"
-
-        price = float(last['close'])
-        atr = float(last.get('atr_14', price * 0.01))
 
         if bias == "LONG":
             stop = price - (atr * stop_mult)
@@ -115,34 +113,23 @@ class CryptoQuantEngine:
             stop = price + (atr * stop_mult)
             t1 = price - (atr * tgt_mult)
         else:
-            stop = price
-            t1 = price
+            stop, t1 = price, price
 
         dist = abs(t1 - price)
+        regime = "MOMENTUM" if bias != "HOLD" else "CHOP/RANGE"
+        regime_color = "green" if bias == "LONG" else "red" if bias == "SHORT" else "gray"
 
-        # Context Colors
-        if bias == "LONG":
-            regime = "ACTIVE BUY"
-            regime_color = "green"
-        elif bias == "SHORT":
-            regime = "ACTIVE SELL"
-            regime_color = "red"
-        else:
-            regime = "WAITING"
-            regime_color = "gray"
+        whale_z = float(last.get('whale_z', 0))
+        whale_label = "High Flow" if abs(whale_z) > 1.5 else "Normal"
 
-        whale_z = float(last.get('vol_z', 0))
-        whale_label = "High Vol" if abs(whale_z) > 2 else "Normal"
-
-        # EXPLAINABILITY VECTORS
+        # Explainability
         drivers = []
-        if eff > 0.08:
-            drivers.append({"feature": "Structure", "desc": "CLEAN TREND", "importance": min(eff * 200, 95)})
-        if abs(whale_z) > 1.0:
-            drivers.append(
-                {"feature": "Volume", "desc": "INSTITUTIONAL FLOW", "importance": min(abs(whale_z) * 20, 92)})
-        if float(last.get('trend_strength', 0)) > 0.3:
-            drivers.append({"feature": "Momentum", "desc": "TREND ALIGNMENT", "importance": 85.0})
+        if float(last.get('cvd_slope', 0)) > 0:
+            drivers.append({"feature": "Order Flow", "desc": "BUY PRESSURE (CVD)", "importance": 95})
+        if float(last.get('ttm_squeeze', 0)) > 0:
+            drivers.append({"feature": "Volatility", "desc": "TTM SQUEEZE", "importance": 90})
+        if is_uptrend:
+            drivers.append({"feature": "Trend", "desc": "EMA ALIGNMENT", "importance": 85})
 
         drivers.sort(key=lambda x: x['importance'], reverse=True)
 

@@ -1,417 +1,266 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="relative font-sans text-slate-300 overflow-x-hidden">
+<div class="relative font-sans text-slate-300 overflow-x-hidden bg-[#020202]">
 
-    <h1 class="sr-only">Reelioo: Institutional Crypto Quant Terminal & AI Trading Signals</h1>
+    <section class="relative pt-32 pb-20 px-6 text-center max-w-7xl mx-auto z-10">
 
-    <section class="relative pt-32 pb-48 px-6 text-center max-w-7xl mx-auto z-10">
-
-        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] -z-10"></div>
-        <div class="fixed inset-0 pointer-events-none opacity-20"
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] -z-10"></div>
+        <div class="fixed inset-0 pointer-events-none opacity-10"
              style="background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
              linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
-             background-size:50px 50px"></div>
+             background-size:40px 40px"></div>
 
         <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50 backdrop-blur-md text-[10px] font-bold uppercase tracking-widest mb-8 animate-fade-in-up">
-            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
-            System Status: High Precision Mode Active
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            Regime Detection: Active
         </div>
 
-        <h2 class="text-5xl md:text-8xl font-black text-white mb-6 leading-[0.9] tracking-tight animate-fade-in-up delay-100">
-            Trade Less.<br>
-            <span class="text-blue-500">
-                Profit More.
+        <h1 class="text-5xl md:text-7xl font-black text-white mb-6 leading-[1.1] tracking-tight animate-fade-in-up delay-100">
+            The Crypto Trend <br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
+                Intelligence Engine
             </span>
-        </h2>
+        </h1>
 
         <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed animate-fade-in-up delay-200">
-            Most terminals scream "BUY" every 5 minutes. We don't. <br class="hidden md:block">
-            Reelioo filters out <strong>95% of Market Noise</strong> to show you only the
-            <strong>High-Conviction Setups</strong> that actually matter.
+            Stop guessing. Start forecasting. <br>
+            We analyze <strong>Volatility Regimes</strong> and <strong>Institutional Flow</strong> to alert you only when a high-momentum move is real.
         </p>
 
-        <div class="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-300 relative z-30">
+        <div class="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-300 relative z-30 mb-16">
             {% if user.is_authenticated %}
                 <a href="{% url 'terminal' %}" class="px-8 py-4 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.2)]">
                     LAUNCH TERMINAL
                 </a>
             {% else %}
                 <a href="{% url 'signup' %}" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-[0_0_30px_rgba(37,99,235,0.3)]">
-                    START 21-DAY FREE TRIAL
+                    START TRACKING REGIMES
                 </a>
-                <a href="#how-it-works" class="px-8 py-4 bg-[#111] border border-white/10 text-slate-300 hover:text-white font-bold rounded-xl hover:bg-white/5 transition">
-                    SEE THE LOGIC
+                <a href="#logic" class="px-8 py-4 bg-[#111] border border-white/10 text-slate-300 hover:text-white font-bold rounded-xl hover:bg-white/5 transition">
+                    HOW IT WORKS
                 </a>
             {% endif %}
         </div>
 
-        <p class="mt-4 text-[10px] text-slate-500 uppercase tracking-widest animate-fade-in-up delay-300 relative z-30">
-            <i data-lucide="shield-check" class="w-3 h-3 inline mr-1"></i> No Credit Card Required. 100% Risk-Free Trial
-        </p>
+        <div class="relative max-w-5xl mx-auto perspective-1000 animate-fade-in-up delay-300 group">
+            <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition duration-700"></div>
 
+            <div class="relative bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl transform rotate-x-2 transition hover:rotate-0 duration-700 ease-out">
+
+                <div class="bg-[#050505] border-b border-white/5 px-4 py-3 flex items-center gap-4">
+                    <div class="flex gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                    </div>
+                    <div class="bg-[#111] border border-white/5 rounded px-3 py-1 text-[10px] text-slate-500 font-mono flex items-center gap-2">
+                        <i data-lucide="lock" class="w-3 h-3 text-emerald-500"></i> reelioo.app/terminal
+                    </div>
+                </div>
+
+                <div class="p-6 md:p-10 grid md:grid-cols-12 gap-8 bg-[#020202]">
+                    <div class="md:col-span-8 space-y-8">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-3 mb-2">
+                                    <h2 class="text-5xl font-black text-white">BTC/USDT</h2>
+                                    <span class="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded uppercase">Trend Active</span>
+                                </div>
+                                <div class="flex items-center gap-4 text-xs font-mono text-slate-500">
+                                    <span>VOLATILITY: <b class="text-white">EXPANSION</b></span>
+                                    <span>REGIME: <b class="text-white">High Momentum</b></span>
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <svg class="w-20 h-20 -rotate-90">
+                                    <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#1e293b" fill="transparent"/>
+                                    <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#10b981" fill="transparent" stroke-dasharray="226" stroke-dashoffset="40" class="drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"/>
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span class="text-xl font-bold text-white">84%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-6 bg-emerald-900/10 border border-emerald-500/30 rounded-xl flex flex-col items-center justify-center relative overflow-hidden">
+                                <div class="absolute inset-0 bg-emerald-500/5 blur-xl"></div>
+                                <span class="text-[10px] uppercase text-emerald-300 font-bold mb-1 relative z-10">Bias</span>
+                                <span class="text-3xl font-black text-emerald-400 relative z-10">LONG</span>
+                            </div>
+                            <div class="p-6 bg-[#111] border border-white/10 rounded-xl flex flex-col justify-center">
+                                <span class="text-[10px] uppercase text-slate-500 font-bold mb-1">Execution</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                    <span class="text-sm font-bold text-white">ENTRY ZONE VALID</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-4 space-y-4">
+                        <div class="bg-[#0a0a0a] border border-white/10 p-5 rounded-xl">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase mb-4 tracking-widest">Logic Vectors</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="flex justify-between text-[10px] mb-1">
+                                        <span class="text-cyan-400 font-bold">VOLATILITY EXPANSION</span>
+                                        <span class="text-slate-400">92/100</span>
+                                    </div>
+                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-cyan-400 h-1 rounded-full w-[92%]"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[10px] mb-1">
+                                        <span class="text-blue-400 font-bold">ORDER FLOW</span>
+                                        <span class="text-slate-400">85/100</span>
+                                    </div>
+                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-blue-400 h-1 rounded-full w-[85%]"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[10px] mb-1">
+                                        <span class="text-purple-400 font-bold">TREND ALIGNMENT</span>
+                                        <span class="text-slate-400">78/100</span>
+                                    </div>
+                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-purple-400 h-1 rounded-full w-[78%]"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <div class="relative max-w-6xl mx-auto -mt-12 sm:-mt-32 px-2 sm:px-4 perspective-1000 animate-fade-in-up delay-300 z-20">
-
-        <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-xl opacity-20"></div>
-
-        <div class="relative bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl transform rotate-x-2 transition hover:rotate-0 duration-700 ease-out">
-
-            <div class="bg-[#050505] border-b border-white/5 px-4 py-3 flex items-center gap-4">
-                <div class="flex gap-2">
-                    <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                    <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                    <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                </div>
-                <div class="bg-[#111] border border-white/5 rounded px-3 py-1 text-[10px] text-slate-500 font-mono flex items-center gap-2">
-                    <i data-lucide="lock" class="w-3 h-3 text-emerald-500"></i> reelioo.app/terminal/live
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 font-mono bg-[#020202]">
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                    <div class="col-span-1 lg:col-span-8 space-y-8">
-
-                        <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
-                            <div>
-                                <div class="flex items-center gap-3">
-                                    <h2 class="text-4xl sm:text-5xl font-black text-white">BTC/USDT</h2>
-                                    <span class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-emerald-400 border-emerald-500/20 bg-emerald-500/10">
-                                        MOMENTUM
-                                    </span>
-                                </div>
-                                <div class="flex items-center gap-3 mt-1">
-                                    <span class="text-2xl text-blue-400 font-bold font-mono">$98,420.50</span>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-2 self-end sm:self-auto">
-                                <div class="relative group">
-                                    <svg class="w-20 h-20 -rotate-90">
-                                        <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#1e293b" fill="transparent"/>
-                                        <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#22d3ee"
-                                                fill="transparent"
-                                                stroke-dasharray="226"
-                                                stroke-dashoffset="20"
-                                                class="drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]"/>
-                                    </svg>
-                                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                        <span class="text-lg font-bold text-white">91%</span>
-                                        <span class="text-[8px] uppercase text-slate-500">Confidence</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)] min-h-[120px]">
-                                <div class="absolute inset-0 bg-emerald-500/10 blur-xl"></div>
-                                <span class="text-[10px] uppercase tracking-widest text-emerald-300 opacity-80 mb-1 relative z-10">Directional Bias</span>
-                                <span class="text-3xl font-black text-emerald-400 relative z-10 tracking-wide">LONG</span>
-                            </div>
-
-                            <div class="bg-[#111] rounded-xl p-5 border border-white/10 flex flex-col justify-center min-h-[120px] relative">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="text-[10px] uppercase tracking-widest text-slate-500">Execution</span>
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                    </div>
-                                </div>
-                                <span class="block mt-1 text-sm font-bold text-emerald-400">ENTRY ZONE ACTIVE</span>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                            <div class="bg-red-900/10 border border-red-500/20 rounded-xl p-2 sm:p-4">
-                                <span class="text-[9px] sm:text-[10px] text-red-400 uppercase tracking-widest">Stop</span>
-                                <span class="block text-sm sm:text-xl font-black text-red-500 font-mono break-all mt-1">$96,200</span>
-                            </div>
-                            <div class="bg-[#111] border border-white/10 rounded-xl p-2 sm:p-4">
-                                <span class="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-widest">Entry</span>
-                                <span class="block text-sm sm:text-xl font-black text-white font-mono break-all mt-1">$98,150</span>
-                            </div>
-                            <div class="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-2 sm:p-4">
-                                <span class="text-[9px] sm:text-[10px] text-emerald-400 uppercase tracking-widest">Target</span>
-                                <span class="block text-sm sm:text-xl font-black text-emerald-500 font-mono break-all mt-1">$104,500</span>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-white/5 pt-4 text-[10px] font-mono space-y-4">
-                            <div class="flex flex-wrap gap-4 sm:gap-6 justify-center sm:justify-start">
-                                <span>R/R: <b class="text-white">1.85</b></span>
-                                <span>Vol: <b class="text-white">Institutional</b></span>
-                                <span>Duration: <b class="text-blue-400">1-3 DAYS</b></span>
-                                <span>Leverage: <b class="text-amber-400">High (Selective)</b></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-span-1 lg:col-span-4 space-y-6">
-                        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
-                            <div class="flex items-center gap-2 mb-6">
-                                <div class="w-1 h-4 bg-blue-500"></div>
-                                <h4 class="text-sm font-bold text-white uppercase tracking-widest">Logic Vectors</h4>
-                            </div>
-                            <div class="space-y-3">
-                                <div class="p-3 rounded-xl border bg-cyan-500/10 border-cyan-500/20">
-                                    <div class="flex justify-between items-start mb-1">
-                                        <span class="text-[9px] uppercase font-bold text-slate-500 tracking-widest">Driver 01</span>
-                                        <span class="text-xs font-mono font-bold text-cyan-400">0.82</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <span class="text-lg">🐋</span>
-                                        <h5 class="text-xs font-bold text-cyan-400 uppercase">WHALE ACCUMULATION</h5>
-                                    </div>
-                                    <div class="w-full bg-black/20 h-1 rounded-full overflow-hidden">
-                                        <div class="h-full bg-cyan-400 opacity-60" style="width: 82%"></div>
-                                    </div>
-                                </div>
-                                <div class="p-3 rounded-xl border bg-blue-500/10 border-blue-500/20">
-                                    <div class="flex justify-between items-start mb-1">
-                                        <span class="text-[9px] uppercase font-bold text-slate-500 tracking-widest">Driver 02</span>
-                                        <span class="text-xs font-mono font-bold text-blue-400">0.65</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <span class="text-lg">💎</span>
-                                        <h5 class="text-xs font-bold text-blue-400 uppercase">TREND MOMENTUM</h5>
-                                    </div>
-                                    <div class="w-full bg-black/20 h-1 rounded-full overflow-hidden">
-                                        <div class="h-full bg-blue-400 opacity-60" style="width: 65%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="text-[10px] uppercase tracking-widest text-slate-500">Volume Profile</span>
-                                <i data-lucide="waves" class="w-4 h-4 text-blue-500"></i>
-                            </div>
-                            <div class="flex justify-between items-end mb-2">
-                                <span class="text-lg font-bold text-white leading-none">Net Long</span>
-                                <span class="text-[10px] font-mono text-slate-400">σ: 2.1</span>
-                            </div>
-                            <div class="w-full bg-[#111] h-1 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500 w-[75%] shadow-[0_0_10px_#3b82f6]"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <section class="py-24 bg-[#050505] border-y border-white/5 relative overflow-hidden mt-32">
+    <section class="py-24 border-y border-white/5 bg-[#050505]">
         <div class="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
 
-            <div class="relative">
-                <div class="absolute inset-0 bg-red-500/10 blur-[80px] rounded-full"></div>
-                <div class="relative bg-[#0a0a0a] border border-red-500/20 p-8 rounded-2xl shadow-2xl transform md:-rotate-2">
-                    <div class="flex items-center gap-3 mb-4 border-b border-white/5 pb-4">
-                        <i data-lucide="activity" class="text-red-500"></i>
-                        <h3 class="text-lg font-bold text-white">The "Overtrading" Trap</h3>
+            <div class="order-2 md:order-1">
+                <span class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Philosophy</span>
+                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">Trade when the market wants to move.</h2>
+                <div class="space-y-6 text-slate-400 leading-relaxed">
+                    <p>
+                        Most "signal" tools fail because they try to predict every candle. That's mathematically impossible.
+                    </p>
+                    <p>
+                        Reelioo is different. We ignore <strong>80% of the chop</strong>. Our engine only wakes up when the "Regime Model" detects a high probability of <strong>Volatility Expansion</strong>.
+                    </p>
+                    <div class="pl-4 border-l-2 border-emerald-500">
+                        <p class="text-white italic font-medium">"Silence is a feature. We protect your capital during the noise so you have it ready for the trend."</p>
                     </div>
-                    <ul class="space-y-4 text-sm text-slate-400">
-                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Chasing green candles (FOMO)</li>
-                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Getting chopped up in sideways markets</li>
-                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Entering "Speculative" setups</li>
-                        <li class="flex gap-3"><span class="text-red-500 font-bold">✖</span> Staring at charts for 12 hours</li>
-                    </ul>
                 </div>
             </div>
 
-            <div>
-                <span class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Philosophy</span>
-                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">Silence is Profitable.</h2>
-                <p class="text-slate-400 leading-relaxed mb-6">
-                    Amateurs look for action. Professionals look for <strong>Probability</strong>.
-                </p>
-                <p class="text-slate-400 leading-relaxed mb-8">
-                    Our AI isn't designed to find <em>every</em> trade. It's designed to reject the bad ones.
-                    If the <strong>Conviction Score is below 65%</strong>, the terminal stays dark.
-                    We save you capital by keeping you out of the casino.
-                </p>
-                <div class="pl-4 border-l-2 border-blue-500">
-                    <p class="text-white italic font-medium">"Reelioo is the discipline you wish you had. It waits for the perfect alignment of Price, Volume, and Order Flow before it speaks."</p>
+            <div class="order-1 md:order-2 relative">
+                <div class="absolute inset-0 bg-blue-600/10 blur-[60px] rounded-full"></div>
+                <div class="relative bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 shadow-2xl">
+                    <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">The Reelioo Difference</h3>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 text-xs uppercase font-bold text-slate-500 tracking-widest mb-2">
+                            <span>Typical App</span>
+                            <span class="text-emerald-500 text-right">Reelioo</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
+                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> 30 Signals / Day</span>
+                            <span class="text-sm text-white font-bold text-right">2-3 High Quality</span>
+                        </div>
+                        <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
+                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> RSI / MACD Toys</span>
+                            <span class="text-sm text-white font-bold text-right">Regime AI Models</span>
+                        </div>
+                        <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
+                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Ignored Chop</span>
+                            <span class="text-sm text-white font-bold text-right">Filtered Chop</span>
+                        </div>
+                        <div class="grid grid-cols-2 items-center py-3">
+                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> "Guessing"</span>
+                            <span class="text-sm text-white font-bold text-right">Forecasting</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
         </div>
     </section>
 
-    <section id="features" class="py-32 px-6 max-w-7xl mx-auto">
+    <section id="logic" class="py-32 px-6 max-w-7xl mx-auto">
         <div class="text-center mb-20">
-            <span class="text-emerald-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Technology</span>
-            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Deep Conviction Engine.</h2>
-            <p class="text-slate-400 max-w-2xl mx-auto">We process terabytes of exchange data to answer one simple question: <br><strong>Is the edge in your favor?</strong></p>
+            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">The 3-Model Architecture.</h2>
+            <p class="text-slate-400 max-w-2xl mx-auto">We don't rely on one metric. A signal is only generated when three distinct intelligence layers align.</p>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-blue-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-6 border border-blue-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="filter" class="w-6 h-6 text-blue-400"></i>
+                    <span class="text-2xl">🌐</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">Aggressive Noise Filtering</h3>
-                <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    The engine ignores 99% of market movement. If it doesn't meet our strict <strong>Volatility & Volume</strong> criteria, it's noise. We only alert you on the 1% that matters.
+                <h3 class="text-xl font-bold text-white mb-3">1. Regime Model</h3>
+                <p class="text-xs font-mono text-blue-400 mb-3">TIMEFRAME: 4H</p>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Detects the global market state. Is it Trending? Chopping? Or transitioning? If the Regime is "Low Volatility," the system stays silent.
                 </p>
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-purple-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 border border-purple-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="target" class="w-6 h-6 text-purple-400"></i>
+                    <span class="text-2xl">🧭</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">0-100% Conviction Score</h3>
-                <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    No vague signals. Every asset gets a precise score based on <strong>Institutional Order Flow</strong>. <br>
-                    <span class="text-purple-400 font-bold">> 65%</span> = Execution Ready. <br>
-                    <span class="text-slate-500">< 65%</span> = Stay Away.
+                <h3 class="text-xl font-bold text-white mb-3">2. Direction Model</h3>
+                <p class="text-xs font-mono text-purple-400 mb-3">TIMEFRAME: 1H</p>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Once a trend is confirmed, this layer calculates the probability of Bullish vs Bearish pressure using Order Flow and Momentum Physics.
                 </p>
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-emerald-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-6 border border-emerald-500/20 group-hover:scale-110 transition">
-                    <i data-lucide="crosshair" class="w-6 h-6 text-emerald-400"></i>
+                    <span class="text-2xl">⚡</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">Limit Entry Precision</h3>
-                <p class="text-sm text-slate-400 leading-relaxed mb-4">
-                    High conviction isn't enough. We calculate the exact <strong>Entry Zone</strong> to maximize Risk/Reward. We don't chase pumps; we let the price come to us.
+                <h3 class="text-xl font-bold text-white mb-3">3. Breakout Model</h3>
+                <p class="text-xs font-mono text-emerald-400 mb-3">TIMEFRAME: 15M</p>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    The final check. Is there enough immediate volume to sustain the move? This prevents buying "fakeouts" and times the perfect entry.
                 </p>
             </div>
         </div>
     </section>
 
-    <section id="how-it-works" class="py-24 bg-gradient-to-b from-[#050505] to-black border-y border-white/5">
-        <div class="max-w-5xl mx-auto px-6">
-            <h2 class="text-3xl font-black text-white mb-16 text-center">The Precision Workflow</h2>
-
-            <div class="relative">
-                <div class="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-blue-900 to-transparent -translate-y-1/2 z-0"></div>
-
-                <div class="grid md:grid-cols-3 gap-12 relative z-10">
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
-                        <div class="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">1</div>
-                        <h4 class="text-white font-bold mb-2">Scan & Filter</h4>
-                        <p class="text-xs text-slate-500">The AI scans the crypto market instantly, filtering out low-quality "Chop" and "Speculative" setups.</p>
-                    </div>
-
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
-                        <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">2</div>
-                        <h4 class="text-white font-bold mb-2">Check Conviction</h4>
-                        <p class="text-xs text-slate-500">
-                            Look for the Green Score <strong>(>65%)</strong>. This confirms Institutional Whales are backing the move.
-                        </p>
-                    </div>
-
-                    <div class="text-center bg-[#0a0a0a] p-6 rounded-2xl border border-white/10 shadow-lg">
-                        <div class="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4 ring-4 ring-[#0a0a0a]">3</div>
-                        <h4 class="text-white font-bold mb-2">Wait for the Zone</h4>
-                        <p class="text-xs text-slate-500">Don't market buy. Set your Limit Order at our <strong>Smart Entry Level</strong> and let the trade execute automatically.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-24 max-w-4xl mx-auto px-6">
-        <h2 class="text-3xl font-black text-white mb-12 text-center">Why Switch to Reelioo?</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-white/10">
-                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Feature</th>
-                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Standard Indicators</th>
-                        <th class="p-4 text-xs font-bold text-blue-400 uppercase bg-blue-900/10 rounded-t-xl">Reelioo Engine</th>
-                    </tr>
-                </thead>
-                <tbody class="text-sm text-slate-300">
-                    <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Signal Quality</td>
-                        <td class="p-4 text-slate-500">Noisy (Too many signals)</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Curated (Low Frequency)</td>
-                    </tr>
-                    <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Market Chop</td>
-                        <td class="p-4 text-slate-500">Generates false signals</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Automatically Filtered</td>
-                    </tr>
-                    <tr class="border-b border-white/5">
-                        <td class="p-4 font-bold">Entry Strategy</td>
-                        <td class="p-4 text-slate-500">"Buy Now" (FOMO)</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Limit Order Zones</td>
-                    </tr>
-                    <tr>
-                        <td class="p-4 font-bold">Risk Reward</td>
-                        <td class="p-4 text-slate-500">Unknown / Manual</td>
-                        <td class="p-4 bg-blue-900/5 font-bold text-white">Optimized for 1:2+</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="max-w-7xl mx-auto px-6 pb-32 pt-10">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl font-black text-white mb-4">Invest in Clarity.</h2>
-            <p class="text-slate-400 max-w-xl mx-auto">Access the same precision data vectors as institutional desks, for less than the cost of one bad trade.</p>
-        </div>
-
+    <section class="max-w-7xl mx-auto px-6 pb-32">
         <div class="max-w-sm mx-auto relative group">
             <div class="absolute -inset-0.5 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-700"></div>
             <div class="relative bg-[#050505] rounded-2xl p-1 overflow-hidden">
-                <div class="bg-[#0a0a0a] rounded-xl p-8 border border-white/5 relative z-10 h-full flex flex-col">
+                <div class="bg-[#0a0a0a] rounded-xl p-8 border border-white/5 relative z-10 h-full flex flex-col text-center">
 
-                    <div class="text-center border-b border-white/5 pb-6 mb-6">
-                        <span class="inline-block py-1 px-3 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                            Early Adopter Access
-                        </span>
-                        <div class="flex items-baseline justify-center gap-1">
-                            <span class="text-5xl font-black text-white tracking-tight">$19</span>
-                            <span class="text-sm text-slate-500 font-mono">/mo</span>
-                        </div>
-                        <p class="text-xs text-slate-600 mt-2 line-through">Regular Price $29</p>
+                    <h3 class="text-xl font-bold text-white mb-2">Reelioo Black</h3>
+                    <p class="text-xs text-slate-500 mb-6">Institutional Intelligence for Retail</p>
+
+                    <div class="flex items-baseline justify-center gap-1 mb-8">
+                        <span class="text-5xl font-black text-white tracking-tight">$19</span>
+                        <span class="text-sm text-slate-500 font-mono">/mo</span>
                     </div>
 
-                    <div class="space-y-4 mb-8 flex-grow">
-                        <div class="flex items-start gap-3">
-                            <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
-                            <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Smart Noise Filtration</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Never see a bad setup again</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
-                            <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Precision Entry Zones</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">Calculated risk levels</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="p-1 rounded bg-emerald-500/10 text-emerald-400 mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
-                            <div>
-                                <h5 class="text-xs font-bold text-white uppercase tracking-wide">Whale Confirmation</h5>
-                                <p class="text-[10px] text-slate-500 leading-snug">See the flow behind the move</p>
-                            </div>
-                        </div>
+                    <div class="space-y-4 mb-8 text-left pl-4">
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Full Regime Detection</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Volatility & Breakout Signals</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Confidence Scoring</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Unlimited Scans</div>
                     </div>
 
                     {% if user.is_authenticated %}
-                        <a href="{% url 'pricing' %}" class="block w-full py-4 bg-white hover:bg-slate-200 text-black font-black text-xs uppercase tracking-[0.15em] rounded-lg transition-all text-center shadow-[0_0_20px_rgba(255,255,255,0.15)] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-                            Upgrade Access
+                        <a href="{% url 'pricing' %}" class="block w-full py-4 bg-white hover:bg-slate-200 text-black font-black text-xs uppercase tracking-[0.15em] rounded-lg transition-all">
+                            Upgrade Now
                         </a>
                     {% else %}
-                        <a href="{% url 'signup' %}" class="block w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-[0.15em] rounded-lg transition-all text-center shadow-[0_0_20px_rgba(37,99,235,0.3)] group-hover:shadow-[0_0_30px_rgba(37,99,235,0.5)]">
-                            Start 21-Day Trial
+                        <a href="{% url 'signup' %}" class="block w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-[0.15em] rounded-lg transition-all">
+                            Start 21-Day Free Trial
                         </a>
                     {% endif %}
 
-                    <p class="text-[9px] text-slate-600 text-center mt-4 uppercase tracking-widest">Cancel Anytime · Secure Payment</p>
+                    <p class="text-[9px] text-slate-600 mt-4 uppercase tracking-widest">Cancel Anytime</p>
                 </div>
             </div>
         </div>

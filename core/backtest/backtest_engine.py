@@ -5,7 +5,7 @@ import lightgbm as lgb
 from catboost import CatBoostClassifier
 import os
 import logging
-from django.conf import settings
+import traceback
 from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
 log = logging.getLogger(__name__)
@@ -18,12 +18,19 @@ class CryptoBacktestEngine:
         self.trades = []
         self.models = {}
 
-        # --- PATH FIX: USE DJANGO SETTINGS ---
-        # This ensures we look in "ROOT/core/quant/ml_models" no matter what.
-        self.MODEL_DIR = os.path.join(settings.BASE_DIR, "core", "quant", "ml_models")
+        # --- PATH FIX: Relative to this file ---
+        # Current: core/backtest/backtest_engine.py
+        # Goal:    core/quant/ml_models
 
-        # Debug Log: Tells you exactly where it is looking
-        print(f"🔍 BACKTEST ENGINE LOOKING IN: {self.MODEL_DIR}")
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # core/backtest
+            core_dir = os.path.dirname(current_dir)  # core
+            self.MODEL_DIR = os.path.join(core_dir, "quant", "ml_models")
+
+            print(f"🔍 Backtest Engine looking for models in: {self.MODEL_DIR}")
+        except Exception as e:
+            log.error(f"Path Error: {e}")
+            self.MODEL_DIR = ""
 
         self.PATHS = {
             "xgb_long": os.path.join(self.MODEL_DIR, "xgb_long.json"),
@@ -37,17 +44,15 @@ class CryptoBacktestEngine:
 
     def _load_models(self):
         try:
-            # Check if directory exists first
             if not os.path.exists(self.MODEL_DIR):
-                log.error(f"❌ DIRECTORY MISSING: {self.MODEL_DIR}")
-                print(f"❌ DIRECTORY MISSING: {self.MODEL_DIR}")
+                print(f"❌ Model Directory Missing: {self.MODEL_DIR}")
                 return
 
             if os.path.exists(self.PATHS['xgb_long']):
                 self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
                 self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
             else:
-                print(f"❌ MODEL MISSING: {self.PATHS['xgb_long']}")
+                print("⚠️ XGBoost Models missing in backtest")
 
             if os.path.exists(self.PATHS['lgb_long']):
                 self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
@@ -61,117 +66,131 @@ class CryptoBacktestEngine:
 
         except Exception as e:
             log.error(f"Backtest Model Load Error: {e}")
-            print(f"❌ EXCEPTION LOADING MODELS: {e}")
+            print(f"❌ Backtest Model Exception: {e}")
 
     def run(self, trade_style="INTRADAY"):
-        if self.df is None or self.df.empty:
-            return self._empty_result()
+        # CRASH PROTECTION START
+        try:
+            if self.df is None or self.df.empty:
+                print("❌ Backtest received empty DataFrame")
+                return self._empty_result()
 
-        df = generate_features(self.df.copy())
+            # 1. Feature Engineering
+            try:
+                df = generate_features(self.df.copy())
+            except Exception as e:
+                print(f"❌ Feature Engineering Failed: {e}")
+                traceback.print_exc()
+                return self._empty_result()
 
-        # Check if models loaded successfully
-        if not self.models or 'xgb_long' not in self.models:
-            log.error("Backtest Error: Models not loaded. Check file paths.")
-            return self._empty_result()
+            if not self.models or 'xgb_long' not in self.models:
+                print("❌ Models not loaded, skipping predictions")
+                return self._empty_result()
 
-        # --- RESILIENT HUNTER SETTINGS (Matching Live Engine) ---
-        if trade_style == "SCALP":
-            min_conf = 55.0
-            min_eff = 0.05
-            stop_mult, tgt_mult = 1.0, 1.5
-        elif trade_style == "SWING":
+            # 2. Config
             min_conf = 65.0
-            min_eff = 0.08
-            stop_mult, tgt_mult = 2.5, 4.0
-        else:  # DAY / INTRADAY
-            min_conf = 60.0
-            min_eff = 0.09
             stop_mult = 2.0
             tgt_mult = 3.0
+            if trade_style == "SCALP": stop_mult, tgt_mult = 1.0, 1.5
+            if trade_style == "SWING": stop_mult, tgt_mult = 2.5, 4.0
 
-            # Predict Batch
-        try:
-            X = df[FEATURES].astype(float)
-            dmat = xgb.DMatrix(X)
-            xl = self.models['xgb_long'].predict(dmat)
-            xs = self.models['xgb_short'].predict(dmat)
-            ll = self.models['lgb_long'].predict(X)
-            ls = self.models['lgb_short'].predict(X)
-            cl = self.models['cat_long'].predict_proba(X)[:, 1]
-            cs = self.models['cat_short'].predict_proba(X)[:, 1]
+            # 3. Batch Predict
+            try:
+                X = df[FEATURES].astype(float)
+                dmat = xgb.DMatrix(X)
+                xl = self.models['xgb_long'].predict(dmat)
+                xs = self.models['xgb_short'].predict(dmat)
 
-            df['ens_long'] = ((xl + ll + cl) / 3) * 100
-            df['ens_short'] = ((xs + ls + cs) / 3) * 100
-        except Exception as e:
-            log.error(f"Prediction Error: {e}")
-            return self._empty_result()
+                # Check if other models exist before predicting
+                if 'lgb_long' in self.models:
+                    ll = self.models['lgb_long'].predict(X)
+                    ls = self.models['lgb_short'].predict(X)
+                else:
+                    ll, ls = xl, xs  # Fallback
 
-        # Simulate
-        position = None
-        entry_price = 0
-        stop_loss = 0
-        take_profit = 0
+                if 'cat_long' in self.models:
+                    cl = self.models['cat_long'].predict_proba(X)[:, 1]
+                    cs = self.models['cat_short'].predict_proba(X)[:, 1]
+                else:
+                    cl, cs = xl, xs  # Fallback
 
-        start_idx = 50
-        for i in range(start_idx, len(df)):
-            curr = df.iloc[i]
-            price = curr['close']
-            atr = curr.get('atr_14', price * 0.01)
+                df['ens_long'] = ((xl + ll + cl) / 3) * 100
+                df['ens_short'] = ((xs + ls + cs) / 3) * 100
 
-            # Exit
-            if position:
-                res = None
-                if position == 'LONG':
-                    if curr['low'] <= stop_loss:
-                        res, pnl = "LOSS", -1.0
-                    elif curr['high'] >= take_profit:
-                        res, pnl = "WIN", (take_profit - entry_price) / entry_price * 100
-                elif position == 'SHORT':
-                    if curr['high'] >= stop_loss:
-                        res, pnl = "LOSS", -1.0
-                    elif curr['low'] <= take_profit:
-                        res, pnl = "WIN", (entry_price - take_profit) / entry_price * 100
+            except Exception as e:
+                print(f"❌ Prediction Error: {e}")
+                traceback.print_exc()
+                return self._empty_result()
 
-                if res:
-                    self.trades.append({"result": res, "pnl": round(pnl, 2), "entry": entry_price})
-                    position = None
-                    continue
+            # 4. Simulation Loop
+            position = None
+            entry_price = 0
+            stop_loss = 0
+            take_profit = 0
 
-            # Entry
-            if not position:
-                eff = curr.get('efficiency_ratio', 0)
-                vol = curr.get('volatility_slope', 0)
+            start_idx = 50
+            for i in range(start_idx, len(df)):
+                curr = df.iloc[i]
+                price = curr['close']
+                atr = curr.get('atr_14', price * 0.01)
 
-                if (eff > min_eff) or (vol > 0.2):
-                    p_l = curr['ens_long']
-                    p_s = curr['ens_short']
+                # Exit Logic
+                if position:
+                    res = None
+                    pnl = 0
+                    if position == 'LONG':
+                        if curr['low'] <= stop_loss:
+                            res, pnl = "LOSS", -1.0
+                        elif curr['high'] >= take_profit:
+                            res, pnl = "WIN", (take_profit - entry_price) / entry_price * 100
+                    elif position == 'SHORT':
+                        if curr['high'] >= stop_loss:
+                            res, pnl = "LOSS", -1.0
+                        elif curr['low'] <= take_profit:
+                            res, pnl = "WIN", (entry_price - take_profit) / entry_price * 100
 
-                    if p_l > min_conf and p_l > p_s + 5:
+                    if res:
+                        self.trades.append({"result": res, "pnl": round(pnl, 2), "entry": entry_price})
+                        position = None
+                        continue
+
+                # Entry Logic
+                if not position:
+                    p_l = curr.get('ens_long', 0)
+                    p_s = curr.get('ens_short', 0)
+                    ema_20 = curr.get('ema_20', 0)
+                    ema_50 = curr.get('ema_50', 0)
+
+                    is_uptrend = (price > ema_20) and (ema_20 > ema_50)
+                    is_downtrend = (price < ema_20) and (ema_20 < ema_50)
+
+                    if p_l > min_conf and is_uptrend:
                         position = 'LONG'
                         entry_price = price
                         stop_loss = price - (atr * stop_mult)
                         take_profit = price + (atr * tgt_mult)
-                    elif p_s > min_conf and p_s > p_l + 5:
+                    elif p_s > min_conf and is_downtrend:
                         position = 'SHORT'
                         entry_price = price
                         stop_loss = price + (atr * stop_mult)
                         take_profit = price - (atr * tgt_mult)
 
-        return self._generate_stats()
+            return self._generate_stats()
+
+        except Exception as e:
+            print(f"❌ CRITICAL BACKTEST FAILURE: {e}")
+            traceback.print_exc()
+            return self._empty_result()
 
     def _generate_stats(self):
         total = len(self.trades)
-        if total == 0:
-            return self._empty_result()
-
+        if total == 0: return self._empty_result()
         wins = [t for t in self.trades if t['result'] == 'WIN']
-        wr = (len(wins) / total * 100) if total > 0 else 0
+        wr = (len(wins) / total * 100)
 
-        gross_profit = sum(t['pnl'] for t in wins)
-        losses = [t for t in self.trades if t['pnl'] < 0]
-        gross_loss = abs(sum(t['pnl'] for t in losses))
-
-        pf = gross_profit / gross_loss if gross_loss > 0 else 99.9
+        net_pnl_sum = sum(t['pnl'] for t in self.trades)
+        loss_sum = abs(sum(t['pnl'] for t in self.trades if t['pnl'] < 0))
+        pf = (sum(t['pnl'] for t in wins) / loss_sum) if loss_sum > 0 else 10.0
 
         return {
             "win_rate": round(wr, 1),
@@ -181,9 +200,4 @@ class CryptoBacktestEngine:
         }
 
     def _empty_result(self):
-        return {
-            "win_rate": 0,
-            "profit_factor": 0,
-            "total_trades": 0,
-            "trades_log": []
-        }
+        return {"win_rate": 0, "profit_factor": 0, "total_trades": 0, "trades_log": []}

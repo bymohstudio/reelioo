@@ -18,11 +18,8 @@ SYMBOLS = [
     "NEARUSDT", "APTUSDT", "INJUSDT", "RNDRUSDT", "FETUSDT"
 ]
 INTERVAL = "1h"
-LOOKBACK_DAYS = 500  # 1.5 Years of data
+LOOKBACK_DAYS = 500
 
-# --- PATH FIX: RELATIVE TO THIS SCRIPT ---
-# Current: core/quant/ml_training/auto_train.py
-# Target:  core/quant/ml_models
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "..", "ml_models")
 META_PATH = os.path.join(MODEL_DIR, "edge_meta.json")
@@ -52,20 +49,19 @@ class DeepDataLoader:
                 break
 
         if not data: return pd.DataFrame()
-        df = pd.DataFrame(data).iloc[:, :6]
-        df.columns = ["ts", "open", "high", "low", "close", "volume"]
+        # Ensure we get Taker Buy Volume (Index 9)
+        df = pd.DataFrame(data).iloc[:, [0, 1, 2, 3, 4, 5, 9]]
+        df.columns = ["ts", "open", "high", "low", "close", "volume", "taker_base"]
         df = df.astype(float)
         return df
 
 
-# --- TRAINING FUNCTIONS ---
-
 def train_xgboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
     print(f"   🚀 Training XGBoost ({name})...")
     params = {
-        "objective": "binary:logistic", "eval_metric": "auc", "max_depth": 7,
-        "eta": 0.015, "subsample": 0.7, "colsample_bytree": 0.7,
-        "scale_pos_weight": scale_pos_weight, "min_child_weight": 5, "nthread": 4
+        "objective": "binary:logistic", "eval_metric": "auc", "max_depth": 6,
+        "eta": 0.02, "subsample": 0.8, "colsample_bytree": 0.8,
+        "scale_pos_weight": scale_pos_weight, "min_child_weight": 3, "nthread": 4
     }
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dtest = xgb.DMatrix(X_test, label=y_test)
@@ -81,7 +77,7 @@ def train_lightgbm(X_train, y_train, X_test, y_test, name, scale_pos_weight):
     dtest = lgb.Dataset(X_test, label=y_test, reference=dtrain)
     params = {
         "objective": "binary", "metric": "auc", "boosting_type": "gbdt",
-        "num_leaves": 40, "learning_rate": 0.02, "feature_fraction": 0.8,
+        "num_leaves": 31, "learning_rate": 0.03, "feature_fraction": 0.9,
         "bagging_fraction": 0.8, "bagging_freq": 5, "scale_pos_weight": scale_pos_weight,
         "verbose": -1, "nthread": 4
     }
@@ -96,7 +92,7 @@ def train_catboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
     train_pool = Pool(X_train, y_train)
     test_pool = Pool(X_test, y_test)
     model = CatBoostClassifier(
-        iterations=1000, learning_rate=0.02, depth=7, scale_pos_weight=scale_pos_weight,
+        iterations=1000, learning_rate=0.03, depth=6, scale_pos_weight=scale_pos_weight,
         eval_metric='AUC', verbose=0, allow_writing_files=False, thread_count=4
     )
     model.fit(train_pool, eval_set=test_pool, early_stopping_rounds=50)
@@ -121,19 +117,18 @@ def run_training():
         if df.empty: continue
         df = generate_features(df)
 
-        # TARGETS: 2.0 R:R (Velocity Setup)
-        df = generate_targets(df, risk_reward=2.0, stop_mult=1.5, candles=24)
+        # TARGETS: Now detecting VOLATILITY EXPLOSIONS (Regime)
+        df = generate_targets(df, risk_reward=2.0, stop_mult=1.5, candles=12)
         master_df.append(df)
 
     full_data = pd.concat(master_df).dropna()
 
-    # --- STRICT FILTERING (VELOCITY) ---
-    # We filter specifically for high-efficiency moves (0.12) to match live engine
-    print(f"\n🧹 Filtering for High Velocity... (Original: {len(full_data)})")
+    # We filter for at least mild volatility to train the model on active markets
+    print(f"\n🧹 Filtering for Active Markets... (Original: {len(full_data)})")
 
     clean_data = full_data[
-        (full_data['efficiency_ratio'] > 0.12) |
-        (full_data['volatility_slope'] > 0.5)
+        (full_data['efficiency_ratio'] > 0.05) |
+        (full_data['volatility_slope'] > 0.1)
         ]
 
     print(f"📊 High-Quality Training Set: {len(clean_data)} Rows")
@@ -141,28 +136,28 @@ def run_training():
     split = int(len(clean_data) * 0.85)
     X = clean_data[FEATURES]
 
-    # Train Longs
+    # Train Upside Volatility (Long)
     y_long = clean_data['target_long']
     scale_long = min((len(y_long) - y_long.sum()) / (y_long.sum() + 1), 5.0)
     X_train, X_test = X.iloc[:split], X.iloc[split:]
     y_train_l, y_test_l = y_long.iloc[:split], y_long.iloc[split:]
 
-    print("\n🔹 TRAINING LONG ENSEMBLE (VELOCITY MODE)")
+    print("\n🔹 TRAINING LONG REGIME ENSEMBLE")
     xgb_l = train_xgboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
     lgb_l = train_lightgbm(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
     cat_l = train_catboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
-    print(f"✅ LONG Precision: {evaluate_ensemble(xgb_l, lgb_l, cat_l, X_test, y_test_l) * 100:.1f}%")
+    print(f"✅ LONG Regime Precision: {evaluate_ensemble(xgb_l, lgb_l, cat_l, X_test, y_test_l) * 100:.1f}%")
 
-    # Train Shorts
+    # Train Downside Volatility (Short)
     y_short = clean_data['target_short']
     scale_short = min((len(y_short) - y_short.sum()) / (y_short.sum() + 1), 5.0)
     y_train_s, y_test_s = y_short.iloc[:split], y_short.iloc[split:]
 
-    print("\n🔸 TRAINING SHORT ENSEMBLE (VELOCITY MODE)")
+    print("\n🔸 TRAINING SHORT REGIME ENSEMBLE")
     xgb_s = train_xgboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
     lgb_s = train_lightgbm(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
     cat_s = train_catboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
-    print(f"✅ SHORT Precision: {evaluate_ensemble(xgb_s, lgb_s, cat_s, X_test, y_test_s) * 100:.1f}%")
+    print(f"✅ SHORT Regime Precision: {evaluate_ensemble(xgb_s, lgb_s, cat_s, X_test, y_test_s) * 100:.1f}%")
 
     with open(META_PATH, 'w') as f:
         json.dump({"updated": str(datetime.now()), "features": FEATURES}, f)
