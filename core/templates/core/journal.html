@@ -30,7 +30,7 @@
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Signal</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Entry</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Target</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Result</th>
+                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Result</th>
                         <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Action</th>
                     </tr>
                 </thead>
@@ -38,7 +38,7 @@
                     {% for entry in page_obj %}
                     <tr class="border-b border-white/5 hover:bg-white/[0.02] transition group" id="row-{{ entry.id }}">
 
-                        <td class="p-5 font-mono text-xs text-slate-500">
+                        <td class="p-5 font-mono text-xs text-slate-500 local-time" data-timestamp="{{ entry.created_at|date:'c' }}">
                             {{ entry.created_at|date:"M d, H:i" }}
                         </td>
 
@@ -59,8 +59,8 @@
                         <td class="p-5 text-right font-mono">{{ entry.entry_price }}</td>
                         <td class="p-5 text-right font-mono text-emerald-500/80">{{ entry.target }}</td>
 
-                        <td class="p-5 text-center">
-                            <div id="status-badge-{{ entry.id }}" class="transition-all duration-300">
+                        <td class="p-5 text-right">
+                            <div id="status-badge-{{ entry.id }}" class="inline-block transition-all duration-300">
                                 {% if entry.status == 'PENDING' %}
                                     <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold uppercase tracking-wide">
                                         <span class="w-1 h-1 rounded-full bg-yellow-500 animate-pulse"></span> Pending
@@ -77,13 +77,15 @@
                             </div>
                         </td>
 
-                        <td class="p-5 text-right flex justify-end gap-2">
-                            <button id="btn-check-{{ entry.id }}" onclick="checkResult({{ entry.id }})" class="p-2 hover:bg-blue-500/20 rounded-lg text-slate-500 hover:text-blue-400 transition" title="Check Market Result">
-                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="openDeleteModal({{ entry.id }})" class="p-2 hover:bg-red-500/20 rounded-lg text-slate-500 hover:text-red-400 transition" title="Remove">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
+                        <td class="p-5 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button id="btn-check-{{ entry.id }}" onclick="checkResult({{ entry.id }})" class="p-2 hover:bg-blue-500/20 rounded-lg text-slate-500 hover:text-blue-400 transition" title="Check Market Result">
+                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="openDeleteModal({{ entry.id }})" class="p-2 hover:bg-red-500/20 rounded-lg text-slate-500 hover:text-red-400 transition" title="Remove">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
@@ -135,8 +137,22 @@
 </div>
 
 <script>
-    // Initialize icons on load
+    // Initialize icons
     if (window.lucide) lucide.createIcons();
+
+    // Timezone Logic
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('.local-time').forEach(el => {
+            const raw = el.getAttribute('data-timestamp');
+            if(raw) {
+                const date = new Date(raw);
+                el.innerText = date.toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+            }
+        });
+    });
 
     function getCookie(name) {
         let cookieValue = null;
@@ -153,7 +169,7 @@
         return cookieValue;
     }
 
-    // --- TOAST NOTIFICATIONS ---
+    // Toast Logic
     function showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -178,16 +194,13 @@
         }, 3000);
     }
 
-    // --- CHECK RESULT LOGIC ---
+    // Refresh Logic
     async function checkResult(id) {
         const btn = document.querySelector(`#btn-check-${id}`);
-
-        // 1. Initial Icon Selection
         let icon = btn.querySelector('svg') || btn.querySelector('i');
         const badgeDiv = document.getElementById(`status-badge-${id}`);
         const originalBadge = badgeDiv.innerHTML;
 
-        // Visual Cues
         if (icon) icon.classList.add('animate-spin');
         btn.disabled = true;
 
@@ -195,8 +208,6 @@
             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-wide">
                 <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Syncing...
             </span>`;
-
-        // Render new icons immediately
         if(window.lucide) lucide.createIcons();
 
         showToast("Syncing with live market...", "loading");
@@ -210,17 +221,13 @@
 
             if(data.status === 'success') {
                 if (data.new_status === "PENDING") {
-                    // STILL OPEN
                     badgeDiv.innerHTML = `
                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700 border border-slate-600 text-white text-[10px] font-bold uppercase tracking-wide">
                             STILL OPEN
                         </span>`;
                     showToast(`Target not hit. Price: ${data.current_price || '--'}`, "info");
-
                     setTimeout(() => { badgeDiv.innerHTML = originalBadge; }, 2500);
-
                 } else {
-                    // WIN OR LOSS
                     let colorClass = data.new_status === 'WIN'
                         ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                         : "bg-red-500/10 border-red-500/20 text-red-400";
@@ -239,15 +246,13 @@
             badgeDiv.innerHTML = originalBadge;
             showToast("Market data unavailable", "error");
         } finally {
-            // FIX: Re-select the icon in case DOM updated, ensuring we target the LIVE element
             const liveIcon = btn.querySelector('svg') || btn.querySelector('i');
             if (liveIcon) liveIcon.classList.remove('animate-spin');
-
             btn.disabled = false;
         }
     }
 
-    // --- DELETE LOGIC ---
+    // Delete Logic
     let deleteTargetId = null;
     function openDeleteModal(id) {
         deleteTargetId = id;

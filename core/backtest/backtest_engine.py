@@ -5,6 +5,7 @@ import lightgbm as lgb
 from catboost import CatBoostClassifier
 import os
 import logging
+from django.conf import settings
 from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
 log = logging.getLogger(__name__)
@@ -17,16 +18,12 @@ class CryptoBacktestEngine:
         self.trades = []
         self.models = {}
 
-        # --- ROBUST PATH FIX ---
-        # Current: core/quant/backtest/backtest_engine.py
-        # Goal:    core/quant/ml_models
+        # --- PATH FIX: USE DJANGO SETTINGS ---
+        # This ensures we look in "ROOT/core/quant/ml_models" no matter what.
+        self.MODEL_DIR = os.path.join(settings.BASE_DIR, "core", "quant", "ml_models")
 
-        # 1. backtest dir
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 2. quant dir (Parent of backtest)
-        quant_dir = os.path.dirname(current_dir)
-        # 3. ml_models dir
-        self.MODEL_DIR = os.path.join(quant_dir, "ml_models")
+        # Debug Log: Tells you exactly where it is looking
+        print(f"🔍 BACKTEST ENGINE LOOKING IN: {self.MODEL_DIR}")
 
         self.PATHS = {
             "xgb_long": os.path.join(self.MODEL_DIR, "xgb_long.json"),
@@ -40,40 +37,60 @@ class CryptoBacktestEngine:
 
     def _load_models(self):
         try:
+            # Check if directory exists first
+            if not os.path.exists(self.MODEL_DIR):
+                log.error(f"❌ DIRECTORY MISSING: {self.MODEL_DIR}")
+                print(f"❌ DIRECTORY MISSING: {self.MODEL_DIR}")
+                return
+
             if os.path.exists(self.PATHS['xgb_long']):
                 self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
                 self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
+            else:
+                print(f"❌ MODEL MISSING: {self.PATHS['xgb_long']}")
+
             if os.path.exists(self.PATHS['lgb_long']):
                 self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
                 self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
+
             if os.path.exists(self.PATHS['cat_long']):
                 self.models['cat_long'] = CatBoostClassifier()
                 self.models['cat_long'].load_model(self.PATHS['cat_long'])
                 self.models['cat_short'] = CatBoostClassifier()
                 self.models['cat_short'].load_model(self.PATHS['cat_short'])
+
         except Exception as e:
             log.error(f"Backtest Model Load Error: {e}")
+            print(f"❌ EXCEPTION LOADING MODELS: {e}")
 
     def run(self, trade_style="INTRADAY"):
-        if self.df.empty: return {"error": "Empty Data"}
+        if self.df is None or self.df.empty:
+            return self._empty_result()
+
         df = generate_features(self.df.copy())
 
-        # --- VELOCITY LOGIC MATCHING LIVE ENGINE ---
+        # Check if models loaded successfully
+        if not self.models or 'xgb_long' not in self.models:
+            log.error("Backtest Error: Models not loaded. Check file paths.")
+            return self._empty_result()
+
+        # --- RESILIENT HUNTER SETTINGS (Matching Live Engine) ---
         if trade_style == "SCALP":
-            min_conf = 60
-            min_eff = 0.12
+            min_conf = 55.0
+            min_eff = 0.05
             stop_mult, tgt_mult = 1.0, 1.5
         elif trade_style == "SWING":
-            min_conf = 65
+            min_conf = 65.0
             min_eff = 0.08
-            stop_mult, tgt_mult = 1.5, 3.0
+            stop_mult, tgt_mult = 2.5, 4.0
         else:  # DAY / INTRADAY
-            min_conf = 65
-            min_eff = 0.15  # STRICT
-            stop_mult, tgt_mult = 1.5, 2.0  # FASTER EXIT
+            min_conf = 60.0
+            min_eff = 0.09
+            stop_mult = 2.0
+            tgt_mult = 3.0
 
-        # Predict Batch
-        if 'xgb_long' in self.models:
+            # Predict Batch
+        try:
             X = df[FEATURES].astype(float)
             dmat = xgb.DMatrix(X)
             xl = self.models['xgb_long'].predict(dmat)
@@ -85,8 +102,9 @@ class CryptoBacktestEngine:
 
             df['ens_long'] = ((xl + ll + cl) / 3) * 100
             df['ens_short'] = ((xs + ls + cs) / 3) * 100
-        else:
-            return {"error": "Models not loaded"}
+        except Exception as e:
+            log.error(f"Prediction Error: {e}")
+            return self._empty_result()
 
         # Simulate
         position = None
@@ -124,8 +142,7 @@ class CryptoBacktestEngine:
                 eff = curr.get('efficiency_ratio', 0)
                 vol = curr.get('volatility_slope', 0)
 
-                # Strict Filter: Efficiency > 0.15 OR Vol Expansion
-                if (eff > min_eff) and (vol > -0.5):
+                if (eff > min_eff) or (vol > 0.2):
                     p_l = curr['ens_long']
                     p_s = curr['ens_short']
 
@@ -140,15 +157,33 @@ class CryptoBacktestEngine:
                         stop_loss = price + (atr * stop_mult)
                         take_profit = price - (atr * tgt_mult)
 
-        # Stats
-        wins = [t for t in self.trades if t['result'] == 'WIN']
+        return self._generate_stats()
+
+    def _generate_stats(self):
         total = len(self.trades)
+        if total == 0:
+            return self._empty_result()
+
+        wins = [t for t in self.trades if t['result'] == 'WIN']
         wr = (len(wins) / total * 100) if total > 0 else 0
-        pf = sum(t['pnl'] for t in wins) / abs(sum(t['pnl'] for t in self.trades if t['pnl'] < 0)) if total > 0 else 0
+
+        gross_profit = sum(t['pnl'] for t in wins)
+        losses = [t for t in self.trades if t['pnl'] < 0]
+        gross_loss = abs(sum(t['pnl'] for t in losses))
+
+        pf = gross_profit / gross_loss if gross_loss > 0 else 99.9
 
         return {
             "win_rate": round(wr, 1),
             "profit_factor": round(pf, 2),
             "total_trades": total,
             "trades_log": self.trades[-20:]
+        }
+
+    def _empty_result(self):
+        return {
+            "win_rate": 0,
+            "profit_factor": 0,
+            "total_trades": 0,
+            "trades_log": []
         }

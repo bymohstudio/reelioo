@@ -60,36 +60,38 @@ class CryptoQuantEngine:
               float(models['lgb_short'].predict(row_df)[0]) +
               float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
 
-        # ===== INSTITUTIONAL CONFIG =====
+        # ===== RESILIENT HUNTER CONFIG =====
         trade_style = trade_style.upper()
 
         if trade_style == "SCALP":
-            min_conf = 60
-            min_eff = 0.12
+            min_conf = 55  # Faster trigger
+            min_eff = 0.05  # Allow noise
             stop_mult, tgt_mult = 1.0, 1.5
             duration = "15m - 2h"
 
         elif trade_style == "SWING":
             min_conf = 65
             min_eff = 0.08
-            stop_mult, tgt_mult = 1.5, 3.0
+            stop_mult, tgt_mult = 2.5, 4.0  # Deep swing
             duration = "1 - 3 Days"
 
-        else:  # DAY (Default)
-            min_conf = 65    # High Conviction Only
-            min_eff = 0.15   # Strict: Only Clean Trends
-            stop_mult = 1.5
-            tgt_mult = 2.0   # Velocity Target (2.0R)
+        else:  # DAY / INTRADAY (The Fix)
+            # We lowered thresholds to get signals, but WIDENED stops to survive volatility.
+            min_conf = 60  # Lowered from 65 to catch moves early
+            min_eff = 0.09  # Lowered from 0.15 to allow normal market flow
+            stop_mult = 2.0  # Increased from 1.5 to prevent "Wick Outs"
+            tgt_mult = 3.0  # Aim for 3R to pay for losses
             duration = "4h - 24h"
 
         score = max(pL, pS)
-        bias = "HOLD"  # Default is now HOLD
+        bias = "HOLD"  # Default state is now HOLD
 
         eff = float(last['efficiency_ratio'])
         vol = float(last['volatility_slope'])
 
-        # FILTER: Market must be efficient OR Volatility exploding
-        market_ok = (eff > min_eff) and (vol > -0.5)
+        # FILTER: Relaxed check
+        # We allow trades if Efficiency is decent (>0.09) OR Volatility is waking up (>0.2)
+        market_ok = (eff > min_eff) or (vol > 0.2)
 
         if market_ok:
             if pL > min_conf and pL > pS + 5:
@@ -99,9 +101,7 @@ class CryptoQuantEngine:
                 bias = "SHORT"
                 score = pS
         else:
-            # --- FORCE HOLD IF FILTERED ---
-            # If market is choppy, we force "HOLD" and reset score to 50
-            # This prevents seeing "70% Confidence" when the trade is actually blocked.
+            # If market is bad, force HOLD and drop score to avoid confusion
             score = 50
             bias = "HOLD"
 
@@ -115,26 +115,50 @@ class CryptoQuantEngine:
             stop = price + (atr * stop_mult)
             t1 = price - (atr * tgt_mult)
         else:
-            stop, t1 = price, price
+            stop = price
+            t1 = price
 
         dist = abs(t1 - price)
-        regime = "ACTIVE" if score >= min_conf else "WEAK"
-        regime_color = "green" if bias == "LONG" else "red" if bias == "SHORT" else "gray"
+
+        # Context Colors
+        if bias == "LONG":
+            regime = "ACTIVE BUY"
+            regime_color = "green"
+        elif bias == "SHORT":
+            regime = "ACTIVE SELL"
+            regime_color = "red"
+        else:
+            regime = "WAITING"
+            regime_color = "gray"
 
         whale_z = float(last.get('vol_z', 0))
         whale_label = "High Vol" if abs(whale_z) > 2 else "Normal"
 
-        # VECTORS
+        # EXPLAINABILITY VECTORS
         drivers = []
-        if eff > 0.1: drivers.append({"feature": "Trend Efficiency", "desc": "CLEAN PRICE PATH", "importance": min(eff * 200, 95)})
-        if abs(whale_z) > 1.2: drivers.append({"feature": "Whale Volume", "desc": "WHALE ACCUMULATION", "importance": min(abs(whale_z) * 20, 92)})
-        if float(last.get('trend_strength', 0)) > 0.5: drivers.append({"feature": "Momentum", "desc": "TREND MOMENTUM", "importance": 85.0})
+        if eff > 0.08:
+            drivers.append({"feature": "Structure", "desc": "CLEAN TREND", "importance": min(eff * 200, 95)})
+        if abs(whale_z) > 1.0:
+            drivers.append(
+                {"feature": "Volume", "desc": "INSTITUTIONAL FLOW", "importance": min(abs(whale_z) * 20, 92)})
+        if float(last.get('trend_strength', 0)) > 0.3:
+            drivers.append({"feature": "Momentum", "desc": "TREND ALIGNMENT", "importance": 85.0})
+
         drivers.sort(key=lambda x: x['importance'], reverse=True)
 
         return SimpleNamespace(
-            bias=bias, score=int(round(score)), entry=price, stop=round(stop, 4),
-            target1=round(t1, 4), target2=round(t1 + (dist * 0.5), 4), target3=round(t1 + dist, 4),
-            rr_ratio=round(tgt_mult / stop_mult, 2), expected_duration=duration,
-            regime=regime, regime_color=regime_color, whale_zscore=round(whale_z, 2),
-            whale_label=whale_label, top_features=drivers[:3]
+            bias=bias,
+            score=int(round(score)),
+            entry=price,
+            stop=round(stop, 4),
+            target1=round(t1, 4),
+            target2=round(t1 + (dist * 0.5), 4),
+            target3=round(t1 + dist, 4),
+            rr_ratio=round(tgt_mult / stop_mult, 2),
+            expected_duration=duration,
+            regime=regime,
+            regime_color=regime_color,
+            whale_zscore=round(whale_z, 2),
+            whale_label=whale_label,
+            top_features=drivers[:3]
         )
