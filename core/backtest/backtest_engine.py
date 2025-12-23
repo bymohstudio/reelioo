@@ -87,18 +87,10 @@ class CryptoBacktestEngine:
                 print("❌ Models not loaded, skipping predictions")
                 return self._empty_result()
 
-            # 2. Config & Thresholds
+            # 2. Config
             min_conf = 65.0
             stop_mult = 2.0
             tgt_mult = 3.0
-
-            # --- COINDCX FIX: Adaptive Thresholds ---
-            # If trading INR pairs, the synthetic data lacks strong Order Flow (Whale) signals.
-            # We relax the ML threshold to allow Price Action/Trend trades to trigger.
-            if "INR" in self.symbol:
-                print(f"🇮🇳 Indian Pair Detected ({self.symbol}): Relaxing ML Threshold to 55%")
-                min_conf = 55.0
-
             if trade_style == "SCALP": stop_mult, tgt_mult = 1.0, 1.5
             if trade_style == "SWING": stop_mult, tgt_mult = 2.5, 4.0
 
