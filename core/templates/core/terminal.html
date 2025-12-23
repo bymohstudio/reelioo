@@ -247,7 +247,7 @@
                     <span class="text-[8px] text-slate-500 font-mono">LIVE FEED</span>
                 </div>
                 <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 h-40 overflow-y-auto custom-scrollbar border-l border-white/5 pl-3 flex flex-col justify-end">
-                    </div>
+                </div>
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 max-h-[420px] flex flex-col">
@@ -648,10 +648,17 @@
     async function initScan() {
         const input = document.getElementById('symbol-input');
         let raw = input.value.trim().toUpperCase();
+
         clearTimeout(debounceTimer);
         document.getElementById('suggestions').classList.add('hidden');
+
         if (!raw) return;
-        if (!raw.includes("USDT")) raw += "USDT";
+
+        // --- FIX: DON'T APPEND USDT TO INR PAIRS ---
+        if (!raw.includes("USDT") && !raw.includes("INR")) {
+            raw += "USDT";
+        }
+
         resetPositionSizingUI();
 
         const dash = document.getElementById('dashboard');
@@ -846,19 +853,42 @@
     async function handleTickerInput(val) {
         const box = document.getElementById('suggestions');
         if (!box) return;
-        if (val.length < 1) { box.classList.add('hidden'); return; }
+
+        // Hide box if input is empty
+        if (val.length < 1) {
+            box.classList.add('hidden');
+            return;
+        }
+
         clearTimeout(debounceTimer);
+
         debounceTimer = setTimeout(async () => {
             try {
                 const res = await fetch(`/api/search/?q=${val}`);
                 const data = await res.json();
-                box.innerHTML = '';
+
+                box.innerHTML = ''; // Clear previous results
+
                 if (data.length > 0) {
                     box.classList.remove('hidden');
-                    data.slice(0, 5).forEach(item => {
+
+                    data.slice(0, 10).forEach(item => { // Increased limit to 10
                         const div = document.createElement('div');
-                        div.className = "px-4 py-2 hover:bg-white/5 cursor-pointer border-b border-white/5 flex justify-between";
-                        div.innerHTML = `<span class="text-sm font-bold text-white">${item.symbol}</span><span class="text-[10px] text-slate-500">${item.name}</span>`;
+                        div.className = "px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 flex justify-between items-center group";
+
+                        // Color coding for Indian vs Global
+                        const typeBadge = item.type === 'INDIAN'
+                            ? '<span class="text-[9px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded border border-orange-500/30">🇮🇳 INR</span>'
+                            : '<span class="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30">🌏 GLOBAL</span>';
+
+                        div.innerHTML = `
+                            <div class="flex flex-col">
+                                <span class="text-sm font-bold text-white group-hover:text-blue-400 transition">${item.symbol}</span>
+                                <span class="text-[10px] text-slate-500">${item.name}</span>
+                            </div>
+                            ${typeBadge}
+                        `;
+
                         div.onclick = () => {
                             document.getElementById('symbol-input').value = item.symbol;
                             clearTimeout(debounceTimer);
@@ -867,8 +897,12 @@
                         };
                         box.appendChild(div);
                     });
-                } else box.classList.add('hidden');
-            } catch (e) {}
+                } else {
+                    box.classList.add('hidden');
+                }
+            } catch (e) {
+                console.error("Search Error:", e);
+            }
         }, 200);
     }
 
@@ -937,7 +971,11 @@
         const input = document.getElementById('symbol-input');
         let raw = input.value.trim().toUpperCase();
         if (!raw) return;
-        if (!raw.includes("USDT")) raw += "USDT";
+
+        // --- FIX: DON'T APPEND USDT TO INR PAIRS ---
+        if (!raw.includes("USDT") && !raw.includes("INR")) {
+            raw += "USDT";
+        }
 
         const modal = document.getElementById('backtest-modal');
         const loader = document.getElementById('bt-loader');
