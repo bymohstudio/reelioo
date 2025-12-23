@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-# --- IMPORTS ---
 from .services.marketdata_service import MarketService
 from .services.news_service import NewsService
 from .quant.crypto_engine import CryptoQuantEngine
@@ -24,38 +23,41 @@ class AnalyzeCryptoView(APIView):
         try:
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper().replace("-", "")
+            if not symbol.endswith("USDT") and not symbol.endswith("BTC"):
+                symbol += "USDT"
+
             trade_style = body.get("trade_style", "INTRADAY")
 
-            # 1. Fetch Data
-            df = MarketService.get_historical_data(symbol, "AUTO", trade_style)
+            # --- CRITICAL: Use PERP/FUTURES from frontend ---
+            market_type = body.get("market_type", "SPOT")
+
+            # Fetch Data
+            df = MarketService.get_historical_data(symbol, market_type, trade_style)
 
             if df.empty:
-                return Response({"error": "No Data"}, status=400)
+                return Response({"error": "No Data or API Error"}, status=400)
 
-            # 2. Run Engine
+            # Run Engine
             engine = CryptoQuantEngine()
             res = engine.analyze(df, trade_style)
 
-            # 3. Volatility Filter (Prevent Scalping in dead markets)
+            # Volatility Filter
             if trade_style == "SCALP":
                 last_open = float(df['open'].iloc[-1])
                 last_close = float(df['close'].iloc[-1])
                 move_pct = abs(last_close - last_open) / last_close
-                if move_pct < 0.002:  # < 0.2% movement
+                if move_pct < 0.002:
                     res.bias = "NEUTRAL"
                     res.regime = "LOW VOLATILITY"
                     res.regime_color = "gray"
                     res.score = 50
 
-            # 4. GET NEWS (CONNECTED)
             news_data = []
             try:
                 news_data = NewsService.get_smart_insights(symbol)
-            except Exception as e:
-                log.error(f"News Service Error: {e}")
-                news_data = []
+            except:
+                pass
 
-            # 5. Response
             return Response({
                 "symbol": symbol,
                 "price": res.entry,
@@ -73,10 +75,7 @@ class AnalyzeCryptoView(APIView):
                 },
                 "regime": {"phase": res.regime, "color": res.regime_color},
                 "whales": {"zscore": res.whale_zscore, "label": res.whale_label},
-
-                # --- NEW: SEND LOGIC VECTORS TO FRONTEND ---
                 "explainability": res.top_features,
-
                 "sentiment": {"headline": "AI Active", "news_feed": news_data}
             })
 
@@ -86,10 +85,6 @@ class AnalyzeCryptoView(APIView):
 
 
 class BacktestCryptoView(APIView):
-    """
-    Backtest Endpoint.
-    Now accepts 'trade_style' to simulate SCALP/DAY/SWING logic.
-    """
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -97,21 +92,17 @@ class BacktestCryptoView(APIView):
         try:
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper()
+            if not symbol.endswith("USDT"): symbol += "USDT"
             market_type = body.get("market_type", "SPOT")
-            # Get the user's selected style (Default to INTRADAY)
             trade_style = body.get("trade_style", "INTRADAY")
 
-            # Always backtest on 1H data for speed/accuracy balance
-            # We fetch more data (1000 candles) for better backtest depth
             df = MarketService.get_historical_data(symbol, market_type, trade_style="INTRADAY")
 
             if df is None or df.empty:
                 return Response({"error": "Insufficient historical data"}, status=404)
 
             engine = CryptoBacktestEngine(df, symbol)
-            # Pass the style to the engine
             results = engine.run(trade_style=trade_style)
-
             return Response(results)
 
         except Exception as e:

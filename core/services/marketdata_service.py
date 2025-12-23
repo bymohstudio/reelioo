@@ -19,39 +19,42 @@ class MarketService:
     # -------------------------
     @staticmethod
     def _load_exchange_info():
-        """
-        Loads Global symbols. Prioritizes local CSV for speed.
-        """
-        cache_key = "exchange_info_global_v1"
+        cache_key = "exchange_info_v1"
         cached = cache.get(cache_key)
         if cached: return cached
 
         results = []
-        base_dir = settings.BASE_DIR
-        global_path = os.path.join(base_dir, "global_symbols.csv")
+        # Look for the CSV in the project base directory
+        global_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
 
-        # 1. Try Loading CSV (Fastest)
+        # 1. Try Loading from local CSV
         if os.path.exists(global_path):
             try:
-                results.extend(pd.read_csv(global_path).to_dict("records"))
+                # Load symbols from CSV for fast suggestion
+                df_csv = pd.read_csv(global_path)
+                results = df_csv.to_dict("records")
+                log.info(f"Loaded {len(results)} symbols from local CSV.")
             except Exception as e:
                 log.error(f"Error reading Global CSV: {e}")
 
-        # 2. Fallback to API (If CSV missing)
+        # 2. Fallback to live API if results are still empty
         if not results:
             try:
-                spot = requests.get(f"{MarketService.BINANCE_SPOT}/exchangeInfo", timeout=5).json()
-                for s in spot.get("symbols", []):
-                    if s["status"] == "TRADING" and s["quoteAsset"] == "USDT":
-                        results.append({
-                            "symbol": s["symbol"],
-                            "name": s["baseAsset"],
-                            "type": "GLOBAL"
-                        })
+                headers = {"User-Agent": "Mozilla/5.0"}
+                spot = requests.get(f"{MarketService.BASE_SPOT}/exchangeInfo", headers=headers, timeout=5).json()
+
+                if "symbols" in spot:
+                    for s in spot["symbols"]:
+                        if s["status"] == "TRADING" and s["quoteAsset"] == "USDT":
+                            results.append({
+                                "symbol": s["symbol"],
+                                "name": s["baseAsset"],
+                                "type": "GLOBAL"
+                            })
             except Exception as e:
                 log.error(f"Binance API Fallback Failed: {e}")
 
-        # 3. Static Safety Net
+        # 3. Final Static Safety Net
         if not results:
             results = [
                 {"symbol": "BTCUSDT", "name": "BTC", "type": "GLOBAL"},
@@ -59,6 +62,7 @@ class MarketService:
                 {"symbol": "SOLUSDT", "name": "SOL", "type": "GLOBAL"}
             ]
 
+        # Cache the list for 1 hour to reduce disk/network overhead
         cache.set(cache_key, results, timeout=3600)
         return results
 
@@ -139,10 +143,8 @@ class MarketService:
             df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
             df.set_index("timestamp", inplace=True)
 
-            # RENAME taker_base -> taker_buy_base to match feature_engineering.py
-            df = df.rename(columns={"taker_base": "taker_buy_base"})
 
-            final_df = df[["open", "high", "low", "close", "volume", "taker_buy_base"]]
+            final_df = df[["open", "high", "low", "close", "volume", "taker_base"]]
 
             if not final_df.empty:
                 print(f"✅ Data Success: {len(final_df)} candles")
