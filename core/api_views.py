@@ -28,8 +28,10 @@ class AnalyzeCryptoView(APIView):
 
             trade_style = body.get("trade_style", "INTRADAY")
 
-            # --- CRITICAL: Use PERP/FUTURES from frontend ---
-            market_type = body.get("market_type", "SPOT")
+            # --- CRITICAL FIX: DEFAULT TO PERP (FUTURES) ---
+            # Your "Red Pill" logic relies on Taker Buy Volume, which is only
+            # accurate in Futures data. "SPOT" data causes the 0% confidence bug.
+            market_type = body.get("market_type", "PERP")
 
             # Fetch Data
             df = MarketService.get_historical_data(symbol, market_type, trade_style)
@@ -41,7 +43,7 @@ class AnalyzeCryptoView(APIView):
             engine = CryptoQuantEngine()
             res = engine.analyze(df, trade_style)
 
-            # Volatility Filter
+            # Volatility Filter (Safety Valve)
             if trade_style == "SCALP":
                 last_open = float(df['open'].iloc[-1])
                 last_close = float(df['close'].iloc[-1])
@@ -93,7 +95,9 @@ class BacktestCryptoView(APIView):
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper()
             if not symbol.endswith("USDT"): symbol += "USDT"
-            market_type = body.get("market_type", "SPOT")
+
+            # FIX: Backtest should also use PERP by default for consistency
+            market_type = body.get("market_type", "PERP")
             trade_style = body.get("trade_style", "INTRADAY")
 
             df = MarketService.get_historical_data(symbol, market_type, trade_style="INTRADAY")

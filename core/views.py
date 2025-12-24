@@ -434,7 +434,10 @@ def cron_scan_trigger(request, secret_key):
         engine = CryptoQuantEngine()
 
         for symbol in watchlist:
-            df = MarketService.get_historical_data(symbol, "AUTO", "INTRADAY")
+            # CHANGE "AUTO" -> "PERP" here
+            # This ensures the Discord Bot sees the exact same Futures data as your Terminal
+            df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
+
             if df is None or df.empty: continue
 
             res = engine.analyze(df, "INTRADAY")

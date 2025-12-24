@@ -148,7 +148,7 @@ class MarketService:
             final_df = df[cols]
 
             # OPTIONAL caching
-            cache.set(f"kline_v25:{symbol}:{interval}:{market_type}",
+            cache.set(f"kline_v26:{symbol}:{interval}:{market_type}",
                       final_df, timeout=300)
 
             return final_df
