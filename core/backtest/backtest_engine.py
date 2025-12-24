@@ -1,5 +1,3 @@
-import pandas as pd
-import numpy as np
 import xgboost as xgb
 import lightgbm as lgb
 from catboost import CatBoostClassifier
@@ -18,16 +16,11 @@ class CryptoBacktestEngine:
         self.trades = []
         self.models = {}
 
-        # --- PATH FIX: Relative to this file ---
-        # Current: core/backtest/backtest_engine.py
-        # Goal:    core/quant/ml_models
-
+        # --- PATH FIX ---
         try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))  # core/backtest
-            core_dir = os.path.dirname(current_dir)  # core
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            core_dir = os.path.dirname(current_dir)
             self.MODEL_DIR = os.path.join(core_dir, "quant", "ml_models")
-
-            print(f"🔍 Backtest Engine looking for models in: {self.MODEL_DIR}")
         except Exception as e:
             log.error(f"Path Error: {e}")
             self.MODEL_DIR = ""
@@ -45,14 +38,11 @@ class CryptoBacktestEngine:
     def _load_models(self):
         try:
             if not os.path.exists(self.MODEL_DIR):
-                print(f"❌ Model Directory Missing: {self.MODEL_DIR}")
                 return
 
             if os.path.exists(self.PATHS['xgb_long']):
                 self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
                 self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
-            else:
-                print("⚠️ XGBoost Models missing in backtest")
 
             if os.path.exists(self.PATHS['lgb_long']):
                 self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
@@ -66,13 +56,10 @@ class CryptoBacktestEngine:
 
         except Exception as e:
             log.error(f"Backtest Model Load Error: {e}")
-            print(f"❌ Backtest Model Exception: {e}")
 
     def run(self, trade_style="INTRADAY"):
-        # CRASH PROTECTION START
         try:
             if self.df is None or self.df.empty:
-                print("❌ Backtest received empty DataFrame")
                 return self._empty_result()
 
             # 1. Feature Engineering
@@ -80,61 +67,59 @@ class CryptoBacktestEngine:
                 df = generate_features(self.df.copy())
             except Exception as e:
                 print(f"❌ Feature Engineering Failed: {e}")
-                traceback.print_exc()
                 return self._empty_result()
 
             if not self.models or 'xgb_long' not in self.models:
-                print("❌ Models not loaded, skipping predictions")
                 return self._empty_result()
 
-            # 2. Config
-            min_conf = 65.0
+            # 2. Config & Multipliers
             stop_mult = 2.0
             tgt_mult = 3.0
             if trade_style == "SCALP": stop_mult, tgt_mult = 1.0, 1.5
             if trade_style == "SWING": stop_mult, tgt_mult = 2.5, 4.0
 
-            # 3. Batch Predict
+            # 3. Batch Predict (Raw Intelligence)
             try:
                 X = df[FEATURES].astype(float)
                 dmat = xgb.DMatrix(X)
                 xl = self.models['xgb_long'].predict(dmat)
                 xs = self.models['xgb_short'].predict(dmat)
 
-                # Check if other models exist before predicting
                 if 'lgb_long' in self.models:
                     ll = self.models['lgb_long'].predict(X)
                     ls = self.models['lgb_short'].predict(X)
                 else:
-                    ll, ls = xl, xs  # Fallback
+                    ll, ls = xl, xs
 
                 if 'cat_long' in self.models:
                     cl = self.models['cat_long'].predict_proba(X)[:, 1]
                     cs = self.models['cat_short'].predict_proba(X)[:, 1]
                 else:
-                    cl, cs = xl, xs  # Fallback
+                    cl, cs = xl, xs
 
                 df['ens_long'] = ((xl + ll + cl) / 3) * 100
                 df['ens_short'] = ((xs + ls + cs) / 3) * 100
 
             except Exception as e:
                 print(f"❌ Prediction Error: {e}")
-                traceback.print_exc()
                 return self._empty_result()
 
-            # 4. Simulation Loop
+            # 4. Simulation Loop (THE CASINO LOGIC)
             position = None
             entry_price = 0
             stop_loss = 0
             take_profit = 0
+            trades = []
 
+            # Start after rolling windows (50)
             start_idx = 50
+
             for i in range(start_idx, len(df)):
                 curr = df.iloc[i]
                 price = curr['close']
                 atr = curr.get('atr_14', price * 0.01)
 
-                # Exit Logic
+                # --- EXIT LOGIC ---
                 if position:
                     res = None
                     pnl = 0
@@ -154,22 +139,59 @@ class CryptoBacktestEngine:
                         position = None
                         continue
 
-                # Entry Logic
+                # --- ENTRY LOGIC (THE HOUSE RULES) ---
                 if not position:
+                    # 1. Get Raw Scores
                     p_l = curr.get('ens_long', 0)
                     p_s = curr.get('ens_short', 0)
-                    ema_20 = curr.get('ema_20', 0)
-                    ema_50 = curr.get('ema_50', 0)
 
-                    is_uptrend = (price > ema_20) and (ema_20 > ema_50)
-                    is_downtrend = (price < ema_20) and (ema_20 < ema_50)
+                    # 2. Get Context (The Filter)
+                    rsi = curr.get('rsi_14', 50)
+                    vwap_dist = curr.get('vwap_dist', 0)
+                    liq_sweep = curr.get('liq_sweep', 0)
+                    cvd_div = curr.get('cvd_divergence', 0)
 
-                    if p_l > min_conf and is_uptrend:
+                    # 3. Apply "House Rules"
+                    bias = "HOLD"
+                    CONF_THRESH = 65.0  # Base Threshold
+
+                    # --- LONG ---
+                    if p_l > CONF_THRESH:
+                        # Rule A: Don't Buy Top
+                        if rsi < 70:
+                            # Rule B: Value Check (Or Momentum Override)
+                            if vwap_dist < 0.02:
+                                # BONUS: Trap Boost
+                                score = p_l
+                                if liq_sweep == 1: score += 5
+                                if cvd_div == 1: score += 5
+
+                                # Final Trigger
+                                if score >= CONF_THRESH:
+                                    bias = "LONG"
+
+                    # --- SHORT ---
+                    elif p_s > CONF_THRESH:
+                        # Rule A: Don't Short Bottom
+                        if rsi > 30:
+                            # Rule B: Value Check
+                            if vwap_dist > -0.02:
+                                # BONUS: Trap Boost
+                                score = p_s
+                                if liq_sweep == -1: score += 5
+                                if cvd_div == -1: score += 5
+
+                                # Final Trigger
+                                if score >= CONF_THRESH:
+                                    bias = "SHORT"
+
+                    # Execute
+                    if bias == 'LONG':
                         position = 'LONG'
                         entry_price = price
                         stop_loss = price - (atr * stop_mult)
                         take_profit = price + (atr * tgt_mult)
-                    elif p_s > min_conf and is_downtrend:
+                    elif bias == 'SHORT':
                         position = 'SHORT'
                         entry_price = price
                         stop_loss = price + (atr * stop_mult)
@@ -188,7 +210,6 @@ class CryptoBacktestEngine:
         wins = [t for t in self.trades if t['result'] == 'WIN']
         wr = (len(wins) / total * 100)
 
-        net_pnl_sum = sum(t['pnl'] for t in self.trades)
         loss_sum = abs(sum(t['pnl'] for t in self.trades if t['pnl'] < 0))
         pf = (sum(t['pnl'] for t in wins) / loss_sum) if loss_sum > 0 else 10.0
 
