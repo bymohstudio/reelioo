@@ -19,23 +19,28 @@ class MarketService:
     # -------------------------
     @staticmethod
     def _load_exchange_info():
-        cache_key = "exchange_info_v1"
+        # CHANGE KEY TO FORCE REFRESH
+        cache_key = "exchange_info_v2_csv"
         cached = cache.get(cache_key)
         if cached: return cached
 
         results = []
-        # Look for the CSV in the project base directory
+        # Construct path
         global_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
+
+        # DEBUG PRINT: Check where the server is actually looking
+        print(f"📂 Looking for CSV at: {global_path}")
 
         # 1. Try Loading from local CSV
         if os.path.exists(global_path):
             try:
-                # Load symbols from CSV for fast suggestion
                 df_csv = pd.read_csv(global_path)
                 results = df_csv.to_dict("records")
-                log.info(f"Loaded {len(results)} symbols from local CSV.")
+                print(f"✅ Loaded {len(results)} symbols from CSV")
             except Exception as e:
                 log.error(f"Error reading Global CSV: {e}")
+        else:
+            print("❌ CSV File not found at path.")
 
         # 2. Fallback to live API if results are still empty
         if not results:
