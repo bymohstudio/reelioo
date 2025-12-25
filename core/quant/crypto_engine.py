@@ -17,7 +17,6 @@ class CryptoQuantEngine:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
 
-    # (Keep your PATHS dict and _load_models method exactly the same)
     PATHS = {
         "xgb_long": os.path.join(MODEL_DIR, "xgb_long.json"),
         "xgb_short": os.path.join(MODEL_DIR, "xgb_short.json"),
@@ -32,17 +31,33 @@ class CryptoQuantEngine:
 
     def _load_models(self):
         if self.models: return self.models
+
+        # 1. Load XGBoost (Independent Try/Catch)
         try:
-            self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
-            self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
-            self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
-            self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
-            self.models['cat_long'] = CatBoostClassifier()
-            self.models['cat_long'].load_model(self.PATHS['cat_long'])
-            self.models['cat_short'] = CatBoostClassifier()
-            self.models['cat_short'].load_model(self.PATHS['cat_short'])
+            if os.path.exists(self.PATHS['xgb_long']):
+                self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
+                self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
         except Exception as e:
-            pass  # Silent fail if models missing
+            log.error(f"XGB Load Error: {e}")
+
+        # 2. Load LightGBM (Independent Try/Catch)
+        try:
+            if os.path.exists(self.PATHS['lgb_long']):
+                self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
+                self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
+        except Exception as e:
+            log.error(f"LGB Load Error: {e}")
+
+        # 3. Load CatBoost (Independent Try/Catch)
+        try:
+            if os.path.exists(self.PATHS['cat_long']):
+                self.models['cat_long'] = CatBoostClassifier()
+                self.models['cat_long'].load_model(self.PATHS['cat_long'])
+                self.models['cat_short'] = CatBoostClassifier()
+                self.models['cat_short'].load_model(self.PATHS['cat_short'])
+        except Exception as e:
+            log.error(f"CatBoost Load Error: {e}")
+
         return self.models
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY"):
@@ -53,23 +68,42 @@ class CryptoQuantEngine:
         row_df = pd.DataFrame([last])[FEATURES].astype(float)
 
         models = self._load_models()
+
+        # If absolutely no models loaded, return neutral
         if not models:
             return self._neutral_result(last['close'], "System Booting")
 
-        # 1. GET RAW PROBABILITIES (The "Math")
-        pL, pS = 0.0, 0.0
-        try:
-            dmat = xgb.DMatrix(row_df)
-            pL = (float(models['xgb_long'].predict(dmat)[0]) +
-                  float(models['lgb_long'].predict(row_df)[0]) +
-                  float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
+        # 1. GET RAW PROBABILITIES (Safe Prediction Logic)
+        pL_vals = []
+        pS_vals = []
 
-            pS = (float(models['xgb_short'].predict(dmat)[0]) +
-                  float(models['lgb_short'].predict(row_df)[0]) +
-                  float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
+        try:
+            # XGBoost Prediction
+            if 'xgb_long' in models and 'xgb_short' in models:
+                dmat = xgb.DMatrix(row_df)
+                pL_vals.append(float(models['xgb_long'].predict(dmat)[0]))
+                pS_vals.append(float(models['xgb_short'].predict(dmat)[0]))
+
+            # LightGBM Prediction
+            if 'lgb_long' in models and 'lgb_short' in models:
+                pL_vals.append(float(models['lgb_long'].predict(row_df)[0]))
+                pS_vals.append(float(models['lgb_short'].predict(row_df)[0]))
+
+            # CatBoost Prediction
+            if 'cat_long' in models and 'cat_short' in models:
+                pL_vals.append(float(models['cat_long'].predict_proba(row_df)[0][1]))
+                pS_vals.append(float(models['cat_short'].predict_proba(row_df)[0][1]))
+
+            # Calculate Averages (Ensemble)
+            if not pL_vals:
+                return self._neutral_result(last['close'], "Model Error")
+
+            pL = (sum(pL_vals) / len(pL_vals)) * 100
+            pS = (sum(pS_vals) / len(pS_vals)) * 100
+
         except Exception as e:
-            log.error(f"Prediction Error: {e}")
-            return self._neutral_result(last['close'], "Model Error")
+            log.error(f"Prediction Calculation Error: {e}")
+            return self._neutral_result(last['close'], "Calc Error")
 
         # 2. THE CASINO "HOUSE RULES" (Tier 4 Execution Logic)
 

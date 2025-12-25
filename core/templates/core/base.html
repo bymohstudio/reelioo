@@ -9,23 +9,27 @@
 
     <title>{% block title %}Reelioo | Institutional Crypto Quant Terminal & Whale Tracker{% endblock %}</title>
 
-    <meta name="description" content="Stop trading on noise. Reelioo is the institutional-grade crypto scanner that decodes Whale Order Flow, Dark Pool Liquidity, and Volatility Regimes using AI. Start your 21-day free trial.">
+    <meta name="description"
+          content="Stop trading on noise. Reelioo is the institutional-grade crypto scanner that decodes Whale Order Flow, Dark Pool Liquidity, and Volatility Regimes using AI. Start your 21-day free trial.">
 
     <link rel="canonical" href="https://reelioo.app/">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 
-    <meta name="keywords" content="crypto quant terminal, bitcoin order flow, whale alert scanner, binance volatility analysis, ai trading signals, crypto screener, dark pool tracker, reelioo, institutional trading tools">
+    <meta name="keywords"
+          content="crypto quant terminal, bitcoin order flow, whale alert scanner, binance volatility analysis, ai trading signals, crypto screener, dark pool tracker, reelioo, institutional trading tools">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Reelioo Intelligence">
     <meta property="og:url" content="https://reelioo.app/">
     <meta property="og:title" content="Reelioo | Decode Smart Money Order Flow">
-    <meta property="og:description" content="The unfair advantage for retail traders. See where Whales are buying before the chart moves. Powered by Neural Networks.">
+    <meta property="og:description"
+          content="The unfair advantage for retail traders. See where Whales are buying before the chart moves. Powered by Neural Networks.">
     <meta property="og:image" content="https://reelioo.app/static/og-social-card.jpg">
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Reelioo | Institutional Quant Terminal">
-    <meta name="twitter:description" content="Don't guess. Quantify. Access the same volatility vectors used by hedge funds.">
+    <meta name="twitter:description"
+          content="Don't guess. Quantify. Access the same volatility vectors used by hedge funds.">
     <meta name="twitter:image" content="https://reelioo.app/static/og-social-card.jpg">
 
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'apple-touch-icon.png' %}">
@@ -39,43 +43,44 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap"
+          rel="stylesheet">
 
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Reelioo Quant Terminal",
-      "operatingSystem": "Web Browser",
-      "applicationCategory": "FinanceApplication",
-      "offers": {
-        "@type": "Offer",
-        "price": "19.00",
-        "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.8",
-        "ratingCount": "120"
-      },
-      "description": "Institutional-grade crypto analysis terminal powered by AI and whale order flow tracking.",
-      "featureList": "Whale Alerts, Volatility Analysis, AI Sentiment, Dark Pool Tracking"
-    }
+        {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "Reelioo Quant Terminal",
+            "operatingSystem": "Web Browser",
+            "applicationCategory": "FinanceApplication",
+            "offers": {
+                "@type": "Offer",
+                "price": "19.00",
+                "priceCurrency": "USD",
+                "priceValidUntil": "2025-12-31"
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.8",
+                "ratingCount": "120"
+            },
+            "description": "Institutional-grade crypto analysis terminal powered by AI and whale order flow tracking.",
+            "featureList": "Whale Alerts, Volatility Analysis, AI Sentiment, Dark Pool Tracking"
+        }
     </script>
 
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Reelioo",
-      "url": "https://reelioo.app",
-      "logo": "https://reelioo.app/static/favicon.png",
-      "sameAs": [
-        "https://twitter.com/reelioo",
-        "https://linkedin.com/company/reelioo"
-      ]
-    }
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Reelioo",
+            "url": "https://reelioo.app",
+            "logo": "https://reelioo.app/static/favicon.png",
+            "sameAs": [
+                "https://twitter.com/reelioo",
+                "https://linkedin.com/company/reelioo"
+            ]
+        }
     </script>
 
     <style>
@@ -90,167 +95,208 @@
 
 <body class="text-slate-400 font-mono antialiased min-h-screen flex flex-col selection:bg-blue-500/30 selection:text-white">
 
-    <nav class="border-b border-white/5 bg-black/90 backdrop-blur-xl sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6">
-            <div class="h-20 flex items-center justify-between">
+<nav class="border-b border-white/5 bg-black/90 backdrop-blur-xl sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="h-20 flex items-center justify-between">
 
-                <a href="/" class="flex items-center gap-3 group select-none z-50">
-                    <span class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">REEL<span class="text-blue-500">IOO</span></span>
-                    <div class="w-1.5 h-5 bg-blue-500 cursor-blink"></div>
+            <a href="/" class="flex items-center gap-3 group select-none z-50">
+                <span class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">REEL<span
+                        class="text-blue-500">IOO</span></span>
+                <div class="w-1.5 h-5 bg-blue-500 cursor-blink"></div>
+            </a>
+
+            <div class="hidden md:flex items-center gap-6">
+                {% if user.is_authenticated %}
+
+
+                <a href="{% url 'terminal' %}"
+                   class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
+                    <i data-lucide="layout-grid" class="w-3 h-3"></i> Terminal
                 </a>
 
-                <div class="hidden md:flex items-center gap-6">
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'terminal' %}" class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
-                            <i data-lucide="layout-grid" class="w-3 h-3"></i> Terminal
-                        </a>
+                <a href="{% url 'journal' %}"
+                   class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
+                    <i data-lucide="book" class="w-3 h-3"></i> Journal
+                </a>
 
-                        <a href="{% url 'journal' %}" class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
-                            <i data-lucide="book" class="w-3 h-3"></i> Journal
-                        </a>
+                <a href="{% url 'settings' %}"
+                   class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
+                    <i data-lucide="settings" class="w-3 h-3"></i> Settings
+                </a>
 
-                        <a href="{% url 'settings' %}" class="text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest transition flex items-center gap-2">
-                            <i data-lucide="settings" class="w-3 h-3"></i> Settings
-                        </a>
+                {% if not user.profile.is_premium %}
+                <a href="{% url 'pricing' %}"
+                   class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition">
+                    Upgrade
+                </a>
+                {% endif %}
 
-                        {% if not user.profile.is_premium %}
-                            <a href="{% url 'pricing' %}" class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition">
-                                Upgrade
-                            </a>
-                        {% endif %}
+                <a href="https://discord.gg/csVPpg6mFD" target="_blank"
+                   class="flex items-center gap-2 bg-[#5865F2] hover:bg-[#4752C4] text-white px-3 py-2 rounded-lg transition-all shadow-[0_0_15px_rgba(88,101,242,0.3)] hover:shadow-[0_0_25px_rgba(88,101,242,0.5)] transform hover:-translate-y-0.5 group">
+                    <svg class="w-4 h-4 fill-current" viewBox="0 0 127.14 96.36">
+                        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
+                    </svg>
+                    <span class="text-[10px] font-bold uppercase tracking-widest hidden lg:inline">Signal Alerts</span>
+                </a>
 
-                        <form action="{% url 'logout' %}" method="post" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="w-full py-2 px-5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-widest transition shadow-lg shadow-red-900/20 flex items-center justify-center gap-2">
-                            <i data-lucide="log-out" class="w-4 h-4"></i>Logout</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log In</a>
-                        <a href="{% url 'signup' %}" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5">
-                            Start Trial
-                        </a>
-                    {% endif %}
-                </div>
-
-                <button id="mobile-menu-btn" class="md:hidden text-slate-300 hover:text-white focus:outline-none z-50">
-                    <i data-lucide="menu" class="w-6 h-6"></i>
-                </button>
-            </div>
-        </div>
-
-        <div id="mobile-menu" class="md:hidden bg-[#0a0a0a] border-b border-white/5 absolute w-full left-0 top-full shadow-2xl">
-            <div class="px-6 py-8 flex flex-col gap-6 text-center">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'terminal' %}" class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
-                        <i data-lucide="layout-grid" class="w-4 h-4"></i> Terminal
-                    </a>
-                    <a href="{% url 'journal' %}" class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
-                        <i data-lucide="book" class="w-4 h-4"></i> Journal
-                    </a>
-                    <a href="{% url 'settings' %}" class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
-                        <i data-lucide="settings" class="w-4 h-4"></i> Settings
-                    </a>
-
-                    {% if not user.profile.is_premium %}
-                        <a href="{% url 'pricing' %}" class="text-sm font-bold text-emerald-400 uppercase tracking-widest">Upgrade Plan</a>
-                    {% endif %}
-
-                    <form action="{% url 'logout' %}" method="post" class="w-full">
-                        {% csrf_token %}
-                        <button type="submit" class="text-sm font-bold text-red-400 uppercase tracking-widest hover:text-red-300 transition w-full">Logout</button>
-                    </form>
+                <form action="{% url 'logout' %}" method="post" class="inline">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="w-full py-2 px-5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-widest transition shadow-lg shadow-red-900/20 flex items-center justify-center gap-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>Logout
+                    </button>
+                </form>
                 {% else %}
-                    <a href="{% url 'login' %}" class="text-sm font-bold text-slate-300 uppercase tracking-widest hover:text-white transition">Log In</a>
-                    <a href="{% url 'signup' %}" class="bg-blue-600 text-white text-sm font-bold px-6 py-3 rounded-lg uppercase tracking-widest shadow-lg">
-                        Start 21-Day Trial
-                    </a>
+                <a href="{% url 'login' %}"
+                   class="text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log
+                    In</a>
+                <a href="{% url 'signup' %}"
+                   class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5">
+                    Start Trial
+                </a>
                 {% endif %}
             </div>
+
+            <button id="mobile-menu-btn" class="md:hidden text-slate-300 hover:text-white focus:outline-none z-50">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
         </div>
-    </nav>
+    </div>
 
-    <main class="flex-grow w-full relative">
-        {% if messages %}
-            <div class="max-w-2xl mx-auto pt-6 px-4 absolute top-0 left-0 right-0 z-40 pointer-events-none">
-                {% for message in messages %}
-                    <div class="pointer-events-auto p-3 mb-3 text-xs font-bold text-center rounded border shadow-xl backdrop-blur-md animate-fade-in
+    <div id="mobile-menu"
+         class="md:hidden bg-[#0a0a0a] border-b border-white/5 absolute w-full left-0 top-full shadow-2xl">
+        <div class="px-6 py-8 flex flex-col gap-6 text-center">
+            {% if user.is_authenticated %}
+
+
+
+            <a href="{% url 'terminal' %}"
+               class="mt-5 text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i> Terminal
+            </a>
+            <a href="{% url 'journal' %}"
+               class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
+                <i data-lucide="book" class="w-4 h-4"></i> Journal
+            </a>
+            <a href="{% url 'settings' %}"
+               class="text-sm font-bold text-slate-400 uppercase tracking-widest hover:text-white transition flex items-center justify-center gap-2">
+                <i data-lucide="settings" class="w-4 h-4"></i> Settings
+            </a>
+
+            {% if not user.profile.is_premium %}
+            <a href="{% url 'pricing' %}" class="text-sm font-bold text-emerald-400 uppercase tracking-widest">Upgrade
+                Plan</a>
+            {% endif %}
+
+            <form action="{% url 'logout' %}" method="post" class="w-full">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-sm font-bold text-red-400 uppercase tracking-widest hover:text-red-300 transition w-full">
+                    Logout
+                </button>
+            </form>
+            <a href="https://discord.gg/csVPpg6mFD" target="_blank"
+               class="flex items-center justify-center gap-2 bg-[#5865F2] text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 127.14 96.36">
+                    <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
+                </svg>
+                Join Signals
+            </a>
+            {% else %}
+            <a href="{% url 'login' %}"
+               class="text-sm font-bold text-slate-300 uppercase tracking-widest hover:text-white transition">Log In</a>
+            <a href="{% url 'signup' %}"
+               class="bg-blue-600 text-white text-sm font-bold px-6 py-3 rounded-lg uppercase tracking-widest shadow-lg">
+                Start 21-Day Trial
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<main class="flex-grow w-full relative">
+    {% if messages %}
+    <div class="max-w-2xl mx-auto pt-6 px-4 absolute top-0 left-0 right-0 z-40 pointer-events-none">
+        {% for message in messages %}
+        <div class="pointer-events-auto p-3 mb-3 text-xs font-bold text-center rounded border shadow-xl backdrop-blur-md animate-fade-in
                         {% if message.tags == 'success' %}bg-emerald-900/40 border-emerald-500/30 text-emerald-400{% else %}bg-red-900/40 border-red-500/30 text-red-400{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-        {% block content %}{% endblock %}
-    </main>
+    {% block content %}{% endblock %}
+</main>
 
-    <footer class="border-t border-white/5 bg-black pt-16 pb-10 z-10 relative mt-auto">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 text-center md:text-left">
-                <div class="col-span-1 md:col-span-1 space-y-4">
-                    <span class="text-xl font-black text-white">REELIOO</span>
-                    <p class="text-[10px] text-slate-500 leading-relaxed mx-auto md:mx-0 max-w-[200px]">
-                        The quantitative edge for retail traders. Built on institutional-grade data vectors.
-                    </p>
-                </div>
-                <div>
-                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Product</h4>
-                    <ul class="space-y-2 text-[11px] text-slate-500">
-                        <li><a href="{% url 'terminal' %}" class="hover:text-blue-400 transition">Terminal</a></li>
-                        <li><a href="{% url 'plans' %}" class="hover:text-blue-400 transition">Pricing</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Legal</h4>
-                    <ul class="space-y-2 text-[11px] text-slate-500">
-                        <li><a href="{% url 'terms' %}" class="hover:text-white transition">Terms of Service</a></li>
-                        <li><a href="{% url 'privacy' %}" class="hover:text-white transition">Privacy Policy</a></li>
-                        <li><a href="{% url 'refund' %}" class="hover:text-white transition">Refund Policy</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Support</h4>
-                    <a href="{% url 'contact' %}" class="flex items-center justify-center md:justify-start gap-2 bg-[#111] border border-white/10 hover:border-blue-500/50 hover:text-white text-slate-400 px-4 py-3 rounded-lg transition-all group w-fit mx-auto md:mx-0">
-                        <div class="p-1.5 bg-white/5 rounded-md group-hover:bg-blue-500/20 transition">
-                            <i data-lucide="mail" class="w-3 h-3 group-hover:text-blue-400"></i>
-                        </div>
-                        <span class="text-[10px] font-bold uppercase tracking-widest">Contact Us</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="border-t border-white/5 pt-8 text-[10px] text-slate-600 text-center flex flex-col gap-2">
-                <p>&copy; 2025 REELIOO.</p>
-                <p class="text-[9px] text-slate-300/90 max-w-xl mx-auto px-4 leading-relaxed font-medium">
-                    <strong>⚠️ RISK DISCLOSURE:</strong> Reelioo is a data analytics tool, not a financial advisor.
-                    Content is for educational purposes only. Trading involves high risk;
-                    <strong class="text-orange-400">you are solely responsible for your trades and losses.</strong>
-                    We do not accept liability for any financial decisions.
+<footer class="border-t border-white/5 bg-black pt-16 pb-10 z-10 relative mt-auto">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12 text-center md:text-left">
+            <div class="col-span-1 md:col-span-1 space-y-4">
+                <span class="text-xl font-black text-white">REELIOO</span>
+                <p class="text-[10px] text-slate-500 leading-relaxed mx-auto md:mx-0 max-w-[200px]">
+                    The quantitative edge for retail traders. Built on institutional-grade data vectors.
                 </p>
             </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Product</h4>
+                <ul class="space-y-2 text-[11px] text-slate-500">
+                    <li><a href="{% url 'terminal' %}" class="hover:text-blue-400 transition">Terminal</a></li>
+                    <li><a href="{% url 'plans' %}" class="hover:text-blue-400 transition">Pricing</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Legal</h4>
+                <ul class="space-y-2 text-[11px] text-slate-500">
+                    <li><a href="{% url 'terms' %}" class="hover:text-white transition">Terms of Service</a></li>
+                    <li><a href="{% url 'privacy' %}" class="hover:text-white transition">Privacy Policy</a></li>
+                    <li><a href="{% url 'refund' %}" class="hover:text-white transition">Refund Policy</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Support</h4>
+                <a href="{% url 'contact' %}"
+                   class="flex items-center justify-center md:justify-start gap-2 bg-[#111] border border-white/10 hover:border-blue-500/50 hover:text-white text-slate-400 px-4 py-3 rounded-lg transition-all group w-fit mx-auto md:mx-0">
+                    <div class="p-1.5 bg-white/5 rounded-md group-hover:bg-blue-500/20 transition">
+                        <i data-lucide="mail" class="w-3 h-3 group-hover:text-blue-400"></i>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Contact Us</span>
+                </a>
+            </div>
         </div>
-    </footer>
 
-    <script>
-        if (window.lucide) lucide.createIcons();
+        <div class="border-t border-white/5 pt-8 text-[10px] text-slate-600 text-center flex flex-col gap-2">
+            <p>&copy; 2025 REELIOO.</p>
+            <p class="text-[9px] text-slate-300/90 max-w-xl mx-auto px-4 leading-relaxed font-medium">
+                <strong>⚠️ RISK DISCLOSURE:</strong> Reelioo is a data analytics tool, not a financial advisor.
+                Content is for educational purposes only. Trading involves high risk;
+                <strong class="text-orange-400">you are solely responsible for your trades and losses.</strong>
+                We do not accept liability for any financial decisions.
+            </p>
+        </div>
+    </div>
+</footer>
 
-        // Mobile Menu Logic
-        const btn = document.getElementById('mobile-menu-btn');
-        const menu = document.getElementById('mobile-menu');
+<script>
+    if (window.lucide) lucide.createIcons();
 
-        if(btn && menu) {
-            btn.addEventListener('click', () => {
-                menu.classList.toggle('open');
+    // Mobile Menu Logic
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
 
-                // Toggle Icon (Menu <-> X)
-                const isOpen = menu.classList.contains('open');
-                btn.innerHTML = isOpen
-                    ? '<i data-lucide="x" class="w-6 h-6"></i>'
-                    : '<i data-lucide="menu" class="w-6 h-6"></i>';
+    if(btn && menu) {
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('open');
 
-                if (window.lucide) lucide.createIcons();
-            });
-        }
-    </script>
+            // Toggle Icon (Menu <-> X)
+            const isOpen = menu.classList.contains('open');
+            btn.innerHTML = isOpen
+                ? '<i data-lucide="x" class="w-6 h-6"></i>'
+                : '<i data-lucide="menu" class="w-6 h-6"></i>';
+
+            if (window.lucide) lucide.createIcons();
+        });
+    }
+</script>
 </body>
 </html>
