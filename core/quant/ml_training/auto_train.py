@@ -1,15 +1,30 @@
 import os
+import sys
+import django
+import json
+import warnings
+
+# --- 1. SETUP DJANGO ENVIRONMENT ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+sys.path.append(project_root)
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reelioo.settings')
+django.setup()
+
+# --- 2. IMPORTS ---
 import pandas as pd
 import numpy as np
 import xgboost as xgb
 import lightgbm as lgb
-from catboost import CatBoostClassifier, Pool
-import requests
-import json
-import time
-from datetime import datetime, timedelta
-from sklearn.metrics import precision_score
+from catboost import CatBoostClassifier
+from sklearn.metrics import precision_score, roc_auc_score
+from datetime import datetime
+
 from core.quant.ml_training.feature_engineering import generate_features, generate_targets, FEATURES
+from core.quant.ml_training.training_data_loader import TrainingDataLoader
+
+warnings.filterwarnings("ignore")
 
 # CONFIG
 SYMBOLS = [
@@ -18,10 +33,9 @@ SYMBOLS = [
     "NEARUSDT", "APTUSDT", "INJUSDT", "RNDRUSDT", "FETUSDT"
 ]
 INTERVAL = "1h"
-LOOKBACK_DAYS = 500
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(BASE_DIR, "..", "ml_models")
+MODEL_DIR = os.path.join(os.path.dirname(BASE_DIR), "ml_models")
 META_PATH = os.path.join(MODEL_DIR, "edge_meta.json")
 
 if not os.path.exists(MODEL_DIR): os.makedirs(MODEL_DIR)
@@ -30,137 +44,190 @@ if not os.path.exists(MODEL_DIR): os.makedirs(MODEL_DIR)
 class DeepDataLoader:
     @staticmethod
     def fetch(symbol):
-        print(f"   ⬇️  Fetching {symbol}...")
-        start_ts = int((datetime.now() - timedelta(days=LOOKBACK_DAYS)).timestamp() * 1000)
-        url = "https://fapi.binance.com/fapi/v1/klines"
-        data = []
-        current = start_ts
-        now = int(time.time() * 1000)
-
-        while current < now:
-            try:
-                params = {"symbol": symbol, "interval": INTERVAL, "startTime": current, "limit": 1000}
-                res = requests.get(url, params=params, timeout=5).json()
-                if not isinstance(res, list) or len(res) == 0: break
-                data.extend(res)
-                current = res[-1][6] + 1
-                time.sleep(0.05)
-            except:
-                break
-
-        if not data: return pd.DataFrame()
-        # Ensure we get Taker Buy Volume (Index 9)
-        df = pd.DataFrame(data).iloc[:, [0, 1, 2, 3, 4, 5, 9]]
-        df.columns = ["ts", "open", "high", "low", "close", "volume", "taker_base"]
-        df = df.astype(float)
+        df = TrainingDataLoader.fetch_deep_history(symbol, limit=50000)
+        if df.empty: return None
         return df
 
 
-def train_xgboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
-    print(f"   🚀 Training XGBoost ({name})...")
+def train_xgboost(X_train, y_train, X_test, y_test, label, scale_pos_weight):
+    print(f"   🚀 XGBoost ({label}) on RTX 4060...")
+
+    # Optimized for Asymmetric Targets
     params = {
-        "objective": "binary:logistic", "eval_metric": "auc", "max_depth": 6,
-        "eta": 0.02, "subsample": 0.8, "colsample_bytree": 0.8,
-        "scale_pos_weight": scale_pos_weight, "min_child_weight": 3, "nthread": 4
+        'objective': 'binary:logistic',
+        'eval_metric': 'auc',
+        'max_depth': 10,
+        'learning_rate': 0.015 if label == "LONG" else 0.02,  # Shorts learn faster
+        'n_estimators': 4000,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'scale_pos_weight': scale_pos_weight,
+        'min_child_weight': 5,
+        'tree_method': 'hist',
+        'device': 'cuda',  # GPU
+        'gamma': 0.5,
+        'alpha': 0.5,
+        'lambda': 1.0,
+        'early_stopping_rounds': 150
     }
-    dtrain = xgb.DMatrix(X_train, label=y_train)
-    dtest = xgb.DMatrix(X_test, label=y_test)
-    model = xgb.train(params, dtrain, num_boost_round=1000, evals=[(dtest, "Test")],
-                      early_stopping_rounds=50, verbose_eval=False)
-    model.save_model(os.path.join(MODEL_DIR, f"xgb_{name.lower()}.json"))
+
+    model = xgb.XGBClassifier(**params)
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+    model.save_model(os.path.join(MODEL_DIR, f"xgb_{label.lower()}.json"))
     return model
 
 
-def train_lightgbm(X_train, y_train, X_test, y_test, name, scale_pos_weight):
-    print(f"   🍃 Training LightGBM ({name})...")
-    dtrain = lgb.Dataset(X_train, label=y_train)
-    dtest = lgb.Dataset(X_test, label=y_test, reference=dtrain)
+def train_lightgbm(X_train, y_train, X_test, y_test, label, scale_pos_weight):
+    print(f"   🍃 LightGBM ({label}) - CPU Optimized...")
+
     params = {
-        "objective": "binary", "metric": "auc", "boosting_type": "gbdt",
-        "num_leaves": 31, "learning_rate": 0.03, "feature_fraction": 0.9,
-        "bagging_fraction": 0.8, "bagging_freq": 5, "scale_pos_weight": scale_pos_weight,
-        "verbose": -1, "nthread": 4
+        'objective': 'binary',
+        'metric': 'auc',
+        'boosting_type': 'gbdt',
+        'num_leaves': 80,
+        'learning_rate': 0.02,
+        'feature_fraction': 0.8,
+        'bagging_fraction': 0.8,
+        'bagging_freq': 5,
+        'scale_pos_weight': scale_pos_weight,
+        'min_child_samples': 50,
+        'verbose': -1,
+        'n_estimators': 3000
     }
-    model = lgb.train(params, dtrain, num_boost_round=1000, valid_sets=[dtest],
-                      callbacks=[lgb.early_stopping(50), lgb.log_evaluation(0)])
-    model.save_model(os.path.join(MODEL_DIR, f"lgb_{name.lower()}.txt"))
-    return model
 
-
-def train_catboost(X_train, y_train, X_test, y_test, name, scale_pos_weight):
-    print(f"   🐱 Training CatBoost ({name})...")
-    train_pool = Pool(X_train, y_train)
-    test_pool = Pool(X_test, y_test)
-    model = CatBoostClassifier(
-        iterations=1000, learning_rate=0.03, depth=6, scale_pos_weight=scale_pos_weight,
-        eval_metric='AUC', verbose=0, allow_writing_files=False, thread_count=4
+    model = lgb.LGBMClassifier(**params)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_test, y_test)],
+        eval_metric='auc',
+        callbacks=[lgb.early_stopping(stopping_rounds=150), lgb.log_evaluation(0)]
     )
-    model.fit(train_pool, eval_set=test_pool, early_stopping_rounds=50)
-    model.save_model(os.path.join(MODEL_DIR, f"cat_{name.lower()}.cbm"))
+    model.booster_.save_model(os.path.join(MODEL_DIR, f"lgb_{label.lower()}.txt"))
     return model
 
 
-def evaluate_ensemble(xgb_m, lgb_m, cat_m, X_test, y_test, threshold=0.60):
-    p_xgb = xgb_m.predict(xgb.DMatrix(X_test))
-    p_lgb = lgb_m.predict(X_test)
-    p_cat = cat_m.predict_proba(X_test)[:, 1]
-    avg_prob = (p_xgb + p_lgb + p_cat) / 3.0
-    preds = (avg_prob > threshold).astype(int)
-    return precision_score(y_test, preds, zero_division=0)
+def train_catboost(X_train, y_train, X_test, y_test, label, scale_pos_weight):
+    print(f"   🐱 CatBoost ({label}) on RTX 4060...")
+
+    model = CatBoostClassifier(
+        iterations=4000,
+        depth=10,
+        learning_rate=0.02,
+        loss_function='Logloss',
+        eval_metric='AUC',
+        scale_pos_weight=scale_pos_weight,
+        task_type="GPU",
+        devices='0',
+        verbose=0,
+        early_stopping_rounds=150,
+        l2_leaf_reg=5,
+        border_count=128
+    )
+
+    model.fit(X_train, y_train, eval_set=(X_test, y_test))
+    model.save_model(os.path.join(MODEL_DIR, f"cat_{label.lower()}.cbm"))
+    return model
+
+
+def evaluate_ensemble(xgb_m, lgb_m, cat_m, X_test, y_test):
+    p1 = xgb_m.predict_proba(X_test)[:, 1]
+    p2 = lgb_m.predict_proba(X_test)[:, 1]
+    p3 = cat_m.predict_proba(X_test)[:, 1]
+
+    final_prob = (p1 + p2 + p3) / 3
+
+    print("\n   🎯 SNIPER SCOPE CALIBRATION (Normalized):")
+    print(f"      Avg Prob: {np.mean(final_prob) * 100:.1f}% | Max Prob: {np.max(final_prob) * 100:.1f}%")
+
+    thresholds = [0.60, 0.65, 0.70, 0.75, 0.80]
+    for thresh in thresholds:
+        preds = (final_prob > thresh).astype(int)
+        count = np.sum(preds)
+        if count > 0:
+            prec = precision_score(y_test, preds, zero_division=0)
+            print(f"      > {int(thresh * 100)}% Conf: Win Rate {prec * 100:.1f}%  ({count} trades)")
+        else:
+            print(f"      > {int(thresh * 100)}% Conf: --  (0 trades)")
+
+    return precision_score(y_test, (final_prob > 0.65).astype(int), zero_division=0)
+
+
+def save_metadata():
+    meta_data = {
+        "updated": str(datetime.now()),
+        "features": FEATURES,
+        "note": "RTX 4060 Asymmetric Targets"
+    }
+    with open(META_PATH, 'w') as f:
+        json.dump(meta_data, f)
+    print(f"📝 Metadata updated at: {META_PATH}")
 
 
 def run_training():
-    master_df = []
-    print("⏳ Loading Data...")
+    print("🧹 Filtering for Active Markets...")
+    all_data = []
+
     for sym in SYMBOLS:
         df = DeepDataLoader.fetch(sym)
-        if df.empty: continue
-        df = generate_features(df)
+        if df is None: continue
 
-        # TARGETS: Now detecting VOLATILITY EXPLOSIONS (Regime)
-        df = generate_targets(df, risk_reward=2.0, stop_mult=1.5, candles=12)
-        master_df.append(df)
+        try:
+            df = generate_features(df)
+            # Use Asymmetric Logic (Hardcoded in function now)
+            df = generate_targets(df)
+            df['symbol'] = sym
+            all_data.append(df)
+        except Exception as e:
+            print(f"Error processing {sym}: {e}")
 
-    full_data = pd.concat(master_df).dropna()
+    if not all_data:
+        print("❌ No Data Found.")
+        return
 
-    # We filter for at least mild volatility to train the model on active markets
-    print(f"\n🧹 Filtering for Active Markets... (Original: {len(full_data)})")
+    full_data = pd.concat(all_data)
+    full_data.replace([np.inf, -np.inf], 0, inplace=True)
+    full_data.dropna(inplace=True)
 
-    clean_data = full_data[
-        (full_data['efficiency_ratio'] > 0.05) |
-        (full_data['volatility_slope'] > 0.1)
-        ]
+    if 'volatility_slope' in full_data.columns:
+        full_data = full_data[full_data['volatility_slope'] > 0.05]
 
-    print(f"📊 High-Quality Training Set: {len(clean_data)} Rows")
+    print(f"📊 GPU Training Set: {len(full_data)} Rows")
 
-    split = int(len(clean_data) * 0.85)
-    X = clean_data[FEATURES]
+    X = full_data[FEATURES]
+    split = int(len(X) * 0.85)
 
-    # Train Upside Volatility (Long)
-    y_long = clean_data['target_long']
-    scale_long = min((len(y_long) - y_long.sum()) / (y_long.sum() + 1), 5.0)
+    # --- LONG TRAINING ---
+    y_long = full_data['target_long']
+    pos_count = y_long.sum()
+    scale_long = np.sqrt((len(y_long) - pos_count) / (pos_count + 1)) * 1.5
+
+    print(f"\n⚖️  Class Balance LONG: Scaled to {scale_long:.2f}")
+
     X_train, X_test = X.iloc[:split], X.iloc[split:]
     y_train_l, y_test_l = y_long.iloc[:split], y_long.iloc[split:]
 
-    print("\n🔹 TRAINING LONG REGIME ENSEMBLE")
+    print("\n🔹 TRAINING LONG REGIME ENSEMBLE (GPU ACCELERATED)")
     xgb_l = train_xgboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
     lgb_l = train_lightgbm(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
     cat_l = train_catboost(X_train, y_train_l, X_test, y_test_l, "LONG", scale_long)
-    print(f"✅ LONG Regime Precision: {evaluate_ensemble(xgb_l, lgb_l, cat_l, X_test, y_test_l) * 100:.1f}%")
+    evaluate_ensemble(xgb_l, lgb_l, cat_l, X_test, y_test_l)
 
-    # Train Downside Volatility (Short)
-    y_short = clean_data['target_short']
-    scale_short = min((len(y_short) - y_short.sum()) / (y_short.sum() + 1), 5.0)
+    # --- SHORT TRAINING ---
+    y_short = full_data['target_short']
+    pos_count = y_short.sum()
+    scale_short = np.sqrt((len(y_short) - pos_count) / (pos_count + 1)) * 1.5
+
+    print(f"\n⚖️  Class Balance SHORT: Scaled to {scale_short:.2f}")
+
     y_train_s, y_test_s = y_short.iloc[:split], y_short.iloc[split:]
 
-    print("\n🔸 TRAINING SHORT REGIME ENSEMBLE")
+    print("\n🔸 TRAINING SHORT REGIME ENSEMBLE (GPU ACCELERATED)")
     xgb_s = train_xgboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
     lgb_s = train_lightgbm(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
     cat_s = train_catboost(X_train, y_train_s, X_test, y_test_s, "SHORT", scale_short)
-    print(f"✅ SHORT Regime Precision: {evaluate_ensemble(xgb_s, lgb_s, cat_s, X_test, y_test_s) * 100:.1f}%")
+    evaluate_ensemble(xgb_s, lgb_s, cat_s, X_test, y_test_s)
 
-    with open(META_PATH, 'w') as f:
-        json.dump({"updated": str(datetime.now()), "features": FEATURES}, f)
+    save_metadata()
     print("\n💾 ALL MODELS SAVED.")
 
 

@@ -17,6 +17,7 @@ class CryptoQuantEngine:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
 
+    # (Keep your PATHS dict and _load_models method exactly the same)
     PATHS = {
         "xgb_long": os.path.join(MODEL_DIR, "xgb_long.json"),
         "xgb_short": os.path.join(MODEL_DIR, "xgb_short.json"),
@@ -31,33 +32,27 @@ class CryptoQuantEngine:
 
     def _load_models(self):
         if self.models: return self.models
-
-        # 1. Load XGBoost (Independent Try/Catch)
         try:
-            if os.path.exists(self.PATHS['xgb_long']):
-                self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
-                self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
-        except Exception as e:
-            log.error(f"XGB Load Error: {e}")
+            # --- 1. XGBOOST (Force CPU Mode) ---
+            self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
+            self.models['xgb_long'].set_param({"predictor": "cpu_predictor", "nthread": 1})
 
-        # 2. Load LightGBM (Independent Try/Catch)
-        try:
-            if os.path.exists(self.PATHS['lgb_long']):
-                self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
-                self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
-        except Exception as e:
-            log.error(f"LGB Load Error: {e}")
+            self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
+            self.models['xgb_short'].set_param({"predictor": "cpu_predictor", "nthread": 1})
 
-        # 3. Load CatBoost (Independent Try/Catch)
-        try:
-            if os.path.exists(self.PATHS['cat_long']):
-                self.models['cat_long'] = CatBoostClassifier()
-                self.models['cat_long'].load_model(self.PATHS['cat_long'])
-                self.models['cat_short'] = CatBoostClassifier()
-                self.models['cat_short'].load_model(self.PATHS['cat_short'])
-        except Exception as e:
-            log.error(f"CatBoost Load Error: {e}")
+            # --- 2. LIGHTGBM (Naturally CPU) ---
+            self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
+            self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
 
+            # --- 3. CATBOOST (Force CPU Mode) ---
+            self.models['cat_long'] = CatBoostClassifier()
+            self.models['cat_long'].load_model(self.PATHS['cat_long'])
+
+            self.models['cat_short'] = CatBoostClassifier()
+            self.models['cat_short'].load_model(self.PATHS['cat_short'])
+
+        except Exception as e:
+            pass
         return self.models
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY"):
@@ -68,54 +63,37 @@ class CryptoQuantEngine:
         row_df = pd.DataFrame([last])[FEATURES].astype(float)
 
         models = self._load_models()
-
-        # If absolutely no models loaded, return neutral
         if not models:
             return self._neutral_result(last['close'], "System Booting")
 
-        # 1. GET RAW PROBABILITIES (Safe Prediction Logic)
-        pL_vals = []
-        pS_vals = []
-
+        # 1. GET RAW PROBABILITIES (The "Math")
+        pL, pS = 0.0, 0.0
         try:
-            # XGBoost Prediction
-            if 'xgb_long' in models and 'xgb_short' in models:
-                dmat = xgb.DMatrix(row_df)
-                pL_vals.append(float(models['xgb_long'].predict(dmat)[0]))
-                pS_vals.append(float(models['xgb_short'].predict(dmat)[0]))
+            # XGBoost DMatrix (Force CPU usage)
+            dmat = xgb.DMatrix(row_df)
 
-            # LightGBM Prediction
-            if 'lgb_long' in models and 'lgb_short' in models:
-                pL_vals.append(float(models['lgb_long'].predict(row_df)[0]))
-                pS_vals.append(float(models['lgb_short'].predict(row_df)[0]))
+            pL = (float(models['xgb_long'].predict(dmat)[0]) +
+                  float(models['lgb_long'].predict(row_df)[0]) +
+                  float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
 
-            # CatBoost Prediction
-            if 'cat_long' in models and 'cat_short' in models:
-                pL_vals.append(float(models['cat_long'].predict_proba(row_df)[0][1]))
-                pS_vals.append(float(models['cat_short'].predict_proba(row_df)[0][1]))
-
-            # Calculate Averages (Ensemble)
-            if not pL_vals:
-                return self._neutral_result(last['close'], "Model Error")
-
-            pL = (sum(pL_vals) / len(pL_vals)) * 100
-            pS = (sum(pS_vals) / len(pS_vals)) * 100
-
+            pS = (float(models['xgb_short'].predict(dmat)[0]) +
+                  float(models['lgb_short'].predict(row_df)[0]) +
+                  float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
         except Exception as e:
-            log.error(f"Prediction Calculation Error: {e}")
-            return self._neutral_result(last['close'], "Calc Error")
+            log.error(f"Prediction Error: {e}")
+            return self._neutral_result(last['close'], "Model Error")
 
         # 2. THE CASINO "HOUSE RULES" (Tier 4 Execution Logic)
 
         bias = "HOLD"
-        # Default score is the max probability so user sees "45%" instead of "0%"
         score = max(pL, pS)
 
         # Context Variables
         rsi = last['rsi_14']
-        vwap_dist = last['vwap_dist']  # +ve means Price > VWAP (Premium), -ve means Discount
+        vwap_dist = last['vwap_dist']
         cvd_div = last.get('cvd_divergence', 0)
         liq_sweep = last.get('liq_sweep', 0)
+        vol_slope = last.get('volatility_slope', 0)
 
         # Trend Physics
         ema_20 = last['ema_20']
@@ -125,63 +103,56 @@ class CryptoQuantEngine:
         is_uptrend = (price > ema_20) and (ema_20 > ema_50)
         is_downtrend = (price < ema_20) and (ema_20 < ema_50)
 
-        # --- DYNAMIC THRESHOLD (UX FIX) ---
-        # If SCALP (High Risk), we lower the bar to 60%.
-        # If DAY/SWING (Safe), we keep it at 65% (Sniper).
+        # --- DATA-DRIVEN SNIPER THRESHOLDS ---
+        # LONG: 70.0% is the "Bank Mode" (High Win Rate).
+        # SHORT: 99.0% (Disabled because Short model was weak/dormant).
+        LONG_THRESH = 70.0
+        SHORT_THRESH = 99.0
+
         if trade_style == "SCALP":
-            CONF_THRESH = 60.0
-        else:
-            CONF_THRESH = 65.0
+            LONG_THRESH -= 5.0  # Scalping allows slightly looser entries
 
-        # --- LONG LOGIC ---
-        if pL > CONF_THRESH:
-            # Rule 1: Don't Buy the Top (RSI check)
-            if rsi < 70:
-                # Rule 2: Value Check (Prefer buying below or near VWAP, or if momentum is huge)
-                if vwap_dist < 0.02:  # Don't buy if > 2% above VWAP
-                    # Bonus Confidence if we swept liquidity or have CVD Div
-                    bonus = 0
-                    if liq_sweep == 1: bonus += 5
-                    if cvd_div == 1: bonus += 5
-
-                    if (pL + bonus) >= CONF_THRESH:
+        # --- LONG LOGIC (The Money Maker) ---
+        if pL > LONG_THRESH:
+            if rsi < 75:  # Don't buy extreme tops
+                if vwap_dist < 0.04:  # Don't buy if price is >4% extended
+                    # Filter 3: Must have Trend OR massive Volatility/Sweep
+                    if is_uptrend or vol_slope > 0.1 or liq_sweep == 1:
                         bias = "LONG"
-                        score = pL + bonus
+                        score = pL
+                        # Bonus: Liquidity Sweep Confirmation
+                        if liq_sweep == 1: score += 5
 
-        # --- SHORT LOGIC ---
-        elif pS > CONF_THRESH:
-            # Rule 1: Don't Short the Bottom
-            if rsi > 30:
-                # Rule 2: Value Check (Prefer shorting above or near VWAP)
-                if vwap_dist > -0.02:  # Don't short if > 2% below VWAP
-                    # Bonus Confidence
-                    bonus = 0
-                    if liq_sweep == -1: bonus += 5
-                    if cvd_div == -1: bonus += 5
-
-                    if (pS + bonus) >= CONF_THRESH:
+        # --- SHORT LOGIC (The Shield - STRICT) ---
+        elif pS > SHORT_THRESH:
+            if rsi > 25:
+                if vwap_dist > -0.04:
+                    if is_downtrend:  # Shorts strictly require downtrend
                         bias = "SHORT"
-                        score = pS + bonus
+                        score = pS
+                        if liq_sweep == -1: score += 5
 
-        # --- SAFETY VALVE (Conflict Resolution) ---
-        # If we triggered logic but trend opposes, or signals conflict, revert to HOLD
+        # --- SAFETY VALVE ---
         if bias == "LONG" and not is_uptrend and trade_style != "SCALP":
-            bias = "HOLD"
-        if bias == "SHORT" and not is_downtrend and trade_style != "SCALP":
+            # Only allow counter-trend Longs if it's a Liquidity Sweep
+            if liq_sweep != 1: bias = "HOLD"
+
+        if bias == "SHORT" and not is_downtrend:
             bias = "HOLD"
 
-        # 3. TRADE MANAGEMENT (Risk Engine)
+        # 3. TRADE MANAGEMENT (1.5R High Win Rate Strategy)
         atr = float(last.get('atr_14', price * 0.01))
 
-        # Dynamic Multipliers
         if trade_style == "SCALP":
             stop_mult, tgt_mult = 1.0, 1.5
             duration = "15m - 2h"
         elif trade_style == "SWING":
-            stop_mult, tgt_mult = 2.5, 4.0
+            stop_mult, tgt_mult = 2.0, 3.0  # Swings get more room
             duration = "1 - 3 Days"
-        else:  # DAY
-            stop_mult, tgt_mult = 2.0, 3.0
+        else:  # DAY (Default Sniper Mode)
+            # 1.5R Stop / 1.5R Target ensures we capture the win quickly
+            # This matches our "High Win Rate" philosophy
+            stop_mult, tgt_mult = 1.5, 1.5
             duration = "4h - 24h"
 
         if bias == "LONG":
@@ -193,18 +164,17 @@ class CryptoQuantEngine:
         else:
             stop, t1 = price, price
 
-        # 4. EXPLAINABILITY (Why did we take this?)
+        # 4. EXPLAINABILITY
         drivers = []
-        if abs(vwap_dist) > 0.01:
-            drivers.append({"feature": "Value", "desc": "VWAP DEVIATION", "importance": 90})
+        if vol_slope > 0.1:
+            drivers.append({"feature": "Energy", "desc": "VOLATILITY SPIKE", "importance": 95})
+        if abs(vwap_dist) < 0.01:
+            drivers.append({"feature": "Value", "desc": "FAIR VALUE ENTRY", "importance": 85})
         if liq_sweep != 0:
-            drivers.append({"feature": "Trap", "desc": "LIQUIDITY SWEEP", "importance": 95})
-        if cvd_div != 0:
-            drivers.append({"feature": "Whale", "desc": "CVD DIVERGENCE", "importance": 85})
+            drivers.append({"feature": "Trap", "desc": "STOP HUNT", "importance": 90})
 
-        # Fill remaining with generic features if needed
         if not drivers:
-            drivers.append({"feature": "Trend", "desc": "MOMENTUM ALIGNMENT", "importance": 80})
+            drivers.append({"feature": "Trend", "desc": "AI MOMENTUM", "importance": 80})
 
         dist = abs(t1 - price)
 
