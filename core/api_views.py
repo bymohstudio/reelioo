@@ -167,7 +167,7 @@ class FindAlphaView(APIView):
 
         # 2. RUN IN PARALLEL (FAST)
         # This runs up to 10 scans simultaneously
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             results = list(executor.map(analyze_symbol, vip_assets))
 
         # Filter out None values
