@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .api_views import AnalyzeCryptoView, BacktestCryptoView, SearchCryptoView
+from .api_views import AnalyzeCryptoView, BacktestCryptoView, SearchCryptoView,FindAlphaView
 from .views import robots_view, sitemap_view, cron_scan_trigger, debug_models_view
 
 urlpatterns = [
@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/analyze/", AnalyzeCryptoView.as_view(), name="analyze_crypto"),
     path("api/backtest/", BacktestCryptoView.as_view(), name="backtest_crypto"),
     path("api/search/", SearchCryptoView.as_view(), name="search_crypto"),
+    path('api/find_best_opportunity/',FindAlphaView.as_view(), name='find_alpha'),
 
     # Pages
     path("", views.landing_view, name="landing"),

@@ -48,10 +48,23 @@
                     <button onclick="initScan()" id="btn-scan" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex items-center justify-center gap-2">
                         <span>SCAN</span> <i data-lucide="radar" class="w-3 h-3"></i>
                     </button>
+
+                    <button onclick="findWinningMarket()" id="btn-alpha" class="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] items-center gap-2 animate-pulse border border-emerald-400/30 whitespace-nowrap">
+                        <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> ALPHA
+                    </button>
                 </div>
             </div>
 
-            <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-2 rounded-lg hidden z-50 shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"></div>
+            <div class="w-full flex justify-between items-start mt-2 px-1">
+                 <p class="text-[9px] text-emerald-500/70 font-mono tracking-wider flex items-center gap-1.5 animate-pulse">
+                    <i data-lucide="zap" class="w-3 h-3"></i> USE 'ALPHA' TO SCAN 15+ PAIRS AND AUTO-DETECT THE HIGHEST EDGE SETUP
+                </p>
+                <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-2 rounded-lg hidden z-50 shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"></div>
+            </div>
+
+            <button onclick="findWinningMarket()" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30">
+                 <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> SCAN FOR ALPHA EDGE
+            </button>
         </div>
     </div>
 
@@ -249,6 +262,72 @@
         </div>
     </div>
 
+    <div id="scan-overlay" class="hidden fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center">
+        <div class="relative w-32 h-32 mb-8">
+            <div class="absolute inset-0 border-4 border-emerald-500/20 rounded-full"></div>
+            <div class="absolute inset-0 border-t-4 border-emerald-500 rounded-full animate-spin"></div>
+            <div class="absolute inset-4 bg-emerald-500/10 rounded-full animate-pulse"></div>
+            <i data-lucide="crosshair" class="absolute inset-0 m-auto w-10 h-10 text-emerald-400"></i>
+        </div>
+
+        <h2 class="text-2xl font-black text-white tracking-widest mb-2" id="scan-text">INITIALIZING...</h2>
+        <p class="text-xs text-emerald-500 font-mono">NEURAL NETWORK ACTIVE</p>
+
+        <div class="mt-8 text-[10px] font-mono text-slate-500 text-center space-y-1 opacity-50">
+            <p>fetching::deep_pool::perp_agg_trade</p>
+            <p>calc::volatility_vectors::skew</p>
+            <p>filtering::retail_noise::98%</p>
+        </div>
+    </div>
+
+    <div id="alpha-modal" class="hidden fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+        <div class="relative w-full max-w-lg bg-[#050505] border border-emerald-500/50 rounded-2xl shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden transform transition-all scale-100">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-white to-emerald-500 animate-shimmer z-20 opacity-50"></div>
+
+            <button onclick="closeAlpha()" class="absolute top-4 right-4 text-slate-500 hover:text-white z-30 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+
+            <div class="p-8 text-center relative z-10">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/5 border border-emerald-500/30 mb-6 relative group">
+                    <div class="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse"></div>
+                    <i data-lucide="trophy" class="w-10 h-10 text-emerald-400 relative z-10"></i>
+                </div>
+
+                <h2 class="text-xs font-bold text-emerald-500 uppercase tracking-[0.3em] mb-2">Highest Probability Setup</h2>
+                <h1 id="alpha-symbol" class="text-6xl font-black text-white tracking-tighter mb-1 text-glow">--</h1>
+                <p id="alpha-bias" class="text-2xl font-bold text-slate-400 tracking-widest mb-8">--</p>
+
+                <div class="grid grid-cols-3 gap-3 mb-8">
+                    <div class="bg-[#0f0f0f] p-4 rounded-xl border border-white/5 relative overflow-hidden group">
+                        <div class="absolute top-0 left-0 w-full h-0.5 bg-slate-700 group-hover:bg-white transition"></div>
+                        <span class="text-[9px] text-slate-500 uppercase block mb-1 font-bold tracking-wider">Entry</span>
+                        <span id="alpha-entry" class="text-lg font-mono font-bold text-white">--</span>
+                    </div>
+                    <div class="bg-[#0f0f0f] p-4 rounded-xl border border-white/5 relative overflow-hidden group">
+                        <div class="absolute top-0 left-0 w-full h-0.5 bg-red-900 group-hover:bg-red-500 transition"></div>
+                        <span class="text-[9px] text-slate-500 uppercase block mb-1 font-bold tracking-wider">Stop Loss</span>
+                        <span id="alpha-stop" class="text-lg font-mono font-bold text-red-500">--</span>
+                    </div>
+                    <div class="bg-emerald-900/10 p-4 rounded-xl border border-emerald-500/30 relative overflow-hidden group shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+                        <div class="absolute top-0 left-0 w-full h-0.5 bg-emerald-500"></div>
+                        <span class="text-[9px] text-emerald-400 uppercase block mb-1 font-bold tracking-wider">Target</span>
+                        <span id="alpha-target" class="text-lg font-mono font-bold text-emerald-400 text-glow">--</span>
+                    </div>
+                </div>
+
+                <div class="bg-[#0a0a0a] border border-white/10 p-4 rounded-lg mb-6 flex items-center justify-center gap-3">
+                    <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i>
+                    <p class="text-[10px] text-slate-400 font-mono uppercase">
+                        DRIVER: <span id="alpha-reason" class="font-bold text-blue-400">--</span>
+                    </p>
+                </div>
+
+                <button onclick="loadIntoTerminal()" class="w-full bg-white hover:bg-slate-200 text-black font-black py-4 rounded-xl transition uppercase tracking-[0.2em] text-xs shadow-xl transform hover:-translate-y-1">
+                    Analyze Full Chart
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <style>
@@ -262,10 +341,15 @@
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
     body { font-family: 'Inter', sans-serif; background-color: #020202; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* NEW STYLES FOR ALPHA SCANNER */
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .animate-shimmer { animation: shimmer 2s infinite; }
+    .text-glow { text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
 </style>
 
 <script>
-    // --- UI HELPERS: Updated Logic Vectors with Icons ---
+    // --- UI HELPERS ---
     function updateDrivers(explanation, show) {
         const container = document.getElementById("shap-box");
         container.innerHTML = "";
@@ -312,7 +396,6 @@
     // --- PULSE LOGIC ---
     function logMessage(msg, colorClass="text-slate-500") { const log = document.getElementById('scanner-log'); if(!log) return; const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'}); const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`; log.insertAdjacentHTML('beforeend', row); log.scrollTop = log.scrollHeight; if(log.children.length > 50) log.firstElementChild.remove(); }
 
-    // --- FAKE WORKER LOGS ---
     function initMaintenanceLoop() {
         const msgs = [
             "Scanning Dark Pool Liquidity...", "Calculating CVD Divergence...", "Checking Whale Wallets...",
@@ -407,8 +490,6 @@
                 sigBox.className = "bg-red-900/10 border border-red-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(239,68,68,0.1)]";
                 glow.className = "absolute inset-0 bg-red-500/10 blur-3xl opacity-100";
             } else {
-                // --- UX FIX: WATCHING STATE VS NO SIGNAL ---
-                // If score is high (>= 60) but not confirmed (Hold), match the Discord "Watch" alert.
                 if (score >= 60.0) {
                     dirEl.innerText = "WATCHING";
                     dirEl.className = "text-4xl md:text-7xl font-black tracking-tighter text-yellow-500 leading-none";
@@ -419,7 +500,6 @@
                     lockMsg.className = "text-xs text-yellow-400 mt-2 font-mono font-bold";
                     lblStatus.innerText = "STATUS";
                 } else {
-                    // Standard No Signal (< 60%)
                     dirEl.innerText = "NO SIGNAL";
                     dirEl.className = "text-4xl md:text-7xl font-black tracking-tighter text-slate-600 leading-none opacity-80";
                     sigBox.className = "bg-[#0a0a0a] border border-white/5 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center";
@@ -432,7 +512,6 @@
 
                 lockMsg.classList.remove('hidden');
 
-                // Mask Trade Levels
                 safeSetText('res-entry', '---');
                 safeSetText('res-stop', '---');
                 safeSetText('res-target2', '---');
@@ -457,56 +536,76 @@
         }
     }
 
-    async function addToJournal() {
-        const btn = document.getElementById('btn-journal'); const originalHTML = btn.innerHTML; const symbol = document.getElementById('res-symbol').innerText; const bias = document.getElementById('res-direction').innerText;
-        if(bias === "NO SIGNAL" || bias === "NEUTRAL") { showError("SAFETY LOCK", "Cannot save. System is protecting capital."); return; }
-        btn.innerHTML = "SAVING..."; btn.disabled = true;
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const payload = { symbol: symbol, bias: bias, entry: document.getElementById('res-entry').innerText.replace(/,/g, ''), stop: document.getElementById('res-stop').innerText.replace(/,/g, ''), target: document.getElementById('res-target2').innerText.replace(/,/g, ''), confidence: document.getElementById('res-score').innerText.replace('%', '') };
-            const res = await fetch("/api/journal/add/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify(payload) });
-            if(res.ok) { btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`; btn.classList.add('text-emerald-400', 'border-emerald-500/50'); setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-400', 'border-emerald-500/50'); btn.disabled = false; if(window.lucide) lucide.createIcons(); }, 2000); } else throw new Error();
-        } catch(e) { btn.innerHTML = "ERROR"; setTimeout(() => { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000); }
-    }
+    // --- ALPHA SCANNER (Hyperspace Logic) ---
+    async function findWinningMarket() {
+        const overlay = document.getElementById('scan-overlay');
+        const scanText = document.getElementById('scan-text');
 
-    function closeBacktest() { document.getElementById('backtest-modal').classList.add('hidden'); }
-    async function initBacktest() {
-        const input = document.getElementById('symbol-input'); let raw = input.value.trim().toUpperCase(); if (!raw) return; if (!raw.includes("USDT")) raw += "USDT";
-        const modal = document.getElementById('backtest-modal'); const loader = document.getElementById('bt-loader'); const results = document.getElementById('bt-results');
-        modal.classList.remove('hidden'); loader.classList.remove('hidden'); results.classList.add('hidden');
+        // 1. Show Hyperspace Overlay
+        overlay.classList.remove('hidden');
+
+        // 2. Start Ticker Animation (UPDATED: REMOVED PEPE, ADDED SUI)
+        const tickers = ["BTC", "ETH", "SOL", "WIF", "SUI", "BNB", "XRP", "DOGE"];
+        const actions = ["ANALYZING", "DECODING", "CHECKING", "SCANNING"];
+
+        const interval = setInterval(() => {
+            const t = tickers[Math.floor(Math.random() * tickers.length)];
+            const a = actions[Math.floor(Math.random() * actions.length)];
+            scanText.innerText = `${a} ${t}...`;
+        }, 150);
+
         try {
-            const csrftoken = getCookie('csrftoken');
-            const res = await fetch("/api/backtest/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify({ symbol: raw, trade_style: "INTRADAY" }) });
-            if (!res.ok) throw new Error();
+            const res = await fetch("/api/find_best_opportunity/");
             const data = await res.json();
-            safeSetText('bt-winrate', (data.win_rate||0) + "%"); safeSetText('bt-pnl', data.profit_factor||0); safeSetText('bt-trades', data.total_trades||0);
-            const logBox = document.getElementById('bt-log'); logBox.innerHTML = "";
-            (data.trades_log || []).forEach(t => { const isWin = (t.pnl || t.roi || 0) > 0; logBox.insertAdjacentHTML('beforeend', `<div class="grid grid-cols-3 border-b border-white/5 py-1"><span class="${isWin?'text-emerald-400':'text-red-500'} font-bold">${isWin?'WIN':'LOSS'}</span><span class="text-center">$${formatPrice(t.entry)}</span><span class="text-right ${isWin?'text-emerald-400':'text-red-500'}">${(t.pnl||0).toFixed(2)}%</span></div>`); });
-            loader.classList.add('hidden'); results.classList.remove('hidden');
-        } catch (e) { closeBacktest(); showError("BACKTEST FAILED", "Data unavailable."); }
+
+            clearInterval(interval);
+            overlay.classList.add('hidden'); // Hide overlay
+
+            if (data.status === "success") {
+                const trade = data.trade;
+
+                document.getElementById('alpha-symbol').innerText = trade.symbol.replace("USDT", "");
+                const biasEl = document.getElementById('alpha-bias');
+                biasEl.innerText = trade.bias;
+
+                if (trade.bias === "LONG") {
+                    biasEl.className = "text-2xl font-bold text-emerald-400 tracking-widest mb-8 text-glow";
+                } else {
+                    biasEl.className = "text-2xl font-bold text-red-500 tracking-widest mb-8 text-glow";
+                }
+
+                document.getElementById('alpha-entry').innerText = formatPrice(trade.entry);
+                document.getElementById('alpha-stop').innerText = formatPrice(trade.stop);
+                document.getElementById('alpha-target').innerText = formatPrice(trade.target);
+                document.getElementById('alpha-reason').innerText = trade.explanation;
+
+                window.foundSymbol = trade.symbol;
+
+                document.getElementById('alpha-modal').classList.remove('hidden');
+                if(window.lucide) lucide.createIcons();
+
+            } else {
+                showError("MARKET CHOPPY", "No high-confidence setups found right now.");
+            }
+
+        } catch (e) {
+            clearInterval(interval);
+            overlay.classList.add('hidden');
+            console.error(e);
+            showError("SCAN FAILED", "Network error. Please try again.");
+        }
     }
 
-    // --- TICKER LOGIC (RESTORED) ---
-    document.addEventListener("DOMContentLoaded", () => {
-        const marquee = document.getElementById("live-marquee");
-        const tickers = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
-        const streams = tickers.map(t => `${t.toLowerCase()}@ticker`).join('/');
-        const socket = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`);
-        const priceMap = {}; tickers.forEach(t => priceMap[t] = { price: 0, change: 0 });
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.s && data.c) { priceMap[data.s] = { price: parseFloat(data.c), change: parseFloat(data.P) }; renderMarquee(); }
-        };
-        function renderMarquee() {
-            let html = "";
-            tickers.forEach(sym => {
-                const item = priceMap[sym]; if (!item || item.price === 0) return;
-                const colorClass = item.change >= 0 ? "text-emerald-400" : "text-red-400";
-                const icon = item.change >= 0 ? "activity" : "arrow-down";
-                html += `<span class="flex items-center gap-2 mx-6"><i data-lucide="${icon}" class="w-3 h-3 ${colorClass}"></i>${sym.replace("USDT","")}<span class="${colorClass}">$${item.price < 1 ? item.price.toFixed(4) : item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></span>`;
-            });
-            if (html.length > 50) { marquee.innerHTML = html; if (window.lucide) lucide.createIcons(); }
+    function closeAlpha() {
+        document.getElementById('alpha-modal').classList.add('hidden');
+    }
+
+    function loadIntoTerminal() {
+        closeAlpha();
+        if (window.foundSymbol) {
+            document.getElementById('symbol-input').value = window.foundSymbol;
+            initScan();
         }
-    });
+    }
 </script>
 {% endblock %}

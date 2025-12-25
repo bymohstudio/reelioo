@@ -117,3 +117,61 @@ class SearchCryptoView(APIView):
     def get(self, request):
         q = request.GET.get("q", "")
         return Response(MarketService.search_assets(q))
+
+
+class FindAlphaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # 1. THE VIP LIST (Don't scan trash, scan volume)
+            vip_assets = [
+                "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+                "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT",
+                "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"
+            ]
+
+            leaderboard = []
+            engine = CryptoQuantEngine()
+
+            # 2. FAST SCAN LOOP
+            for symbol in vip_assets:
+                # Reuse your existing MarketService (Standardized Data)
+                df = MarketService.get_historical_data(symbol, market_type="PERP", trade_style="INTRADAY")
+
+                if df.empty: continue
+
+                # Run the Brain
+                res = engine.analyze(df, trade_style="INTRADAY")
+
+                # 3. FILTER: Only "Actionable" Signals
+                # We want High Score (>60) AND a clear direction (LONG/SHORT)
+                if res.bias in ["LONG", "SHORT"] and res.score >= 60:
+                    leaderboard.append({
+                        "symbol": symbol,
+                        "bias": res.bias,
+                        "score": res.score,
+                        "entry": res.entry,
+                        "stop": res.stop,
+                        "target": res.target1,  # Conservative target
+                        "rr": res.rr_ratio,
+                        "regime": res.regime,
+                        "explanation": res.top_features[0]['desc'] if res.top_features else "TREND ALIGNMENT"
+                    })
+
+            # 4. PICK THE WINNER
+            if not leaderboard:
+                return Response({"status": "empty", "message": "Market is choppy. No high-probability setups found."})
+
+            # Sort by Score (Highest Confidence First)
+            leaderboard.sort(key=lambda x: x['score'], reverse=True)
+            best_trade = leaderboard[0]
+
+            return Response({
+                "status": "success",
+                "trade": best_trade
+            })
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
