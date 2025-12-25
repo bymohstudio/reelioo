@@ -342,7 +342,7 @@
     body { font-family: 'Inter', sans-serif; background-color: #020202; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-    /* NEW STYLES FOR ALPHA SCANNER */
+    /* ALPHA SCANNER ANIMATIONS */
     @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
     .animate-shimmer { animation: shimmer 2s infinite; }
     .text-glow { text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
@@ -393,7 +393,42 @@
     function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
     function formatPrice(value) { const num = parseFloat(value); if (isNaN(num)) return "--"; return num < 1.0 ? num.toFixed(5) : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-    // --- PULSE LOGIC ---
+    // --- INFINITE TICKER LOGIC (RESTORED) ---
+    document.addEventListener("DOMContentLoaded", () => {
+        const marquee = document.getElementById("live-marquee");
+        const tickers = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+        const streams = tickers.map(t => `${t.toLowerCase()}@ticker`).join('/');
+
+        // This is strictly for the price feed, unrelated to backend scanning logic
+        const socket = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`);
+        const priceMap = {};
+        tickers.forEach(t => priceMap[t] = { price: 0, change: 0 });
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.s && data.c) {
+                priceMap[data.s] = { price: parseFloat(data.c), change: parseFloat(data.P) };
+                renderMarquee();
+            }
+        };
+
+        function renderMarquee() {
+            let html = "";
+            tickers.forEach(sym => {
+                const item = priceMap[sym]; if (!item || item.price === 0) return;
+                const colorClass = item.change >= 0 ? "text-emerald-400" : "text-red-400";
+                const icon = item.change >= 0 ? "activity" : "arrow-down";
+                html += `<span class="flex items-center gap-2 mx-6"><i data-lucide="${icon}" class="w-3 h-3 ${colorClass}"></i>${sym.replace("USDT","")}<span class="${colorClass}">$${item.price < 1 ? item.price.toFixed(4) : item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></span>`;
+            });
+            // Update HTML only if we have data to show
+            if (html.length > 50) {
+                marquee.innerHTML = html;
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+    });
+
+    // --- PULSE & FAKE WORKER LOGS ---
     function logMessage(msg, colorClass="text-slate-500") { const log = document.getElementById('scanner-log'); if(!log) return; const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'}); const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`; log.insertAdjacentHTML('beforeend', row); log.scrollTop = log.scrollHeight; if(log.children.length > 50) log.firstElementChild.remove(); }
 
     function initMaintenanceLoop() {
@@ -404,6 +439,7 @@
         ];
         setInterval(() => { const dash = document.getElementById('dashboard'); if(dash && !dash.classList.contains('hidden')) { logMessage(msgs[Math.floor(Math.random() * msgs.length)], "text-slate-600"); } }, 3500);
     }
+
     document.addEventListener("DOMContentLoaded", () => {
         initMaintenanceLoop();
         setTimeout(() => logMessage(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
@@ -442,7 +478,9 @@
         dash.classList.add('hidden'); dash.classList.add('opacity-0'); loader.classList.remove('hidden');
 
         logText.innerHTML = `<p class="text-slate-300">>> INITIALIZING ${tradeStyle} PROTOCOL...</p>`;
-        setTimeout(() => logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> CONNECTING TO BINANCE FUTURES...</p>`), 500);
+
+        // UPDATED TEXT HERE
+        setTimeout(() => logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> ESTABLISHING HIGH-FREQUENCY UPLINK...</p>`), 500);
         setTimeout(() => logText.insertAdjacentHTML('beforeend', `<p class="text-blue-400 animate-pulse">>> CALCULATING VECTORS...</p>`), 1500);
 
         try {
@@ -536,6 +574,35 @@
         }
     }
 
+    async function addToJournal() {
+        const btn = document.getElementById('btn-journal'); const originalHTML = btn.innerHTML; const symbol = document.getElementById('res-symbol').innerText; const bias = document.getElementById('res-direction').innerText;
+        if(bias === "NO SIGNAL" || bias === "NEUTRAL") { showError("SAFETY LOCK", "Cannot save. System is protecting capital."); return; }
+        btn.innerHTML = "SAVING..."; btn.disabled = true;
+        try {
+            const csrftoken = getCookie('csrftoken');
+            const payload = { symbol: symbol, bias: bias, entry: document.getElementById('res-entry').innerText.replace(/,/g, ''), stop: document.getElementById('res-stop').innerText.replace(/,/g, ''), target: document.getElementById('res-target2').innerText.replace(/,/g, ''), confidence: document.getElementById('res-score').innerText.replace('%', '') };
+            const res = await fetch("/api/journal/add/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify(payload) });
+            if(res.ok) { btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`; btn.classList.add('text-emerald-400', 'border-emerald-500/50'); setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-400', 'border-emerald-500/50'); btn.disabled = false; if(window.lucide) lucide.createIcons(); }, 2000); } else throw new Error();
+        } catch(e) { btn.innerHTML = "ERROR"; setTimeout(() => { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000); }
+    }
+
+    function closeBacktest() { document.getElementById('backtest-modal').classList.add('hidden'); }
+    async function initBacktest() {
+        const input = document.getElementById('symbol-input'); let raw = input.value.trim().toUpperCase(); if (!raw) return; if (!raw.includes("USDT")) raw += "USDT";
+        const modal = document.getElementById('backtest-modal'); const loader = document.getElementById('bt-loader'); const results = document.getElementById('bt-results');
+        modal.classList.remove('hidden'); loader.classList.remove('hidden'); results.classList.add('hidden');
+        try {
+            const csrftoken = getCookie('csrftoken');
+            const res = await fetch("/api/backtest/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify({ symbol: raw, trade_style: "INTRADAY" }) });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            safeSetText('bt-winrate', (data.win_rate||0) + "%"); safeSetText('bt-pnl', data.profit_factor||0); safeSetText('bt-trades', data.total_trades||0);
+            const logBox = document.getElementById('bt-log'); logBox.innerHTML = "";
+            (data.trades_log || []).forEach(t => { const isWin = (t.pnl || t.roi || 0) > 0; logBox.insertAdjacentHTML('beforeend', `<div class="grid grid-cols-3 border-b border-white/5 py-1"><span class="${isWin?'text-emerald-400':'text-red-500'} font-bold">${isWin?'WIN':'LOSS'}</span><span class="text-center">$${formatPrice(t.entry)}</span><span class="text-right ${isWin?'text-emerald-400':'text-red-500'}">${(t.pnl||0).toFixed(2)}%</span></div>`); });
+            loader.classList.add('hidden'); results.classList.remove('hidden');
+        } catch (e) { closeBacktest(); showError("BACKTEST FAILED", "Data unavailable."); }
+    }
+
     // --- ALPHA SCANNER (Hyperspace Logic) ---
     async function findWinningMarket() {
         const overlay = document.getElementById('scan-overlay');
@@ -544,7 +611,7 @@
         // 1. Show Hyperspace Overlay
         overlay.classList.remove('hidden');
 
-        // 2. Start Ticker Animation (UPDATED: REMOVED PEPE, ADDED SUI)
+        // 2. Start Ticker Animation
         const tickers = ["BTC", "ETH", "SOL", "WIF", "SUI", "BNB", "XRP", "DOGE"];
         const actions = ["ANALYZING", "DECODING", "CHECKING", "SCANNING"];
 
