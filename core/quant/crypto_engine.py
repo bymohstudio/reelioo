@@ -72,10 +72,10 @@ class CryptoQuantEngine:
             return self._neutral_result(last['close'], "Model Error")
 
         # 2. THE CASINO "HOUSE RULES" (Tier 4 Execution Logic)
-        # We act as a Filter. The ML is aggressive; the Engine must be defensive.
 
         bias = "HOLD"
-        score = 50
+        # Default score is the max probability so user sees "45%" instead of "0%"
+        score = max(pL, pS)
 
         # Context Variables
         rsi = last['rsi_14']
@@ -83,8 +83,21 @@ class CryptoQuantEngine:
         cvd_div = last.get('cvd_divergence', 0)
         liq_sweep = last.get('liq_sweep', 0)
 
-        # Thresholds
-        CONF_THRESH = 65.0
+        # Trend Physics
+        ema_20 = last['ema_20']
+        ema_50 = last['ema_50']
+        price = last['close']
+
+        is_uptrend = (price > ema_20) and (ema_20 > ema_50)
+        is_downtrend = (price < ema_20) and (ema_20 < ema_50)
+
+        # --- DYNAMIC THRESHOLD (UX FIX) ---
+        # If SCALP (High Risk), we lower the bar to 60%.
+        # If DAY/SWING (Safe), we keep it at 65% (Sniper).
+        if trade_style == "SCALP":
+            CONF_THRESH = 60.0
+        else:
+            CONF_THRESH = 65.0
 
         # --- LONG LOGIC ---
         if pL > CONF_THRESH:
@@ -92,11 +105,14 @@ class CryptoQuantEngine:
             if rsi < 70:
                 # Rule 2: Value Check (Prefer buying below or near VWAP, or if momentum is huge)
                 if vwap_dist < 0.02:  # Don't buy if > 2% above VWAP
-                    bias = "LONG"
-                    score = pL
                     # Bonus Confidence if we swept liquidity or have CVD Div
-                    if liq_sweep == 1: score += 5
-                    if cvd_div == 1: score += 5
+                    bonus = 0
+                    if liq_sweep == 1: bonus += 5
+                    if cvd_div == 1: bonus += 5
+
+                    if (pL + bonus) >= CONF_THRESH:
+                        bias = "LONG"
+                        score = pL + bonus
 
         # --- SHORT LOGIC ---
         elif pS > CONF_THRESH:
@@ -104,21 +120,23 @@ class CryptoQuantEngine:
             if rsi > 30:
                 # Rule 2: Value Check (Prefer shorting above or near VWAP)
                 if vwap_dist > -0.02:  # Don't short if > 2% below VWAP
-                    bias = "SHORT"
-                    score = pS
                     # Bonus Confidence
-                    if liq_sweep == -1: score += 5
-                    if cvd_div == -1: score += 5
+                    bonus = 0
+                    if liq_sweep == -1: bonus += 5
+                    if cvd_div == -1: bonus += 5
+
+                    if (pS + bonus) >= CONF_THRESH:
+                        bias = "SHORT"
+                        score = pS + bonus
 
         # --- SAFETY VALVE (Conflict Resolution) ---
-        # If ML is highly confident but "House Rules" rejected it,
-        # we don't show Neutral. We show a "Watch" state or lower score.
-        if bias == "HOLD" and max(pL, pS) > CONF_THRESH:
-            # This explains "Pending" trades that never trigger
-            score = 55
+        # If we triggered logic but trend opposes, or signals conflict, revert to HOLD
+        if bias == "LONG" and not is_uptrend and trade_style != "SCALP":
+            bias = "HOLD"
+        if bias == "SHORT" and not is_downtrend and trade_style != "SCALP":
+            bias = "HOLD"
 
-            # 3. TRADE MANAGEMENT (Risk Engine)
-        price = last['close']
+        # 3. TRADE MANAGEMENT (Risk Engine)
         atr = float(last.get('atr_14', price * 0.01))
 
         # Dynamic Multipliers
@@ -154,14 +172,16 @@ class CryptoQuantEngine:
         if not drivers:
             drivers.append({"feature": "Trend", "desc": "MOMENTUM ALIGNMENT", "importance": 80})
 
+        dist = abs(t1 - price)
+
         return SimpleNamespace(
             bias=bias,
             score=int(min(99, round(score))),
             entry=price,
             stop=round(stop, 4),
             target1=round(t1, 4),
-            target2=round(t1 + (abs(t1 - price) * 0.5), 4),
-            target3=round(t1 + abs(t1 - price), 4),
+            target2=round(t1 + (dist * 0.5), 4),
+            target3=round(t1 + dist, 4),
             rr_ratio=round(tgt_mult / stop_mult, 2),
             expected_duration=duration,
             regime="LIQUIDITY RUN" if liq_sweep != 0 else "TREND",

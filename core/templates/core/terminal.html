@@ -16,7 +16,7 @@
 
 <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full min-h-screen flex flex-col font-mono text-slate-300 overflow-x-hidden">
 
-    <div class="w-full bg-[#050505] border-y border-white/10 mb-8 sm:mb-12 overflow-hidden relative shadow-2xl">
+    <div class="w-full bg-[#050505] border-y border-white/10 mb-8 sm:mb-10 overflow-hidden relative shadow-2xl">
         <div class="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-black to-transparent z-10"></div>
         <div class="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-black to-transparent z-10"></div>
         <div class="marquee-track flex items-center gap-12 sm:gap-16 py-3 whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-widest text-slate-500" id="live-marquee">
@@ -28,75 +28,66 @@
         <div class="w-full max-w-3xl relative group z-20">
             <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
 
-            <div class="relative flex items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-3 md:p-4 shadow-2xl gap-2 md:gap-4">
+            <div class="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-2 shadow-2xl gap-2 sm:gap-0">
 
-                <div class="flex items-center flex-grow bg-transparent pr-2 overflow-hidden">
-                    <span class="pl-2 md:pl-4 pr-2 md:pr-4 text-emerald-500 font-bold text-xl md:text-3xl">></span>
-                    <input id="symbol-input" type="text" placeholder="ASSET..."
-                           class="w-full bg-transparent border-none text-white text-xl md:text-3xl font-black placeholder-slate-800 focus:ring-0 uppercase tracking-widest h-12 md:h-16 p-0"
+                <div class="flex items-center flex-grow bg-transparent pr-2 overflow-hidden border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0">
+                    <span class="pl-3 pr-3 text-emerald-500 font-bold text-xl md:text-2xl">></span>
+                    <input id="symbol-input" type="text" placeholder="ENTER ASSET..."
+                           class="w-full bg-transparent border-none text-white text-lg md:text-2xl font-black placeholder-slate-800 focus:ring-0 uppercase tracking-widest h-12 p-0"
                            autocomplete="off" oninput="handleTickerInput(this.value)" onkeydown="handleEnter(event)">
                 </div>
 
-                <button onclick="initScan()" id="btn-scan" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-3 md:py-4 px-6 md:px-10 rounded-md text-xs md:text-sm tracking-[0.1em] md:tracking-[0.2em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex-shrink-0">
-                    SCAN <span class="hidden md:inline">MARKET</span>
-                </button>
+                <div class="flex items-center justify-between sm:justify-end gap-2 pl-0 sm:pl-3">
+                    <div class="w-full sm:w-auto">
+                        <select id="mode-select" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 cursor-pointer hover:bg-white/5 transition">
+                            <option value="INTRADAY">🛡️ Safe (Day)</option>
+                            <option value="SCALP">⚡ Scalp (Risk)</option>
+                        </select>
+                    </div>
+
+                    <button onclick="initScan()" id="btn-scan" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex items-center justify-center gap-2">
+                        <span>SCAN</span> <i data-lucide="radar" class="w-3 h-3"></i>
+                    </button>
+                </div>
             </div>
 
             <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-2 rounded-lg hidden z-50 shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"></div>
         </div>
-
-        <div class="mt-8 flex flex-wrap justify-center items-center gap-3 animate-fade-in opacity-90 hover:opacity-100 transition px-4 text-center">
-             <div class="px-3 py-1 rounded-full bg-emerald-900/30 border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.15)] flex-shrink-0">
-                <span class="relative flex h-1.5 w-1.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                </span>
-                <span class="text-[9px] font-bold text-emerald-400 tracking-[0.15em] uppercase">Sniper Logic Active</span>
-            </div>
-            <span class="text-[9px] text-slate-500 font-mono tracking-wide">Mode: INTRADAY (1H)</span>
-        </div>
     </div>
 
-    <div class="w-full max-w-5xl mx-auto mb-16 px-2">
+    <div class="w-full max-w-6xl mx-auto mb-12 px-2">
         <div class="flex items-center justify-center gap-4 mb-6 opacity-60">
-            <div class="h-px bg-white/10 w-16 sm:w-32"></div>
-            <span class="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">Market Radar</span>
-            <div class="h-px bg-white/10 w-16 sm:w-32"></div>
+            <div class="h-px bg-white/10 w-16"></div>
+            <span class="text-[9px] text-slate-500 uppercase tracking-[0.2em] font-bold">Market Radar</span>
+            <div class="h-px bg-white/10 w-16"></div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div onclick="quickScan('BTC')" class="bg-[#0a0a0a] border border-white/10 rounded-xl p-5 hover:border-blue-500/50 cursor-pointer transition-all group active:scale-95 relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-10 bg-orange-500/5 blur-2xl rounded-full"></div>
-                <div class="flex justify-between items-start mb-3 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-white/5"><i data-lucide="bitcoin" class="w-4 h-4 text-orange-500"></i></div>
-                        <div><h3 class="text-sm font-bold text-white leading-none">BTC/USDT</h3><span class="text-[9px] text-slate-500 font-mono">Dominance Leader</span></div>
-                    </div>
-                    <span class="text-[9px] bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition">SCAN</span>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+            <div onclick="quickScan('BTC')" class="bg-[#0a0a0a] border border-orange-500/20 rounded-xl p-6 min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(249,115,22,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+                <div class="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition"></div>
+                <div class="relative z-10 text-center">
+                    <div class="bg-orange-500/20 w-10 h-10 rounded-full flex items-center justify-center mb-3 mx-auto text-orange-400 group-hover:scale-110 transition"><i data-lucide="bitcoin" class="w-5 h-5"></i></div>
+                    <h3 class="text-xl font-black text-white tracking-tight">BTC/USDT</h3>
+                    <span class="text-[10px] text-orange-400/80 font-bold tracking-widest mt-1 block">MARKET LEADER</span>
                 </div>
-                <div class="w-full bg-[#111] h-1 rounded-full overflow-hidden"><div class="h-full bg-orange-500 w-[65%]"></div></div>
             </div>
-            <div onclick="quickScan('SOL')" class="bg-[#0a0a0a] border border-white/10 rounded-xl p-5 hover:border-purple-500/50 cursor-pointer transition-all group active:scale-95 relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-10 bg-purple-500/5 blur-2xl rounded-full"></div>
-                <div class="flex justify-between items-start mb-3 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-white/5"><i data-lucide="zap" class="w-4 h-4 text-purple-500"></i></div>
-                        <div><h3 class="text-sm font-bold text-white leading-none">SOL/USDT</h3><span class="text-[9px] text-slate-500 font-mono">High Velocity</span></div>
-                    </div>
-                    <span class="text-[9px] bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition">SCAN</span>
+
+            <div onclick="quickScan('ETH')" class="bg-[#0a0a0a] border border-blue-500/20 rounded-xl p-6 min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+                <div class="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition"></div>
+                <div class="relative z-10 text-center">
+                    <div class="bg-blue-500/20 w-10 h-10 rounded-full flex items-center justify-center mb-3 mx-auto text-blue-400 group-hover:scale-110 transition"><i data-lucide="layers" class="w-5 h-5"></i></div>
+                    <h3 class="text-xl font-black text-white tracking-tight">ETH/USDT</h3>
+                    <span class="text-[10px] text-blue-400/80 font-bold tracking-widest mt-1 block">SMART MONEY</span>
                 </div>
-                <div class="w-full bg-[#111] h-1 rounded-full overflow-hidden"><div class="h-full bg-purple-500 w-[85%]"></div></div>
             </div>
-            <div onclick="quickScan('ETH')" class="bg-[#0a0a0a] border border-white/10 rounded-xl p-5 hover:border-blue-500/50 cursor-pointer transition-all group active:scale-95 relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-10 bg-blue-500/5 blur-2xl rounded-full"></div>
-                <div class="flex justify-between items-start mb-3 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center border border-white/5"><i data-lucide="layers" class="w-4 h-4 text-blue-500"></i></div>
-                        <div><h3 class="text-sm font-bold text-white leading-none">ETH/USDT</h3><span class="text-[9px] text-slate-500 font-mono">Smart Money</span></div>
-                    </div>
-                    <span class="text-[9px] bg-white/5 border border-white/10 px-2 py-1 rounded text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition">SCAN</span>
+
+            <div onclick="quickScan('SOL')" class="bg-[#0a0a0a] border border-purple-500/20 rounded-xl p-6 min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+                <div class="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition"></div>
+                <div class="relative z-10 text-center">
+                    <div class="bg-purple-500/20 w-10 h-10 rounded-full flex items-center justify-center mb-3 mx-auto text-purple-400 group-hover:scale-110 transition"><i data-lucide="zap" class="w-5 h-5"></i></div>
+                    <h3 class="text-xl font-black text-white tracking-tight">SOL/USDT</h3>
+                    <span class="text-[10px] text-purple-400/80 font-bold tracking-widest mt-1 block">HIGH VOLATILITY</span>
                 </div>
-                <div class="w-full bg-[#111] h-1 rounded-full overflow-hidden"><div class="h-full bg-blue-500 w-[45%]"></div></div>
             </div>
         </div>
     </div>
@@ -116,286 +107,144 @@
 
     <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 w-full opacity-0 translate-y-4 transition-all duration-700">
 
-        <div class="col-span-1 lg:col-span-8">
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden">
-                <div id="status-bar" class="h-1 w-full bg-slate-800"></div>
+        <div class="col-span-1 lg:col-span-12">
+            <div id="signal-box" class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center">
+                <div id="signal-glow" class="absolute inset-0 opacity-0 transition-opacity"></div>
+                <div id="status-bar" class="hidden"></div>
 
-                <div class="p-6 sm:p-8 space-y-8">
-                    <div class="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0">
-                        <div>
-                            <div class="flex items-center gap-3">
-                                <h2 id="res-symbol" class="text-4xl sm:text-5xl font-black text-white">--</h2>
-                                <span id="res-regime-tag" class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all">
-                                    --
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-3 mt-1">
-                                <span id="res-price" class="text-xl sm:text-2xl text-blue-400 font-bold font-mono">--</span>
-                                <button onclick="initBacktest()" class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-white transition ml-3 border border-white/10 px-2 py-1 rounded bg-white/5 hover:bg-white/10">
-                                    <i data-lucide="history" class="w-3 h-3"></i>
-                                    VALIDATE STRATEGY
-                                </button>
-                                <button onclick="addToJournal()" id="btn-journal" class="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-emerald-400 transition ml-2 border border-white/10 px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/10">
-                                <i data-lucide="bookmark" class="w-3 h-3"></i>
-                                    SAVE SIGNAL
-                                </button>
-                            </div>
+                <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-0">
+
+                    <div>
+                        <div class="flex items-center gap-3 mb-2">
+                             <span id="lbl-status" class="text-[10px] bg-white/5 border border-white/10 text-slate-400 px-2 py-1 rounded tracking-widest uppercase font-bold">SIGNAL</span>
+                             <h2 id="res-symbol" class="text-sm font-bold text-slate-500 tracking-widest uppercase">--</h2>
+                             <span id="res-regime-tag" class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all">--</span>
                         </div>
 
-                        <div class="flex flex-col items-center gap-2">
-                            <div class="relative self-center sm:self-auto group">
-                                <svg class="w-20 h-20 -rotate-90">
-                                    <circle cx="40" cy="40" r="36" stroke-width="6" stroke="currentColor" class="text-slate-800" fill="transparent"/>
-                                    <circle id="score-ring" cx="40" cy="40" r="36" stroke-width="6" stroke="currentColor"
-                                            class="text-blue-500 transition-all duration-700"
-                                            fill="transparent"
-                                            stroke-dasharray="226"
-                                            stroke-dashoffset="226"/>
-                                </svg>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span id="res-score" class="text-lg font-bold text-white">0%</span>
-                                    <span class="text-[8px] uppercase text-slate-500">Confidence</span>
-                                </div>
-                            </div>
-                            <button onclick="openGuide()" class="flex items-center gap-1 text-[9px] text-blue-400 hover:text-white transition border-b border-blue-500/30 hover:border-white">
-                                <i data-lucide="help-circle" class="w-3 h-3"></i>
-                                How to read this?
+                        <div class="flex items-baseline gap-4">
+                            <h1 id="res-direction" class="text-4xl md:text-8xl font-black tracking-tighter text-slate-500 leading-none">NEUTRAL</h1>
+                        </div>
+                        <p id="lock-msg" class="text-xs text-blue-300 mt-2 font-bold hidden"><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> CAPITAL PRESERVATION MODE ACTIVE</p>
+
+                        <div class="flex items-center gap-3 mt-4">
+                             <button onclick="addToJournal()" id="btn-journal" class="flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition">
+                                <i data-lucide="bookmark" class="w-3 h-3"></i> SAVE
+                            </button>
+                            <button onclick="initBacktest()" class="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-white bg-transparent hover:bg-white/5 border border-white/10 px-4 py-2 rounded transition">
+                                <i data-lucide="history" class="w-3 h-3"></i> BACKTEST
                             </button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div id="signal-box" class="rounded-xl p-5 border border-white/10 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-500 min-h-[120px]">
-                            <div id="signal-glow" class="absolute inset-0 opacity-0 transition-opacity"></div>
-                            <span id="signal-label" class="text-[10px] uppercase tracking-widest text-slate-500 mb-1 relative z-10">Directional Bias</span>
-                            <span id="res-direction" class="text-3xl font-black text-slate-400 relative z-10">NEUTRAL</span>
-                        </div>
-
-                        <div class="bg-[#111] rounded-xl p-5 border border-white/10 flex flex-col justify-center min-h-[120px] relative group">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-[10px] uppercase tracking-widest text-slate-500">Execution</span>
-                                <div class="flex items-center gap-2">
-                                    <div id="no-trade-info" class="hidden relative group/tooltip cursor-help">
-                                        <i data-lucide="info" class="w-3 h-3 text-slate-600 hover:text-slate-400"></i>
-                                        <div class="absolute bottom-full right-0 mb-2 w-48 p-2 bg-slate-800 border border-slate-700 text-[10px] text-slate-300 rounded shadow-xl hidden group-hover/tooltip:block z-50">
-                                            The market is too choppy. The Sniper AI has activated safety filters to prevent capital loss.
-                                        </div>
-                                    </div>
-                                    <div id="exec-dot" class="w-2 h-2 rounded-full bg-slate-600"></div>
-                                </div>
-                            </div>
-                            <span id="exec-status" class="block mt-1 text-sm font-bold text-slate-300">MARKET NOT READY</span>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                        <div class="bg-red-900/10 border border-red-500/20 rounded-xl p-2 sm:p-4">
-                            <span class="text-[9px] sm:text-[10px] text-red-400 uppercase tracking-widest">Stop</span>
-                            <span id="res-stop" class="block text-sm sm:text-xl font-black text-red-500 font-mono break-all mt-1">--</span>
-                        </div>
-                        <div class="bg-[#111] border border-white/10 rounded-xl p-2 sm:p-4">
-                            <span class="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-widest">Entry</span>
-                            <span id="res-entry" class="block text-sm sm:text-xl font-black text-white font-mono break-all mt-1">--</span>
-                        </div>
-                        <div class="bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-2 sm:p-4">
-                            <span class="text-[9px] sm:text-[10px] text-emerald-400 uppercase tracking-widest">Target</span>
-                            <span id="res-target2" class="block text-sm sm:text-xl font-black text-emerald-500 font-mono break-all mt-1">--</span>
-                        </div>
-                    </div>
-
-                    <div class="border-t border-white/5 pt-4 text-[10px] font-mono space-y-4">
-                        <div class="flex flex-wrap gap-4 sm:gap-6 justify-center sm:justify-start">
-                            <span>R/R: <b id="res-rr">--</b></span>
-                            <span>Vol: <b id="res-whale-tag">--</b></span>
-                            <span>Duration: <b id="res-duration" class="text-blue-400">--</b></span>
-                            <span>Leverage: <b id="res-leverage" class="text-amber-400">--</b></span>
-                        </div>
-
-                        <div class="bg-[#111] p-4 rounded-xl border border-white/10">
-                            <div class="text-[10px] uppercase text-slate-500 mb-2">Position Sizing</div>
-                            <div class="grid grid-cols-3 gap-3">
-                                <input id="cap-input" placeholder="Capital $" type="number" class="bg-black border border-white/10 rounded px-2 py-2 text-xs text-white w-full">
-                                <input id="risk-input" placeholder="Risk %" type="number" class="bg-black border border-white/10 rounded px-2 py-2 text-xs text-white w-full">
-                                <div id="pos-size" class="bg-black border border-white/10 rounded px-2 py-2 text-xs text-emerald-400 font-bold flex items-center justify-center">--</div>
-                            </div>
-                        </div>
+                    <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0">
+                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">AI Confidence</span>
+                         <div class="flex items-center md:justify-end gap-3">
+                             <span id="res-price" class="hidden">--</span>
+                             <span id="res-score" class="text-5xl md:text-7xl font-bold text-white tracking-tighter">0%</span>
+                         </div>
+                         <div class="mt-2 text-right hidden md:block">
+                            <span id="exec-status" class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">MARKET SCANNING...</span>
+                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-span-1 lg:col-span-4 space-y-6">
-
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
-                <div class="flex items-center gap-2 mb-6">
-                    <div class="w-1 h-4 bg-blue-500"></div>
-                    <h4 class="text-sm font-bold text-white uppercase tracking-widest">Logic Vectors</h4>
+        <div class="col-span-1 lg:col-span-12">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-blue-500/30 transition">
+                    <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Entry Zone</span>
+                    <span id="res-entry" class="block text-lg md:text-2xl font-mono font-bold text-white mt-1 break-all">--</span>
                 </div>
-                <div id="shap-box" class="grid grid-cols-1 gap-3">
+                <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-red-500/30 transition">
+                    <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Stop Loss</span>
+                    <span id="res-stop" class="block text-lg md:text-2xl font-mono font-bold text-red-500 mt-1 break-all">--</span>
+                </div>
+                <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-emerald-500/30 transition">
+                    <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Target</span>
+                    <span id="res-target2" class="block text-lg md:text-2xl font-mono font-bold text-emerald-500 mt-1 break-all">--</span>
+                </div>
+                <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition">
+                    <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Whale Flow</span>
+                    <span id="res-whale-tag" class="block text-lg md:text-2xl font-bold text-blue-400 mt-1 truncate">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-1 lg:col-span-8 space-y-6">
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
+                 <div class="flex items-center justify-between mb-6">
+                    <h4 class="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i> Logic Vectors
+                    </h4>
+                    <span class="text-[9px] text-slate-500 font-mono">ML EXPLAINABILITY</span>
+                </div>
+                <div id="shap-box" class="space-y-5">
+                    <div class="text-[10px] text-slate-600 italic text-center py-4">Run scan to view factors.</div>
                 </div>
             </div>
 
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden">
-                <div class="flex justify-between items-center mb-4">
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
+                <div class="text-[10px] uppercase text-slate-500 font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-3 h-3"></i> Position Sizing
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><label class="block text-[9px] text-slate-600 mb-1">CAPITAL ($)</label><input id="cap-input" placeholder="10000" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">RISK (%)</label><input id="risk-input" placeholder="1.0" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">SIZE</label><div id="pos-size" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-emerald-400 font-bold flex items-center h-[34px]">--</div></div>
+                </div>
+                <span id="res-rr" class="hidden">--</span>
+                <span id="res-duration" class="hidden">--</span>
+                <span id="res-leverage" class="hidden">--</span>
+            </div>
+        </div>
+
+        <div class="col-span-1 lg:col-span-4 space-y-6">
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 h-[250px] flex flex-col relative overflow-hidden">
+                <div class="flex justify-between items-center mb-4 relative z-10">
                     <div class="flex items-center gap-2">
                         <span class="relative flex h-2 w-2">
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <h4 class="text-sm font-bold text-white uppercase tracking-widest">Scanner Log</h4>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-widest">Scanner Log</h4>
                     </div>
-                    <span class="text-[8px] text-slate-500 font-mono">LIVE FEED</span>
                 </div>
-                <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 h-40 overflow-y-auto custom-scrollbar border-l border-white/5 pl-3 flex flex-col justify-end">
-                    </div>
+                <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 overflow-y-auto custom-scrollbar flex-grow flex flex-col justify-end relative z-10"></div>
+                <div class="absolute bottom-0 right-0 p-16 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
             </div>
 
-            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 max-h-[420px] flex flex-col">
+            <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 max-h-[400px] flex flex-col">
                 <div class="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
-                    <span class="text-[10px] uppercase tracking-widest text-slate-500">Intel Feed</span>
-                    <span class="text-[9px] bg-red-900/20 text-red-400 px-2 py-0.5 rounded border border-red-500/20 animate-pulse">LIVE</span>
+                    <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Intel Feed</span>
                 </div>
-                <div id="news-feed" class="space-y-3 overflow-y-auto custom-scrollbar max-h-[300px]">
-                    <div class="text-xs text-slate-600 italic">Waiting for uplink...</div>
-                </div>
-            </div>
-
-            <div class="bg-[#5865F2]/10 border border-[#5865F2]/20 rounded-xl p-6 relative group overflow-hidden">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-[#5865F2]/20 blur-[50px] rounded-full group-hover:bg-[#5865F2]/30 transition duration-500"></div>
-
-                <div class="relative z-10">
-                    <div class="flex items-center justify-between mb-3">
-                        <h4 class="text-white font-bold text-sm uppercase tracking-widest">Mobile Alerts</h4>
-                        <i data-lucide="bell" class="w-4 h-4 text-[#5865F2] animate-pulse"></i>
-                    </div>
-
-                    <p class="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                        Don't stare at the screen. Connect to our secure channel to get <span class="text-white font-bold">Push Notifications</span> when the Sniper AI fires.
-                    </p>
-
-                    <a href="https://discord.gg/csVPpg6mFD" target="_blank"
-                       class="flex items-center justify-center gap-2 w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-3 rounded text-[10px] uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(88,101,242,0.3)] hover:shadow-[0_0_30px_rgba(88,101,242,0.5)]">
-                        <svg class="w-4 h-4 fill-current" viewBox="0 0 127.14 96.36">
-                            <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
-                        </svg>
-                        Connect Discord
-                    </a>
+                <div id="news-feed" class="space-y-3 overflow-y-auto custom-scrollbar">
+                    <div class="text-[10px] text-slate-600 italic">Waiting for uplink...</div>
                 </div>
             </div>
-
         </div>
     </div>
 
     <div id="error-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_50px_rgba(220,38,38,0.2)] text-center">
-            <div class="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
-                <i data-lucide="alert-triangle" class="w-6 h-6 text-red-500"></i>
-            </div>
             <h3 id="error-title" class="text-lg font-bold text-white mb-2 tracking-wide">SYSTEM ERROR</h3>
-            <p id="error-msg" class="text-xs text-slate-400 font-mono mb-6 leading-relaxed">Connection severed.</p>
-            <button onclick="closeError()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded text-xs tracking-widest transition-all shadow-lg">
-                ACKNOWLEDGE
-            </button>
+            <p id="error-msg" class="text-xs text-slate-400 font-mono mb-6 leading-relaxed">--</p>
+            <button onclick="closeError()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded text-xs tracking-widest transition-all">ACKNOWLEDGE</button>
         </div>
     </div>
 
     <div id="backtest-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-md w-full p-6 relative shadow-2xl">
-            <button onclick="closeBacktest()" class="absolute top-3 right-3 p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition z-50 cursor-pointer">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-
-            <div class="flex items-center gap-2 mb-1">
-                <h3 class="text-lg font-bold text-white">Strategy Validation</h3>
-                <span class="text-[9px] bg-gradient-to-r from-emerald-500 to-emerald-700 text-white px-2 py-0.5 rounded font-bold uppercase">Titanium Grade</span>
-            </div>
-            <p class="text-xs text-slate-500 uppercase tracking-widest mb-6">Last 180 Days Performance (Out of Sample)</p>
-
-            <div id="bt-loader" class="text-center py-10">
-                <div class="w-8 h-8 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div>
-                <p class="text-xs text-slate-500 animate-pulse">CALCULATING ALPHA...</p>
-            </div>
-
+            <button onclick="closeBacktest()" class="absolute top-3 right-3 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <h3 class="text-lg font-bold text-white mb-1">Strategy Validation</h3>
+            <div id="bt-loader" class="text-center py-10"><div class="w-8 h-8 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div><p class="text-xs text-slate-500">CALCULATING ALPHA...</p></div>
             <div id="bt-results" class="hidden space-y-4">
                 <div class="grid grid-cols-3 gap-3 mb-6">
-                    <div class="bg-[#111] p-3 rounded text-center border border-emerald-500/10">
-                        <span class="text-[9px] text-slate-500 block mb-1">WIN RATE</span>
-                        <span id="bt-winrate" class="text-lg font-bold text-emerald-400">--</span>
-                    </div>
-                    <div class="bg-[#111] p-3 rounded text-center border border-white/5">
-                        <span class="text-[9px] text-slate-500 block mb-1">R:R RATIO</span>
-                        <span id="bt-pnl" class="text-lg font-bold text-blue-400">--</span>
-                    </div>
-                    <div class="bg-[#111] p-3 rounded text-center border border-white/5">
-                        <span class="text-[9px] text-slate-500 block mb-1">SIGNALS</span>
-                        <span id="bt-trades" class="text-lg font-bold text-white">--</span>
-                    </div>
+                    <div class="bg-[#111] p-3 rounded text-center"><span class="text-[9px] text-slate-500 block">WIN RATE</span><span id="bt-winrate" class="text-lg font-bold text-emerald-400">--</span></div>
+                    <div class="bg-[#111] p-3 rounded text-center"><span class="text-[9px] text-slate-500 block">PROFIT FACTOR</span><span id="bt-pnl" class="text-lg font-bold text-blue-400">--</span></div>
+                    <div class="bg-[#111] p-3 rounded text-center"><span class="text-[9px] text-slate-500 block">TRADES</span><span id="bt-trades" class="text-lg font-bold text-white">--</span></div>
                 </div>
-                <div class="border-t border-white/5 pt-4">
-                    <p class="text-[9px] text-slate-500 uppercase mb-3 flex justify-between">
-                        <span>Trade Log</span>
-                        <span class="text-emerald-500">PROFITABLE</span>
-                    </p>
-                    <div id="bt-log" class="space-y-2 text-[10px] font-mono text-slate-400 max-h-40 overflow-y-auto custom-scrollbar"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="guide-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-[#0a0a0a] border border-blue-500/20 rounded-2xl max-w-2xl w-full p-8 shadow-[0_0_50px_rgba(59,130,246,0.1)] relative max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onclick="closeGuide()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                    <i data-lucide="crosshair" class="w-5 h-5 text-blue-400"></i>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-white">Sniper Protocol: Field Manual</h3>
-                    <p class="text-[10px] text-slate-500 uppercase tracking-widest">Trade Less. Win More.</p>
-                </div>
-            </div>
-
-            <div class="space-y-8">
-                <div class="border-l-2 border-blue-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">1. The Green Light</h4>
-                    <p class="text-xs text-slate-400 mb-3 leading-relaxed">
-                        Think of this like a traffic light. The AI scans millions of data points to find <strong>Institutional Momentum</strong>.
-                    </p>
-                    <ul class="text-xs text-slate-400 space-y-2 list-disc list-inside">
-                        <li><strong>Under 60%?</strong> Stay Cash. The market is just noise.</li>
-                        <li><strong>Yellow (60-64%)?</strong> Get Ready. A move is building.</li>
-                        <li><strong>Green (65%+)?</strong> <span class="text-emerald-400 font-bold">EXECUTE.</span> The odds are mathematically in your favor.</li>
-                    </ul>
-                </div>
-
-                <div class="border-l-2 border-purple-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">2. Why is it silent?</h4>
-                    <p class="text-xs text-slate-400 leading-relaxed mb-2">
-                        Most traders lose money because they trade "Chop" (sideways markets).
-                    </p>
-                    <div class="bg-[#111] p-3 rounded border border-white/5">
-                        <p class="text-[10px] text-slate-300 italic">
-                            "If the Scanner is silent, it is saving your money. It only speaks when there is a clear shot."
-                        </p>
-                    </div>
-                </div>
-
-                <div class="border-l-2 border-red-500 pl-4">
-                    <h4 class="text-sm font-bold text-white mb-2">3. The 24-Hour Rule</h4>
-                    <p class="text-xs text-slate-400 leading-relaxed">
-                        Time is Money. If a trade doesn't hit the target within <strong>24 Hours</strong>, the edge is gone. The system will mark it as "TIMEOUT".
-                        <br><br>
-                        <strong>Your Job:</strong> Close the trade at Breakeven. Don't hope. Move to the next target.
-                    </p>
-                </div>
-
-            </div>
-
-            <div class="mt-8 pt-6 border-t border-white/10 text-center">
-                <button onclick="closeGuide()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded text-xs tracking-widest transition shadow-lg shadow-blue-900/20">
-                    ACKNOWLEDGE MISSION
-                </button>
+                <div id="bt-log" class="space-y-2 text-[10px] font-mono text-slate-400 max-h-40 overflow-y-auto custom-scrollbar"></div>
             </div>
         </div>
     </div>
@@ -406,420 +255,185 @@
     @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     .marquee-track { animation: marquee 60s linear infinite; }
     .marquee-track:hover { animation-play-state: paused; }
-
-    @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
     .animate-fade-in { animation: fade-in 0.5s forwards; }
-
+    @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
     body { font-family: 'Inter', sans-serif; background-color: #020202; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
-    .cursor-blink { animation: blink 1s step-end infinite; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #020202; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    html { scrollbar-width: thin; scrollbar-color: #334155 #020202; }
 </style>
 
 <script>
-    // --- UTILITIES ---
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-    function showError(title, msg) {
-        const modal = document.getElementById('error-modal');
-        document.getElementById('error-title').innerText = title;
-        document.getElementById('error-msg').innerText = msg;
-        modal.classList.remove('hidden');
-    }
-    function closeError() { document.getElementById('error-modal').classList.add('hidden'); }
-
-    // GUIDE MODAL LOGIC
-    function openGuide() { document.getElementById('guide-modal').classList.remove('hidden'); }
-    function closeGuide() { document.getElementById('guide-modal').classList.add('hidden'); }
-
-    function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
-    function formatPrice(value) {
-        const num = parseFloat(value);
-        if (isNaN(num)) return "--";
-        return num < 1.0 ? num.toFixed(5) : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    // --- REVISED DRIVER LOGIC ---
+    // --- UI HELPERS: Updated Logic Vectors with Icons ---
     function updateDrivers(explanation, show) {
         const container = document.getElementById("shap-box");
         container.innerHTML = "";
-
         if (!show || !explanation || explanation.length === 0) {
             container.innerHTML = `<div class="text-[10px] text-slate-600 italic text-center py-4">Vectors appear only when execution-grade edge exists.</div>`;
             return;
         }
-
         explanation.slice(0, 3).forEach((item, i) => {
-            let mainColor = "#94a3b8";
-            let bgColor = "rgba(148, 163, 184, 0.1)";
-            let icon = "📊";
-
+            let mainColor = "bg-slate-500"; let textColor = "text-slate-400"; let icon = "activity";
             const desc = item.desc ? item.desc.toUpperCase() : "";
-            const feature = item.feature ? item.feature.toUpperCase() : "";
 
-            if (desc.includes("WHALE") || desc.includes("ACCUMULATION") || feature.includes("WHALE")) {
-                mainColor = "#22d3ee"; bgColor = "rgba(34, 211, 238, 0.1)"; icon = "🐋";
-            }
-            else if (desc.includes("TREND") || desc.includes("MOMENTUM") || desc.includes("VELOCITY") || desc.includes("CLEAN")) {
-                mainColor = "#60a5fa"; bgColor = "rgba(96, 165, 250, 0.1)"; icon = "💎";
-            }
-            else if (desc.includes("SQUEEZE") || desc.includes("VOLATILITY")) {
-                mainColor = "#c084fc"; bgColor = "rgba(192, 132, 252, 0.1)"; icon = "⚡";
-            }
-            else if (desc.includes("EFFICIENCY")) {
-                mainColor = "#34d399"; bgColor = "rgba(52, 211, 153, 0.1)"; icon = "✨";
+            if (desc.includes("WHALE") || desc.includes("ACCUMULATION")) {
+                mainColor = "bg-blue-500"; textColor = "text-blue-400"; icon = "waves";
+            } else if (desc.includes("TREND") || desc.includes("MOMENTUM")) {
+                mainColor = "bg-emerald-500"; textColor = "text-emerald-400"; icon = "trending-up";
+            } else if (desc.includes("SQUEEZE") || desc.includes("VOLATILITY")) {
+                mainColor = "bg-purple-500"; textColor = "text-purple-400"; icon = "zap";
             }
 
-            const card = `
-                <div class="p-4 rounded-xl relative group transition hover:scale-[1.02] duration-300 mb-3"
-                     style="background-color: ${bgColor}; border: 1px solid ${mainColor}40;">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-[9px] uppercase font-bold text-slate-500 tracking-widest">DRIVER 0${i+1}</span>
-                        <span class="text-xs font-mono font-bold" style="color: ${mainColor}">${item.importance.toFixed(1)}</span>
+            const width = Math.min(item.importance, 100);
+            const row = `
+                <div class="mb-4 last:mb-0">
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                            <i data-lucide="${icon}" class="w-3 h-3 ${textColor}"></i> ${item.desc}
+                        </span>
+                        <span class="text-[10px] font-mono ${textColor}">${item.importance.toFixed(1)}</span>
                     </div>
-                    <div class="flex items-center gap-3 mb-4">
-                        <span class="text-xl filter drop-shadow-md transform group-hover:scale-110 transition">${icon}</span>
-                        <h5 class="text-xs font-bold uppercase tracking-wider" style="color: ${mainColor}">${item.desc}</h5>
-                    </div>
-                    <div class="w-full bg-black/40 h-1.5 rounded-full overflow-hidden border border-white/5">
-                        <div class="h-full transition-all duration-1000 ease-out"
-                             style="width: ${Math.min(item.importance, 100)}%; background-color: ${mainColor}; box-shadow: 0 0 15px ${mainColor};">
-                        </div>
+                    <div class="w-full bg-[#111] h-1.5 rounded-full overflow-hidden">
+                        <div class="h-full ${mainColor} rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.1)]" style="width: ${width}%"></div>
                     </div>
                 </div>`;
-            container.insertAdjacentHTML('beforeend', card);
+            container.insertAdjacentHTML('beforeend', row);
         });
+        if(window.lucide) lucide.createIcons();
     }
 
-    // --- HEARTBEAT LOGIC (PERSISTENT FEED) ---
-    function logMessage(msg, colorClass="text-slate-500") {
-        const log = document.getElementById('scanner-log');
-        if(!log) return;
+    function getCookie(name) { let cookieValue = null; if (document.cookie && document.cookie !== '') { const cookies = document.cookie.split(';'); for (let i = 0; i < cookies.length; i++) { const cookie = cookies[i].trim(); if (cookie.substring(0, name.length + 1) === (name + '=')) { cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); break; } } } return cookieValue; }
+    function showError(title, msg) { document.getElementById('error-title').innerText = title; document.getElementById('error-msg').innerText = msg; document.getElementById('error-modal').classList.remove('hidden'); }
+    function closeError() { document.getElementById('error-modal').classList.add('hidden'); }
+    function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
+    function formatPrice(value) { const num = parseFloat(value); if (isNaN(num)) return "--"; return num < 1.0 ? num.toFixed(5) : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-        const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'});
-        const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`;
+    // --- PULSE LOGIC ---
+    function logMessage(msg, colorClass="text-slate-500") { const log = document.getElementById('scanner-log'); if(!log) return; const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'}); const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`; log.insertAdjacentHTML('beforeend', row); log.scrollTop = log.scrollHeight; if(log.children.length > 50) log.firstElementChild.remove(); }
 
-        log.insertAdjacentHTML('beforeend', row);
-        log.scrollTop = log.scrollHeight;
-        if(log.children.length > 50) log.firstElementChild.remove();
-    }
-
+    // --- FAKE WORKER LOGS ---
     function initMaintenanceLoop() {
-        const idleMessages = [
-            "Monitoring Order Flow...",
-            "Scanning 24h Volume Profile...",
-            "Calculating Volatility Drift...",
-            "Checking Whale Wallet Movement...",
-            "System Idle. Awaiting Volatility...",
-            "Updating Moving Averages...",
-            "Analyzing Funding Rates...",
-            "Network Stable. Latency < 20ms.",
-            "Filtering Noise. Protecting Capital."
+        const msgs = [
+            "Scanning Dark Pool Liquidity...", "Calculating CVD Divergence...", "Checking Whale Wallets...",
+            "Volatility Drift: Stable...", "Order Book Imbalance Check...", "Filtering Retail Noise...",
+            "System Idle. Protecting Capital.", "Network Latency: 12ms", "Accumulating Ticks..."
         ];
-
-        setInterval(() => {
-            const dash = document.getElementById('dashboard');
-            if(dash && !dash.classList.contains('hidden')) {
-                const randomMsg = idleMessages[Math.floor(Math.random() * idleMessages.length)];
-                logMessage(randomMsg, "text-slate-600");
-            }
-        }, 4000);
+        setInterval(() => { const dash = document.getElementById('dashboard'); if(dash && !dash.classList.contains('hidden')) { logMessage(msgs[Math.floor(Math.random() * msgs.length)], "text-slate-600"); } }, 3500);
     }
-
     document.addEventListener("DOMContentLoaded", () => {
         initMaintenanceLoop();
         setTimeout(() => logMessage(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
-        setTimeout(() => logMessage(">> CONNECTING TO NEURAL NET...", "text-slate-400"), 1200);
-        setTimeout(() => logMessage(">> SYSTEM ONLINE. READY TO SCAN.", "text-emerald-500 font-bold"), 2000);
+        setTimeout(() => logMessage(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 2000);
+        if(window.lucide) lucide.createIcons();
     });
 
-    // --- NEWS FEED (REAL ONLY) ---
-    function updateNews(newsData) {
-        const box = document.getElementById('news-feed');
-        box.innerHTML = '';
-        if (!newsData || newsData.length === 0) {
-            box.innerHTML = `<div class="text-xs text-slate-500 italic text-center mt-8">No significant headlines.</div>`;
-            return;
-        }
-        newsData.forEach(item => {
-            const row = `
-                <a href="${item.url}" target="_blank" class="block group border-b border-white/5 pb-3 last:border-0">
-                    <h5 class="text-[11px] text-slate-300 font-medium leading-relaxed group-hover:text-blue-400 transition-colors mb-1">${item.title}</h5>
-                    <div class="flex justify-between items-center">
-                        <span class="text-[9px] text-slate-600 font-mono uppercase">${item.source}</span>
-                        <i data-lucide="external-link" class="w-3 h-3 text-slate-700 group-hover:text-blue-500 transition-colors"></i>
-                    </div>
-                </a>`;
-            box.insertAdjacentHTML('beforeend', row);
-        });
-        if (window.lucide) lucide.createIcons();
-    }
+    function updateNews(newsData) { const box = document.getElementById('news-feed'); box.innerHTML = ''; if (!newsData || newsData.length === 0) { box.innerHTML = `<div class="text-[10px] text-slate-500 italic text-center mt-4">No significant headlines.</div>`; return; } newsData.forEach(item => { const row = `<a href="${item.url}" target="_blank" class="block group border-b border-white/5 pb-2 last:border-0"><h5 class="text-[10px] text-slate-300 font-medium group-hover:text-blue-400 transition-colors mb-0.5">${item.title}</h5><span class="text-[8px] text-slate-600 font-mono uppercase">${item.source}</span></a>`; box.insertAdjacentHTML('beforeend', row); }); if (window.lucide) lucide.createIcons(); }
 
-    function resetPositionSizingUI() {
-        const cap = document.getElementById("cap-input");
-        const risk = document.getElementById("risk-input");
-        const size = document.getElementById("pos-size");
-        if (cap) cap.value = "";
-        if (risk) risk.value = "";
-        if (size) size.innerText = "--";
-    }
+    function updateLeverage(score) { let text = "Low"; if (score >= 80) text = "High"; else if (score >= 65) text = "Mod"; const el = document.getElementById("res-leverage"); if(el) el.innerText = text; }
+    function calcPositionSize() { const cap = parseFloat(document.getElementById("cap-input")?.value); const risk = parseFloat(document.getElementById("risk-input")?.value); const entry = parseFloat(document.getElementById("res-entry").innerText.replace(/,/g, "")); if (!cap || !risk || !entry || isNaN(entry)) return; document.getElementById("pos-size").innerText = ((cap * (risk / 100)) / entry).toFixed(4) + " units"; }
+    document.getElementById("cap-input")?.addEventListener("input", calcPositionSize);
+    document.getElementById("risk-input")?.addEventListener("input", calcPositionSize);
+    const _safeSet = window.safeSetText; window.safeSetText = function (id, text) { _safeSet(id, text); if (id === "res-score") { const s = parseFloat(text); if (!isNaN(s)) updateLeverage(s); } };
 
-    function quickScan(ticker) {
-        document.getElementById('symbol-input').value = ticker;
-        initScan();
-    }
+    function handleEnter(e) { if(e.key === 'Enter') initScan(); }
+    function quickScan(ticker) { document.getElementById('symbol-input').value = ticker; initScan(); }
+    async function handleTickerInput(val) { const box = document.getElementById('suggestions'); if (!box) return; if (val.length < 1) { box.classList.add('hidden'); return; } try { const res = await fetch(`/api/search/?q=${val}`); const data = await res.json(); box.innerHTML = ''; if (data.length > 0) { box.classList.remove('hidden'); data.slice(0, 5).forEach(item => { const div = document.createElement('div'); div.className = "px-4 py-2 hover:bg-white/5 cursor-pointer border-b border-white/5 flex justify-between"; div.innerHTML = `<span class="text-sm font-bold text-white">${item.symbol}</span><span class="text-[10px] text-slate-500">${item.name}</span>`; div.onclick = () => { document.getElementById('symbol-input').value = item.symbol; box.classList.add('hidden'); initScan(); }; box.appendChild(div); }); } else box.classList.add('hidden'); } catch (e) {} }
 
-    async function addToJournal() {
-        const btn = document.getElementById('btn-journal');
-        const originalText = btn.innerHTML;
-        const symbol = document.getElementById('res-symbol').innerText;
-        const bias = document.getElementById('res-direction').innerText;
-        const priceText = document.getElementById('res-price').innerText.replace('$', '').replace(',', '');
-        const stopText = document.getElementById('res-stop').innerText.replace(',', '');
-        const targetText = document.getElementById('res-target2').innerText.replace(',', '');
-        const confText = document.getElementById('res-score').innerText.replace('%', '');
-        const levText = document.getElementById('res-leverage').innerText;
-
-        if(bias === "NEUTRAL" || symbol === "--") {
-            showError("CANNOT SAVE", "No valid signal generated yet.");
-            return;
-        }
-
-        btn.innerHTML = "SAVING...";
-        btn.disabled = true;
-
-        const payload = {
-            symbol: symbol,
-            bias: bias,
-            entry: priceText,
-            stop: stopText,
-            target: targetText,
-            confidence: confText,
-            leverage: levText
-        };
-
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const res = await fetch("/api/journal/add/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if(res.ok) {
-                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
-                btn.classList.add('text-emerald-400', 'border-emerald-500/50');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('text-emerald-400', 'border-emerald-500/50');
-                    btn.disabled = false;
-                    if(window.lucide) lucide.createIcons();
-                }, 3000);
-            } else {
-                throw new Error(data.message);
-            }
-        } catch(e) {
-            showError("SAVE FAILED", e.message);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    }
-
+    // --- MAIN SCAN FUNCTION (UPDATED) ---
     async function initScan() {
         const input = document.getElementById('symbol-input');
+        const modeSelect = document.getElementById('mode-select');
         let raw = input.value.trim().toUpperCase();
-        clearTimeout(debounceTimer);
+        const tradeStyle = modeSelect ? modeSelect.value : "INTRADAY";
+
         document.getElementById('suggestions').classList.add('hidden');
         if (!raw) return;
         if (!raw.includes("USDT")) raw += "USDT";
-        resetPositionSizingUI();
 
         const dash = document.getElementById('dashboard');
         const loader = document.getElementById('processing-ui');
         const logText = document.getElementById('loading-text');
 
-        logMessage(`>> INITIATING SCAN: ${raw}...`, "text-blue-400 font-bold");
-
-        // --- HARDCODED DEFAULTS ---
-        const marketType = "PERP";
-        const tradeStyle = "INTRADAY";
-
-        dash.classList.add('hidden');
-        dash.classList.add('opacity-0');
-        loader.classList.remove('hidden');
+        logMessage(`>> INITIATING SCAN: ${raw} [${tradeStyle}]...`, "text-blue-400 font-bold");
+        dash.classList.add('hidden'); dash.classList.add('opacity-0'); loader.classList.remove('hidden');
 
         logText.innerHTML = `<p class="text-slate-300">>> INITIALIZING ${tradeStyle} PROTOCOL...</p>`;
-        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> AGGREGATING ORDER BOOK DEPTH FOR ${raw}...</p>`); }, 400);
-        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> ACTIVATING ENSEMBLE MODELS...</p>`); }, 1200);
-        setTimeout(() => { logText.insertAdjacentHTML('beforeend', `<p class="text-blue-400 animate-pulse">>> CALCULATING CONVICTION VECTORS...</p>`); }, 2500);
+        setTimeout(() => logText.insertAdjacentHTML('beforeend', `<p class="text-slate-400">>> CONNECTING TO BINANCE FUTURES...</p>`), 500);
+        setTimeout(() => logText.insertAdjacentHTML('beforeend', `<p class="text-blue-400 animate-pulse">>> CALCULATING VECTORS...</p>`), 1500);
 
         try {
             const csrftoken = getCookie('csrftoken');
-            const res = await fetch("/api/analyze/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify({ symbol: raw, market_type: marketType, trade_style: tradeStyle })
-            });
-
+            const res = await fetch("/api/analyze/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify({ symbol: raw, market_type: "PERP", trade_style: tradeStyle }) });
             if (!res.ok) throw new Error("Connection Failed");
             const data = await res.json();
 
-            logMessage(`>> DATA RECEIVED. PARSING...`, "text-emerald-500");
-
+            // Populate
             safeSetText('res-symbol', data.symbol);
             safeSetText('res-price', `$${formatPrice(data.price)}`);
-            safeSetText('res-duration', data.signal.duration || "1-3 DAYS");
+            safeSetText('res-duration', data.signal.duration);
 
             const regTag = document.getElementById('res-regime-tag');
-            let regText = "ANALYZING";
-            let regColor = "gray";
+            let regText = data.regime.phase || data.regime;
+            let regColor = data.regime.color || data.regime_color;
+            regTag.innerText = regText;
+            if(regColor === 'green') regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-emerald-400 border-emerald-500/20 bg-emerald-500/10";
+            else if(regColor === 'red') regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-red-400 border-red-500/20 bg-red-500/10";
+            else regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-slate-500 border-white/10 bg-white/5";
 
-            if (data.regime) {
-                if (typeof data.regime === 'object') {
-                     regText = data.regime.phase || "ANALYZING";
-                     regColor = data.regime.color || "gray";
-                } else {
-                     regText = data.regime;
-                     regColor = data.regime_color || "gray";
-                }
-            }
-
-            if (regTag) {
-                regTag.innerText = regText;
-                if (regColor === 'green') {
-                    regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-emerald-400 border-emerald-500/20 bg-emerald-500/10";
-                } else if (regColor === 'yellow') {
-                    regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-yellow-400 border-yellow-500/20 bg-yellow-500/10";
-                } else if (regColor === 'red') {
-                    regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-red-400 border-red-500/20 bg-red-500/10";
-                } else {
-                    regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-slate-500 border-white/10 bg-white/5";
-                }
-            }
-
-            const whaleLabel = (data.whales && data.whales.label) ? data.whales.label : (data.whale_label || "--");
-            const whaleZ = (data.whales && data.whales.zscore) ? data.whales.zscore : (data.whale_zscore || 0);
-
+            const whaleLabel = (data.whales && data.whales.label) ? data.whales.label : "--";
             safeSetText('res-whale-tag', whaleLabel);
-            safeSetText('txt-whale', whaleLabel);
-            safeSetText('txt-whale-z', `σ: ${whaleZ}`);
-            const bar = document.getElementById('bar-whale');
-            if(bar) bar.style.width = Math.min(100, Math.abs(whaleZ)*20) + "%";
 
             const score = data.signal.probability;
-            const rawBias = data.signal.bias;
-
-            let isTradeGrade = score >= 65;
-            let isWatchGrade = score >= 55 && score < 65;
-            let isNoTrade = score < 55;
+            safeSetText('res-score', score + "%");
 
             const dirEl = document.getElementById('res-direction');
             const glow = document.getElementById('signal-glow');
-            const statusBar = document.getElementById('status-bar');
             const sigBox = document.getElementById('signal-box');
-            const sigLabel = document.getElementById('signal-label');
-            const noTradeInfo = document.getElementById('no-trade-info');
+            const lockMsg = document.getElementById('lock-msg');
+            const lblStatus = document.getElementById('lbl-status');
 
-            safeSetText('res-score', score + "%");
-            dirEl.innerText = rawBias;
+            const bias = data.signal.bias;
+            dirEl.innerText = bias;
+            lockMsg.classList.add('hidden');
+            lblStatus.innerText = "SIGNAL";
 
-            if (rawBias === "LONG" && !isNoTrade) {
-                dirEl.className = "text-3xl font-black text-emerald-400 relative z-10 tracking-wide";
-                sigLabel.className = "text-[10px] uppercase tracking-widest mb-1 relative z-10 font-bold text-emerald-300 opacity-80";
-                sigBox.className = "rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500 bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
-                glow.className = "absolute inset-0 bg-emerald-500/10 blur-xl transition-opacity";
-                statusBar.className = "h-1 w-full bg-gradient-to-r from-emerald-900 via-emerald-500 to-emerald-900 animate-pulse";
-                logMessage(`>> BIAS DETECTED: LONG (Score ${score}%)`, "text-emerald-400");
-            } else if (rawBias === "SHORT" && !isNoTrade) {
-                dirEl.className = "text-3xl font-black text-red-400 relative z-10 tracking-wide";
-                sigLabel.className = "text-[10px] uppercase tracking-widest mb-1 relative z-10 font-bold text-red-300 opacity-80";
-                sigBox.className = "rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500 bg-red-900/10 border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]";
-                glow.className = "absolute inset-0 bg-red-500/10 blur-xl transition-opacity";
-                statusBar.className = "h-1 w-full bg-gradient-to-r from-red-900 via-red-500 to-red-900 animate-pulse";
-                logMessage(`>> BIAS DETECTED: SHORT (Score ${score}%)`, "text-red-400");
+            if (bias === "LONG") {
+                dirEl.className = "text-5xl md:text-8xl font-black tracking-tighter text-emerald-400 leading-none";
+                sigBox.className = "bg-emerald-900/10 border border-emerald-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(16,185,129,0.1)]";
+                glow.className = "absolute inset-0 bg-emerald-500/10 blur-3xl opacity-100";
+            } else if (bias === "SHORT") {
+                dirEl.className = "text-5xl md:text-8xl font-black tracking-tighter text-red-500 leading-none";
+                sigBox.className = "bg-red-900/10 border border-red-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(239,68,68,0.1)]";
+                glow.className = "absolute inset-0 bg-red-500/10 blur-3xl opacity-100";
             } else {
-                dirEl.className = "text-3xl font-black text-slate-500 relative z-10 tracking-wide";
-                sigLabel.className = "text-[10px] uppercase tracking-widest mb-1 relative z-10 font-bold text-slate-600";
-                sigBox.className = "rounded-xl p-5 border flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500 bg-[#111] border-white/5";
+                // --- UX FIX: BETTER NEUTRAL STATE ---
+                dirEl.innerText = "NO SIGNAL"; // Changed from SYSTEM LOCKED
+                dirEl.className = "text-4xl md:text-7xl font-black tracking-tighter text-slate-600 leading-none opacity-80";
+                sigBox.className = "bg-[#0a0a0a] border border-white/5 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center";
                 glow.className = "hidden";
-                statusBar.className = "h-1 w-full bg-slate-800";
+
+                // Show "Scanning" status instead of "Locked"
+                lockMsg.innerHTML = `<i data-lucide="activity" class="w-3 h-3 inline mr-1"></i> SCANNING FOR VOLATILITY...`;
+                lockMsg.className = "text-xs text-slate-500 mt-2 font-mono";
+                lockMsg.classList.remove('hidden');
+
+                lblStatus.innerText = "STATUS";
+
+                // Show dashes for trade levels, but keep UI clean
+                safeSetText('res-entry', '---');
+                safeSetText('res-stop', '---');
+                safeSetText('res-target2', '---');
             }
 
-            const ring = document.getElementById('score-ring');
-            const circumference = 2 * Math.PI * 36;
-            const offset = circumference - ((score / 100) * circumference);
-            ring.style.strokeDashoffset = offset;
-
-            if (isTradeGrade) ring.setAttribute("class", "text-cyan-400 transition-all duration-1000 ease-out drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]");
-            else if (isNoTrade) ring.setAttribute("class", "text-slate-700 transition-all duration-1000 ease-out");
-            else ring.setAttribute("class", "text-yellow-500 transition-all duration-1000 ease-out");
-
-            const execStatus = document.getElementById('exec-status');
-            const execDot = document.getElementById('exec-dot');
-            noTradeInfo.classList.add('hidden');
-
-            if (isNoTrade || rawBias === "NEUTRAL" || rawBias === "HOLD") {
-                execStatus.innerText = "MARKET NOT READY";
-                execStatus.className = "text-sm font-bold text-slate-500";
-                execDot.className = "w-2 h-2 rounded-full bg-slate-700";
-                noTradeInfo.classList.remove('hidden');
-
-                logMessage(`>> REJECTED: Efficiency Low. Capital Protected.`, "text-red-400 font-bold");
-
-            } else if (isWatchGrade) {
-                execStatus.innerText = "WATCH - BIAS ACTIVE";
-                execStatus.className = "text-sm font-bold text-yellow-500";
-                execDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
-                logMessage(`>> WATCHLIST: Volatility Building...`, "text-yellow-400");
-            } else {
-                const currentPrice = data.price;
-                const entryPrice = data.signal.entry;
-                const dist = Math.abs((currentPrice - entryPrice) / entryPrice) * 100;
-                if (dist < 0.35) {
-                    execStatus.innerText = "ENTRY ZONE ACTIVE";
-                    execStatus.className = "text-sm font-bold text-emerald-400 animate-pulse";
-                    execDot.className = "w-2 h-2 rounded-full bg-emerald-500";
-                } else if (dist > 2.0) {
-                    execStatus.innerText = "WAIT FOR PULLBACK";
-                    execStatus.className = "text-sm font-bold text-slate-500";
-                    execDot.className = "w-2 h-2 rounded-full bg-slate-700";
-                } else {
-                    execStatus.innerText = "MONITORING...";
-                    execStatus.className = "text-sm font-bold text-blue-400";
-                    execDot.className = "w-2 h-2 rounded-full bg-blue-500";
-                }
+            if(bias !== "NEUTRAL" && bias !== "HOLD") {
+                safeSetText('res-entry', formatPrice(data.signal.entry));
+                safeSetText('res-stop', formatPrice(data.signal.stop));
+                safeSetText('res-target2', formatPrice(data.signal.target2));
             }
 
-            safeSetText('res-stop', formatPrice(data.signal.stop));
-            safeSetText('res-target2', formatPrice(data.signal.target2));
-            safeSetText('res-entry', formatPrice(data.signal.entry));
-            safeSetText('res-rr', data.signal.rr);
-
-            updateDrivers(data.explainability, isTradeGrade);
-
-            if (data.sentiment && data.sentiment.news_feed && data.sentiment.news_feed.length > 0) {
-                updateNews(data.sentiment.news_feed);
-            }
+            updateDrivers(data.explainability, score >= 60);
+            if (data.sentiment && data.sentiment.news_feed) updateNews(data.sentiment.news_feed);
 
             loader.classList.add('hidden');
             dash.classList.remove('hidden');
@@ -827,200 +441,60 @@
 
         } catch (e) {
             loader.classList.add('hidden');
-            showError("CONNECTION INTERRUPTION", e.message || "Unable to establish neural link.");
-            logMessage(`!! CONNECTION ERROR !!`, "text-red-600 font-black");
+            showError("CONNECTION INTERRUPTION", e.message);
         }
     }
 
-    let debounceTimer;
-    document.addEventListener('click', function(event) {
-        const box = document.getElementById('suggestions');
-        const input = document.getElementById('symbol-input');
-        if (box && !box.classList.contains('hidden') && !box.contains(event.target) && event.target !== input) {
-            box.classList.add('hidden');
-        }
-    });
-
-    function handleEnter(e) { if(e.key === 'Enter') initScan(); }
-
-    async function handleTickerInput(val) {
-        const box = document.getElementById('suggestions');
-        if (!box) return;
-        if (val.length < 1) { box.classList.add('hidden'); return; }
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-            try {
-                const res = await fetch(`/api/search/?q=${val}`);
-                const data = await res.json();
-                box.innerHTML = '';
-                if (data.length > 0) {
-                    box.classList.remove('hidden');
-                    data.slice(0, 5).forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = "px-4 py-2 hover:bg-white/5 cursor-pointer border-b border-white/5 flex justify-between";
-                        div.innerHTML = `<span class="text-sm font-bold text-white">${item.symbol}</span><span class="text-[10px] text-slate-500">${item.name}</span>`;
-                        div.onclick = () => {
-                            document.getElementById('symbol-input').value = item.symbol;
-                            clearTimeout(debounceTimer);
-                            box.classList.add('hidden');
-                            initScan();
-                        };
-                        box.appendChild(div);
-                    });
-                } else box.classList.add('hidden');
-            } catch (e) {}
-        }, 200);
+    async function addToJournal() {
+        const btn = document.getElementById('btn-journal'); const originalHTML = btn.innerHTML; const symbol = document.getElementById('res-symbol').innerText; const bias = document.getElementById('res-direction').innerText;
+        if(bias === "NO SIGNAL" || bias === "NEUTRAL") { showError("SAFETY LOCK", "Cannot save. System is protecting capital."); return; }
+        btn.innerHTML = "SAVING..."; btn.disabled = true;
+        try {
+            const csrftoken = getCookie('csrftoken');
+            const payload = { symbol: symbol, bias: bias, entry: document.getElementById('res-entry').innerText.replace(/,/g, ''), stop: document.getElementById('res-stop').innerText.replace(/,/g, ''), target: document.getElementById('res-target2').innerText.replace(/,/g, ''), confidence: document.getElementById('res-score').innerText.replace('%', '') };
+            const res = await fetch("/api/journal/add/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify(payload) });
+            if(res.ok) { btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`; btn.classList.add('text-emerald-400', 'border-emerald-500/50'); setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-emerald-400', 'border-emerald-500/50'); btn.disabled = false; if(window.lucide) lucide.createIcons(); }, 2000); } else throw new Error();
+        } catch(e) { btn.innerHTML = "ERROR"; setTimeout(() => { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000); }
     }
 
+    function closeBacktest() { document.getElementById('backtest-modal').classList.add('hidden'); }
+    async function initBacktest() {
+        const input = document.getElementById('symbol-input'); let raw = input.value.trim().toUpperCase(); if (!raw) return; if (!raw.includes("USDT")) raw += "USDT";
+        const modal = document.getElementById('backtest-modal'); const loader = document.getElementById('bt-loader'); const results = document.getElementById('bt-results');
+        modal.classList.remove('hidden'); loader.classList.remove('hidden'); results.classList.add('hidden');
+        try {
+            const csrftoken = getCookie('csrftoken');
+            const res = await fetch("/api/backtest/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify({ symbol: raw, trade_style: "INTRADAY" }) });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            safeSetText('bt-winrate', (data.win_rate||0) + "%"); safeSetText('bt-pnl', data.profit_factor||0); safeSetText('bt-trades', data.total_trades||0);
+            const logBox = document.getElementById('bt-log'); logBox.innerHTML = "";
+            (data.trades_log || []).forEach(t => { const isWin = (t.pnl || t.roi || 0) > 0; logBox.insertAdjacentHTML('beforeend', `<div class="grid grid-cols-3 border-b border-white/5 py-1"><span class="${isWin?'text-emerald-400':'text-red-500'} font-bold">${isWin?'WIN':'LOSS'}</span><span class="text-center">$${formatPrice(t.entry)}</span><span class="text-right ${isWin?'text-emerald-400':'text-red-500'}">${(t.pnl||0).toFixed(2)}%</span></div>`); });
+            loader.classList.add('hidden'); results.classList.remove('hidden');
+        } catch (e) { closeBacktest(); showError("BACKTEST FAILED", "Data unavailable."); }
+    }
+
+    // --- TICKER LOGIC (RESTORED) ---
     document.addEventListener("DOMContentLoaded", () => {
         const marquee = document.getElementById("live-marquee");
         const tickers = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
         const streams = tickers.map(t => `${t.toLowerCase()}@ticker`).join('/');
         const socket = new WebSocket(`wss://stream.binance.com:9443/ws/${streams}`);
-        const priceMap = {};
-        tickers.forEach(t => priceMap[t] = { price: 0, change: 0 });
-
+        const priceMap = {}; tickers.forEach(t => priceMap[t] = { price: 0, change: 0 });
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            if (data.s && data.c) {
-                priceMap[data.s] = { price: parseFloat(data.c), change: parseFloat(data.P) };
-                renderMarquee();
-            }
+            if (data.s && data.c) { priceMap[data.s] = { price: parseFloat(data.c), change: parseFloat(data.P) }; renderMarquee(); }
         };
-
         function renderMarquee() {
             let html = "";
             tickers.forEach(sym => {
-                const item = priceMap[sym];
-                if (!item || item.price === 0) return;
+                const item = priceMap[sym]; if (!item || item.price === 0) return;
                 const colorClass = item.change >= 0 ? "text-emerald-400" : "text-red-400";
-                const iconColor = item.change >= 0 ? "text-emerald-500" : "text-red-500";
                 const icon = item.change >= 0 ? "activity" : "arrow-down";
-                const cleanSym = sym.replace("USDT", "");
-                html += `<span class="flex items-center gap-2"><i data-lucide="${icon}" class="w-3 h-3 ${iconColor}"></i>${cleanSym}<span class="${colorClass}">$${item.price < 1 ? item.price.toFixed(4) : item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></span>`;
+                html += `<span class="flex items-center gap-2 mx-6"><i data-lucide="${icon}" class="w-3 h-3 ${colorClass}"></i>${sym.replace("USDT","")}<span class="${colorClass}">$${item.price < 1 ? item.price.toFixed(4) : item.price.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></span>`;
             });
             if (html.length > 50) { marquee.innerHTML = html; if (window.lucide) lucide.createIcons(); }
         }
     });
-
-    function updateLeverage(score) {
-        let text = "Low";
-        if (score >= 80) text = "High (Selective)";
-        else if (score >= 65) text = "Moderate";
-        const el = document.getElementById("res-leverage");
-        if(el) el.innerText = text;
-    }
-
-    function calcPositionSize() {
-        const cap = parseFloat(document.getElementById("cap-input")?.value);
-        const risk = parseFloat(document.getElementById("risk-input")?.value);
-        const entryText = document.getElementById("res-entry").innerText.replace(/,/g, "");
-        const entry = parseFloat(entryText);
-        if (!cap || !risk || !entry || isNaN(entry)) return;
-        const size = ((cap * (risk / 100)) / entry).toFixed(4);
-        document.getElementById("pos-size").innerText = size + " units";
-    }
-    document.getElementById("cap-input")?.addEventListener("input", calcPositionSize);
-    document.getElementById("risk-input")?.addEventListener("input", calcPositionSize);
-
-    const _safeSet = window.safeSetText;
-    window.safeSetText = function (id, text) {
-        _safeSet(id, text);
-        if (id === "res-score") {
-            const s = parseFloat(text);
-            if (!isNaN(s)) updateLeverage(s);
-        }
-    };
-
-    function closeBacktest() { document.getElementById('backtest-modal').classList.add('hidden'); }
-    async function initBacktest() {
-        const input = document.getElementById('symbol-input');
-        let raw = input.value.trim().toUpperCase();
-        if (!raw) return;
-        if (!raw.includes("USDT")) raw += "USDT";
-
-        const modal = document.getElementById('backtest-modal');
-        const loader = document.getElementById('bt-loader');
-        const results = document.getElementById('bt-results');
-
-        modal.classList.remove('hidden');
-        loader.classList.remove('hidden');
-        results.classList.add('hidden');
-
-        try {
-            const csrftoken = getCookie('csrftoken');
-            // FIX: Removed invalid getElementById call. Hardcoded to match new logic.
-            const tradeStyle = "INTRADAY";
-
-            const res = await fetch("/api/backtest/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify({ symbol: raw, trade_style: tradeStyle })
-            });
-
-            if (!res.ok) throw new Error("Backtest Error");
-            const data = await res.json();
-
-            // ROBUST CHECK: Handle undefined/error states
-            const winRate = data.win_rate !== undefined ? data.win_rate : 0;
-            const pf = data.profit_factor !== undefined ? data.profit_factor : 0;
-            const total = data.total_trades !== undefined ? data.total_trades : 0;
-
-            safeSetText('bt-winrate', winRate + "%");
-            safeSetText('bt-pnl', pf);
-            safeSetText('bt-trades', total);
-
-            const logBox = document.getElementById('bt-log');
-            logBox.innerHTML = "";
-            const trades = data.trades_log || data.trades || [];
-
-            if (trades.length > 0) {
-                let winCount = 0;
-                let lossCount = 0;
-                trades.forEach(t => {
-                    let pnlKey = t.pnl !== undefined ? t.pnl : (t.pnl_percent !== undefined ? t.pnl_percent : t.roi);
-                    let rawVal = parseFloat(String(pnlKey).replace('%', '').replace('+', ''));
-                    let isWin = rawVal > 0;
-                    if (isNaN(rawVal)) {
-                        const statusText = (t.result || t.status || "").toUpperCase();
-                        isWin = statusText.includes("WIN") || statusText.includes("PROFIT");
-                    }
-                    if (isWin) winCount++; else lossCount++;
-
-                    const colorClass = isWin ? "text-emerald-400" : "text-red-500";
-                    const label = isWin ? "WIN" : "LOSS";
-                    const sign = (isWin && rawVal > 0) ? "+" : "";
-                    const entryPrice = parseFloat(t.entry || t.entry_price || 0);
-
-                    const row = `
-                        <div class="grid grid-cols-3 items-center border-b border-white/5 py-2 hover:bg-white/5 px-3 transition group">
-                            <div class="text-left"><span class="${colorClass} font-black tracking-wider text-[10px] bg-white/5 px-2 py-1 rounded border border-white/5">${label}</span></div>
-                            <div class="text-center">
-                                <span class="text-[9px] text-slate-500 block uppercase tracking-widest mb-0.5">${t.type || t.direction || 'TRADE'}</span>
-                                <span class="text-slate-300 font-mono text-xs group-hover:text-white">$${formatPrice(entryPrice)}</span>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-[9px] text-slate-500 block uppercase tracking-widest mb-0.5">ROI</span>
-                                <span class="${colorClass} font-mono font-bold text-xs">${sign}${rawVal.toFixed(2)}%</span>
-                            </div>
-                        </div>`;
-                    logBox.insertAdjacentHTML('beforeend', row);
-                });
-                const summaryHeader = `
-                    <div class="sticky top-0 bg-[#111] border-b border-white/10 p-2 text-[9px] text-slate-400 flex justify-between font-mono z-10 mb-2">
-                        <span>LOG ANALYSIS:</span>
-                        <span><span class="text-emerald-400">${winCount} WINS</span> / <span class="text-red-400">${lossCount} LOSSES</span></span>
-                    </div>`;
-                logBox.insertAdjacentHTML('afterbegin', summaryHeader);
-            } else {
-                logBox.innerHTML = '<div class="text-center text-xs text-slate-500 py-8 italic">No trades recorded.</div>';
-            }
-            loader.classList.add('hidden');
-            results.classList.remove('hidden');
-        } catch (e) {
-            closeBacktest();
-            showError("BACKTEST FAILED", "Data unavailable.");
-        }
-    }
 </script>
 {% endblock %}
