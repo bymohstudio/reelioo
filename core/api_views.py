@@ -1,6 +1,7 @@
 # core/api_views.py
-
+import csv
 import json
+import os
 import traceback
 import logging
 import concurrent.futures
@@ -11,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import IsAuthenticated
 
+from reelioo import settings
 from .services.marketdata_service import MarketService
 from .services.news_service import NewsService
 from .quant.crypto_engine import CryptoQuantEngine
@@ -120,6 +122,38 @@ class SearchCryptoView(APIView):
     def get(self, request):
         q = request.GET.get("q", "")
         return Response(MarketService.search_assets(q))
+
+
+class GlobalSymbolsView(APIView):
+    """
+    Reads 'global_symbols.csv' from the project root and returns a list of symbols.
+    Used by the frontend for instant, zero-latency search suggestions.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # 1. Path to the CSV file in the project root
+        csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
+
+        symbols = []
+
+        # 2. Read the CSV
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # We extract just the 'symbol' column (e.g., 'BTCUSDT')
+                        if 'symbol' in row:
+                            symbols.append(row['symbol'])
+            except Exception as e:
+                print(f"Error reading symbols CSV: {e}")
+
+        # 3. Fallback (if file missing) to ensure dropdown isn't empty
+        if not symbols:
+            symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+
+        return Response(symbols)
 
 
 class FindAlphaView(APIView):

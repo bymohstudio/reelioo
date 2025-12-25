@@ -64,7 +64,7 @@
             <div class="mt-3 text-center sm:text-left px-1">
                  <p class="text-[9px] text-emerald-500/70 font-mono tracking-wider flex items-center justify-center sm:justify-start gap-1.5 animate-pulse">
                     <i data-lucide="zap" class="w-3 h-3"></i>
-                    <span>USE 'ALPHA' TO AUTO-DETECT HIGHEST EDGE SETUP</span>
+                    <span>USE 'ALPHA' TO SCAN 15+ PAIRS FOR EDGE</span>
                 </p>
             </div>
         </div>
@@ -324,7 +324,7 @@
                 </div>
 
                 <button onclick="loadIntoTerminal()" class="w-full bg-white hover:bg-slate-200 text-black font-black py-4 rounded-xl transition uppercase tracking-[0.2em] text-xs shadow-xl transform hover:-translate-y-1">
-                    Analyze Full Chart
+                    RETURN TO TERMINAL
                 </button>
             </div>
         </div>
@@ -351,19 +351,28 @@
 </style>
 
 <script>
-    // --- STATIC SYMBOL MAP (INSTANT SEARCH) ---
-    // This removes the need for slow API calls on every keystroke
-    const SYMBOL_MAP = [
-        "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "AVAXUSDT",
-        "TRXUSDT", "LINKUSDT", "DOTUSDT", "MATICUSDT", "LTCUSDT", "SHIBUSDT", "UNIUSDT", "ATOMUSDT",
-        "XLMUSDT", "ETCUSDT", "FILUSDT", "HBARUSDT", "APTUSDT", "VETUSDT", "NEARUSDT", "QNTUSDT",
-        "AAVEUSDT", "ALGOUSDT", "GRTUSDT", "EOSUSDT", "FTMUSDT", "SANDUSDT", "THETAUSDT", "EGLDUSDT",
-        "AXSUSDT", "MANAUSDT", "RNDRUSDT", "INJUSDT", "PEPEUSDT", "SUIUSDT", "OPUSDT", "ARBUSDT",
-        "STXUSDT", "IMXUSDT", "XTZUSDT", "KAVAUSDT", "NEOUSDT", "GALAUSDT", "SNXUSDT", "LDOUSDT",
-        "FLOWUSDT", "CHZUSDT", "CRVUSDT", "KSMUSDT", "KLAYUSDT", "ZECUSDT", "IOTAUSDT", "MKRUSDT"
-    ];
+    // --- DYNAMIC SYMBOL MAP FROM API ---
+    // We fetch this ONCE on load, then search instantly locally
+    let SYMBOL_MAP = [];
 
-    // --- SEARCH LOGIC (FIXED) ---
+    async function loadSymbols() {
+        try {
+            const res = await fetch('/api/symbols/');
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                SYMBOL_MAP = data;
+            }
+        } catch (e) {
+            console.error("Symbol load failed", e);
+            // Fallback
+            SYMBOL_MAP = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+        }
+    }
+
+    // Call immediately
+    loadSymbols();
+
+    // --- SEARCH LOGIC (FIXED COLOR & SPEED) ---
     function handleTickerInput(val) {
         const box = document.getElementById('suggestions');
         const input = val.toUpperCase().trim();
@@ -374,7 +383,7 @@
         }
 
         // Filter local list (Instant)
-        const matches = SYMBOL_MAP.filter(s => s.includes(input)).slice(0, 6); // Limit to 6
+        const matches = SYMBOL_MAP.filter(s => s.includes(input)).slice(0, 6);
 
         box.innerHTML = '';
         if (matches.length > 0) {
@@ -383,8 +392,8 @@
                 const div = document.createElement('div');
                 div.className = "px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors";
 
-                // Highlight matching text
-                const highlighted = sym.replace(input, `<span class="text-emerald-400">${input}</span>`);
+                // Highlight matching text with BRAND BLUE
+                const highlighted = sym.replace(input, `<span class="text-blue-500 font-black">${input}</span>`);
 
                 div.innerHTML = `<span class="text-sm font-bold text-white">${highlighted}</span>`;
                 div.onclick = () => {
@@ -481,7 +490,7 @@
     function handleEnter(e) { if(e.key === 'Enter') initScan(); }
     function quickScan(ticker) { document.getElementById('symbol-input').value = ticker; initScan(); }
 
-    // --- MAIN SCAN FUNCTION (UPDATED) ---
+    // --- MAIN SCAN FUNCTION ---
     async function initScan() {
         const input = document.getElementById('symbol-input');
         const modeSelect = document.getElementById('mode-select');
@@ -663,7 +672,7 @@
         }
     }
 
-    // Infinite Ticker Logic (Restored)
+    // Infinite Ticker Logic
     document.addEventListener("DOMContentLoaded", () => {
         const marquee = document.getElementById("live-marquee");
         const tickers = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
