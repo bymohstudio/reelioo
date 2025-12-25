@@ -3,6 +3,8 @@
 import json
 import traceback
 import logging
+
+from django.core.cache import cache
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
@@ -123,8 +125,12 @@ class FindAlphaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # 1. CHECK CACHE FIRST (5 Minutes)
+        cached_result = cache.get("alpha_opportunity_v1")
+        if cached_result:
+            return Response(cached_result)
+
         try:
-            # 1. THE VIP LIST (Don't scan trash, scan volume)
             vip_assets = [
                 "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
                 "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT",
@@ -136,41 +142,48 @@ class FindAlphaView(APIView):
 
             # 2. FAST SCAN LOOP
             for symbol in vip_assets:
-                # Reuse your existing MarketService (Standardized Data)
-                df = MarketService.get_historical_data(symbol, market_type="PERP", trade_style="INTRADAY")
+                try:
+                    df = MarketService.get_historical_data(symbol, market_type="PERP", trade_style="INTRADAY")
+                    if df.empty: continue
 
-                if df.empty: continue
+                    res = engine.analyze(df, trade_style="INTRADAY")
 
-                # Run the Brain
-                res = engine.analyze(df, trade_style="INTRADAY")
+                    # Filter: Only High Probability Setups
+                    if res.bias in ["LONG", "SHORT"] and res.score >= 60:
+                        leaderboard.append({
+                            "symbol": symbol,
+                            "bias": res.bias,
+                            "score": res.score,
+                            "entry": res.entry,
+                            "stop": res.stop,
+                            "target": res.target1,
+                            "rr": res.rr_ratio,
+                            "regime": res.regime,
+                            "explanation": res.top_features[0]['desc'] if res.top_features else "TREND ALIGNMENT"
+                        })
+                except Exception:
+                    continue  # Skip coin if it fails
 
-                # 3. FILTER: Only "Actionable" Signals
-                # We want High Score (>60) AND a clear direction (LONG/SHORT)
-                if res.bias in ["LONG", "SHORT"] and res.score >= 60:
-                    leaderboard.append({
-                        "symbol": symbol,
-                        "bias": res.bias,
-                        "score": res.score,
-                        "entry": res.entry,
-                        "stop": res.stop,
-                        "target": res.target1,  # Conservative target
-                        "rr": res.rr_ratio,
-                        "regime": res.regime,
-                        "explanation": res.top_features[0]['desc'] if res.top_features else "TREND ALIGNMENT"
-                    })
-
-            # 4. PICK THE WINNER
+            # 3. HANDLE RESULTS
             if not leaderboard:
-                return Response({"status": "empty", "message": "Market is choppy. No high-probability setups found."})
+                # GRACEFUL FAIL: Return a "Neutral" State instead of error
+                result = {
+                    "status": "empty",
+                    "trade": {
+                        "symbol": "MARKET",
+                        "bias": "NEUTRAL",
+                        "explanation": "LOW VOLATILITY / CHOP DETECTED",
+                        "entry": 0, "stop": 0, "target": 0
+                    }
+                }
+            else:
+                leaderboard.sort(key=lambda x: x['score'], reverse=True)
+                result = {"status": "success", "trade": leaderboard[0]}
 
-            # Sort by Score (Highest Confidence First)
-            leaderboard.sort(key=lambda x: x['score'], reverse=True)
-            best_trade = leaderboard[0]
+            # 4. SAVE TO CACHE (300 seconds = 5 mins)
+            cache.set("alpha_opportunity_v1", result, 300)
 
-            return Response({
-                "status": "success",
-                "trade": best_trade
-            })
+            return Response(result)
 
         except Exception as e:
             traceback.print_exc()

@@ -603,7 +603,7 @@
         } catch (e) { closeBacktest(); showError("BACKTEST FAILED", "Data unavailable."); }
     }
 
-    // --- ALPHA SCANNER (Hyperspace Logic) ---
+    // --- ALPHA SCANNER (Updated with Graceful UI) ---
     async function findWinningMarket() {
         const overlay = document.getElementById('scan-overlay');
         const scanText = document.getElementById('scan-text');
@@ -611,7 +611,6 @@
         // 1. Show Hyperspace Overlay
         overlay.classList.remove('hidden');
 
-        // 2. Start Ticker Animation
         const tickers = ["BTC", "ETH", "SOL", "WIF", "SUI", "BNB", "XRP", "DOGE"];
         const actions = ["ANALYZING", "DECODING", "CHECKING", "SCANNING"];
 
@@ -626,11 +625,11 @@
             const data = await res.json();
 
             clearInterval(interval);
-            overlay.classList.add('hidden'); // Hide overlay
+            overlay.classList.add('hidden');
 
             if (data.status === "success") {
+                // --- SUCCESS CASE ---
                 const trade = data.trade;
-
                 document.getElementById('alpha-symbol').innerText = trade.symbol.replace("USDT", "");
                 const biasEl = document.getElementById('alpha-bias');
                 biasEl.innerText = trade.bias;
@@ -647,19 +646,34 @@
                 document.getElementById('alpha-reason').innerText = trade.explanation;
 
                 window.foundSymbol = trade.symbol;
-
                 document.getElementById('alpha-modal').classList.remove('hidden');
-                if(window.lucide) lucide.createIcons();
 
-            } else {
-                showError("MARKET CHOPPY", "No high-confidence setups found right now.");
+            } else if (data.status === "empty") {
+                // --- GRACEFUL "NO SIGNAL" CASE (Capital Preservation) ---
+                // We use the same modal but style it as a "Safety" alert
+                document.getElementById('alpha-symbol').innerText = "NO EDGE";
+                const biasEl = document.getElementById('alpha-bias');
+
+                biasEl.innerText = "CAPITAL PRESERVATION";
+                biasEl.className = "text-xl font-bold text-blue-400 tracking-widest mb-8 text-glow"; // Blue for safety
+
+                document.getElementById('alpha-entry').innerText = "---";
+                document.getElementById('alpha-stop').innerText = "---";
+                document.getElementById('alpha-target').innerText = "---";
+                document.getElementById('alpha-reason').innerText = "MARKET CHOP / LOW VOLATILITY";
+
+                window.foundSymbol = null; // No chart to load
+                document.getElementById('alpha-modal').classList.remove('hidden');
             }
+
+            if(window.lucide) lucide.createIcons();
 
         } catch (e) {
             clearInterval(interval);
             overlay.classList.add('hidden');
             console.error(e);
-            showError("SCAN FAILED", "Network error. Please try again.");
+            // Only show Red Error if it's a true crash
+            showError("SCAN FAILED", "Network timeout. Try again in 30s.");
         }
     }
 
