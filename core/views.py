@@ -434,25 +434,24 @@ def cron_scan_trigger(request, secret_key):
         engine = CryptoQuantEngine()
 
         for symbol in watchlist:
-            # CHANGE "AUTO" -> "PERP" here
-            # This ensures the Discord Bot sees the exact same Futures data as your Terminal
-            df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
-
+            df = MarketService.get_historical_data(symbol, "AUTO", "INTRADAY")
             if df is None or df.empty: continue
 
             res = engine.analyze(df, "INTRADAY")
 
-            # --- TIERED LOGIC ---
+            # --- TIERED LOGIC (FIXED) ---
 
-            # TIER 1: SNIPER SIGNAL (The 65% "Kill Shot")
-            if res.score >= 65 and res.bias != 'NEUTRAL':
+            # TIER 1: SNIPER SIGNAL
+            # Logic: Must have 65%+ Score AND explicit Direction (LONG/SHORT).
+            # "HOLD" bias is excluded.
+            if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
                 send_discord_alert(symbol, res, alert_type="SNIPER")
                 alerts_sent += 1
                 logs.append(f"{symbol}: SNIPER SENT ({res.score}%)")
 
-            # TIER 2: WATCH SIGNAL (The 60-64% "Heads Up")
-            # We alert ONLY if it's "Active" (60%) but not yet "Sniper" (65%)
-            elif res.score >= 60 and res.bias != 'NEUTRAL':
+            # TIER 2: WATCH SIGNAL
+            # Logic: Score >= 60% OR (Score > 65% but Bias is HOLD/Conflicted)
+            elif res.score >= 60:
                 send_discord_alert(symbol, res, alert_type="WATCH")
                 alerts_sent += 1
                 logs.append(f"{symbol}: WATCH SENT ({res.score}%)")
