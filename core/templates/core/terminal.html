@@ -23,11 +23,12 @@
             <span class="flex items-center gap-2 animate-pulse">ESTABLISHING UPLINK...</span>
         </div>
     </div>
+
     <div class="flex flex-col items-center justify-center mb-12 px-2">
         <div class="w-full max-w-3xl relative group z-20">
             <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
 
-            <div class="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-2 shadow-2xl gap-2 sm:gap-0 transition-colors duration-300 focus-within:border-blue-500/50 focus-within:bg-[#0f0f0f]">
+            <div class="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-2 shadow-2xl gap-2 sm:gap-0">
 
                 <div class="relative flex items-center flex-grow bg-transparent pr-2 border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0">
                     <span class="pl-3 pr-3 text-emerald-500 font-bold text-xl md:text-2xl">></span>
@@ -35,12 +36,12 @@
                            class="w-full bg-transparent border-none text-white text-lg md:text-2xl font-black placeholder-slate-800 focus:ring-0 focus:outline-none uppercase tracking-widest h-12 p-0"
                            autocomplete="off" oninput="handleTickerInput(this.value)" onkeydown="handleEnter(event)">
 
-                    <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg hidden z-50 shadow-2xl max-h-60 overflow-y-auto custom-scrollbar"></div>
+                    <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg hidden z-[60] shadow-2xl max-h-60 overflow-y-auto custom-scrollbar pointer-events-auto"></div>
                 </div>
 
                 <div class="flex items-center justify-between sm:justify-end gap-2 pl-0 sm:pl-3 pt-2 sm:pt-0">
                     <div class="w-full sm:w-auto">
-                        <select id="mode-select" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 focus:outline-none cursor-pointer hover:bg-white/5 transition">
+                        <select id="mode-select" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 cursor-pointer hover:bg-white/5 transition">
                             <option value="INTRADAY">🛡️ Safe (Day)</option>
                             <option value="SCALP">⚡ Scalp (Risk)</option>
                         </select>
@@ -56,7 +57,7 @@
                 </div>
             </div>
 
-            <button onclick="findWinningMarket()" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30">
+            <button onclick="document.getElementById('suggestions').classList.add('hidden'); findWinningMarket()" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30 relative z-30 pointer-events-auto">
                  <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> SCAN FOR ALPHA EDGE
             </button>
 
@@ -85,7 +86,6 @@
                     <span class="text-[8px] sm:text-[10px] text-orange-400/80 font-bold tracking-widest mt-0.5 sm:mt-1 block">MARKET LEADER</span>
                 </div>
             </div>
-
             <div onclick="quickScan('ETH')" class="bg-[#0a0a0a] border border-blue-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition"></div>
                 <div class="relative z-10 text-center">
@@ -94,7 +94,6 @@
                     <span class="text-[8px] sm:text-[10px] text-blue-400/80 font-bold tracking-widest mt-0.5 sm:mt-1 block">SMART MONEY</span>
                 </div>
             </div>
-
             <div onclick="quickScan('SOL')" class="bg-[#0a0a0a] border border-purple-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition"></div>
                 <div class="relative z-10 text-center">
@@ -109,12 +108,10 @@
     <div id="processing-ui" class="hidden w-full max-w-3xl mx-auto mb-12 px-2">
         <div class="bg-black border border-green-500/30 rounded-lg p-6 font-mono text-xs shadow-[0_0_30px_rgba(16,185,129,0.1)] relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500/50 to-transparent animate-shimmer opacity-50"></div>
-
             <div class="flex justify-between border-b border-white/10 pb-2 mb-4 text-slate-500 relative z-10">
                 <span>TASK: MARKET_SCAN</span>
                 <span class="animate-pulse text-green-500">STATUS: PROCESSING</span>
             </div>
-
             <div id="loading-text" class="space-y-1.5 h-32 overflow-y-auto custom-scrollbar relative z-10 p-2 bg-[#050505] rounded border border-white/5">
                 <p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING NEURAL BRIDGE...</p>
             </div>
@@ -122,11 +119,9 @@
     </div>
 
     <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 w-full opacity-0 translate-y-4 transition-all duration-700">
-
         <div class="col-span-1 lg:col-span-12">
             <div id="signal-box" class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center">
                 <div id="signal-glow" class="absolute inset-0 opacity-0 transition-opacity z-0"></div>
-
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-0">
                     <div>
                         <div class="flex items-center gap-3 mb-2">
@@ -134,12 +129,11 @@
                              <h2 id="res-symbol" class="text-sm font-bold text-slate-500 tracking-widest uppercase">--</h2>
                              <span id="res-regime-tag" class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all">--</span>
                         </div>
-
                         <div class="flex items-baseline gap-4">
                             <h1 id="res-direction" class="text-4xl md:text-8xl font-black tracking-tighter text-slate-500 leading-none">NEUTRAL</h1>
                         </div>
-                        <p id="lock-msg" class="text-xs text-blue-300 mt-2 font-bold hidden"><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> CAPITAL PRESERVATION MODE ACTIVE</p>
-
+                        <p id="signal-expiry" class="mt-1 text-[10px] text-slate-400 font-mono uppercase tracking-wider hidden transition-all animate-fade-in-up">Valid for ~--</p>
+                        <p id="lock-msg" class="text-xs text-blue-300 mt-2 font-bold hidden"><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> NO EDGE. CAPITAL PRESERVED.</p>
                         <div class="flex items-center gap-3 mt-4">
                              <button onclick="addToJournal()" id="btn-journal" class="flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition">
                                 <i data-lucide="bookmark" class="w-3 h-3"></i> SAVE
@@ -149,9 +143,8 @@
                             </button>
                         </div>
                     </div>
-
                     <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0">
-                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">AI Confidence</span>
+                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Signal Strength</span>
                          <div class="flex items-center md:justify-end gap-3">
                              <span id="res-price" class="hidden">--</span>
                              <span id="res-score" class="text-5xl md:text-7xl font-bold text-white tracking-tighter">0%</span>
@@ -197,7 +190,6 @@
                     <div class="text-[10px] text-slate-600 italic text-center py-4">Run scan to view factors.</div>
                 </div>
             </div>
-
             <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
                 <div class="text-[10px] uppercase text-slate-500 font-bold mb-4 flex items-center gap-2">
                     <i data-lucide="calculator" class="w-3 h-3"></i> Position Sizing
@@ -236,6 +228,13 @@
         </div>
     </div>
 
+    <a href="https://discord.gg/reelioo" target="_blank" class="fixed bottom-6 right-6 z-[90] bg-[#5865F2] hover:bg-[#4752C4] text-white p-3 rounded-full shadow-[0_0_30px_rgba(88,101,242,0.5)] transition-all hover:scale-110 flex items-center justify-center group border border-white/10">
+        <i data-lucide="message-circle" class="w-6 h-6"></i>
+        <span class="absolute right-full mr-3 bg-black/90 text-white text-[10px] font-bold px-3 py-1.5 rounded border border-[#5865F2]/30 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none tracking-widest uppercase shadow-xl">
+            Connect to Neural Net
+        </span>
+    </a>
+
     <div id="error-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_50px_rgba(220,38,38,0.2)] text-center">
             <h3 id="error-title" class="text-lg font-bold text-white mb-2 tracking-wide">SYSTEM ERROR</h3>
@@ -246,7 +245,6 @@
 
     <div id="backtest-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl max-w-xl w-full relative shadow-2xl flex flex-col max-h-[80vh] overflow-hidden my-auto">
-
             <div class="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center flex-shrink-0">
                 <div>
                     <h3 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
@@ -256,13 +254,11 @@
                 </div>
                 <button onclick="closeBacktest()" class="text-slate-400 hover:text-white transition bg-white/5 p-1.5 rounded-full hover:bg-white/10"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
-
             <div class="flex-grow overflow-y-auto custom-scrollbar p-0">
                 <div id="bt-loader" class="flex flex-col items-center justify-center py-16">
                     <div class="w-10 h-10 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-3"></div>
                     <p class="text-[10px] text-slate-400 font-mono animate-pulse">RUNNING SIMULATION...</p>
                 </div>
-
                 <div id="bt-results" class="hidden">
                     <div class="grid grid-cols-3 gap-px bg-white/5 border-b border-white/5">
                         <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
@@ -284,7 +280,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="p-2 bg-[#0a0a0a] border-t border-white/5 text-center flex-shrink-0">
                 <p class="text-[8px] text-slate-600 italic">Past performance is not indicative of future results.</p>
             </div>
@@ -298,10 +293,8 @@
             <div class="absolute inset-4 bg-emerald-500/10 rounded-full animate-pulse"></div>
             <i data-lucide="crosshair" class="absolute inset-0 m-auto w-10 h-10 text-emerald-400"></i>
         </div>
-
         <h2 class="text-2xl font-black text-white tracking-widest mb-2" id="scan-text">INITIALIZING...</h2>
         <p class="text-xs text-emerald-500 font-mono">NEURAL NETWORK ACTIVE</p>
-
         <div class="mt-8 text-[10px] font-mono text-slate-500 text-center space-y-1 opacity-50">
             <p>fetching::deep_pool::perp_agg_trade</p>
             <p>calc::volatility_vectors::skew</p>
@@ -312,19 +305,15 @@
     <div id="alpha-modal" class="hidden fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
         <div class="relative w-full max-w-lg bg-[#050505] border border-emerald-500/50 rounded-2xl shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden transform transition-all scale-100">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-white to-emerald-500 animate-shimmer z-20 opacity-50"></div>
-
             <button onclick="closeAlpha()" class="absolute top-4 right-4 text-slate-500 hover:text-white z-30 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
-
             <div class="p-8 text-center relative z-10">
                 <div id="alpha-icon-container" class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/5 border border-emerald-500/30 mb-6 relative group">
                     <div class="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse"></div>
                     <i data-lucide="trophy" class="w-10 h-10 text-emerald-400 relative z-10" id="alpha-main-icon"></i>
                 </div>
-
                 <h2 class="text-xs font-bold text-emerald-500 uppercase tracking-[0.3em] mb-2" id="alpha-subtitle">Highest Probability Setup</h2>
                 <h1 id="alpha-symbol" class="text-6xl font-black text-white tracking-tighter mb-1 text-glow">--</h1>
                 <p id="alpha-bias" class="text-2xl font-bold text-slate-400 tracking-widest mb-8">--</p>
-
                 <div class="grid grid-cols-3 gap-3 mb-8">
                     <div class="bg-[#0f0f0f] p-4 rounded-xl border border-white/5 relative overflow-hidden group">
                         <div class="absolute top-0 left-0 w-full h-0.5 bg-slate-700 group-hover:bg-white transition"></div>
@@ -342,14 +331,12 @@
                         <span id="alpha-target" class="text-lg font-mono font-bold text-emerald-400 text-glow">--</span>
                     </div>
                 </div>
-
                 <div class="bg-[#0a0a0a] border border-white/10 p-4 rounded-lg mb-6 flex items-center justify-center gap-3">
                     <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i>
                     <p class="text-[10px] text-slate-400 font-mono uppercase">
                         DRIVER: <span id="alpha-reason" class="font-bold text-blue-400">--</span>
                     </p>
                 </div>
-
                 <button onclick="loadIntoTerminal()" class="w-full bg-white hover:bg-slate-200 text-black font-black py-4 rounded-xl transition uppercase tracking-[0.2em] text-xs shadow-xl transform hover:-translate-y-1">
                     RETURN TO TERMINAL
                 </button>
@@ -367,6 +354,8 @@
     @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
     @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
     .animate-shimmer { animation: shimmer 2s infinite; }
+    @keyframes fade-in-up { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
     .text-glow { text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -386,7 +375,7 @@
     }
     loadSymbols();
 
-    // --- HEAVY VOCABULARY FOR IDLE LOGS ---
+    // --- IDLE LOGS ---
     const IDLE_LOGS = [
         "Analyzing Order Book Dept. (L2 Data)...",
         "Calibrating Neural Weights [Batch 42]...",
@@ -400,7 +389,6 @@
         "Updating Tensor Core Parameters..."
     ];
 
-    // --- UI/SCAN LOGIC ---
     function handleTickerInput(val) {
         const box = document.getElementById('suggestions');
         const input = val.toUpperCase().trim();
@@ -442,15 +430,14 @@
         if(log.children.length > 50) log.firstElementChild.remove();
     }
 
-    // --- ACCELERATED LOOP FOR ALIVE FEEL ---
+    // --- ACCELERATED LOOP (3s) ---
     function initMaintenanceLoop() {
         setInterval(() => {
             const dash = document.getElementById('dashboard');
-            // Only run if dashboard is active/visible
             if(dash && !dash.classList.contains('hidden')) {
                 logMessage(IDLE_LOGS[Math.floor(Math.random() * IDLE_LOGS.length)], "text-slate-600");
             }
-        }, 1800); // 1.8s interval for "busy" feel
+        }, 3000);
     }
 
     async function initBacktest() {
@@ -613,6 +600,7 @@
         const tradeStyle = modeSelect ? modeSelect.value : "INTRADAY";
 
         document.getElementById('suggestions').classList.add('hidden');
+
         if (!raw) return;
         if (!raw.includes("USDT")) raw += "USDT";
 
@@ -661,10 +649,20 @@
             const sigBox = document.getElementById('signal-box');
             const glow = document.getElementById('signal-glow');
             const lockMsg = document.getElementById('lock-msg');
+            const expiryEl = document.getElementById('signal-expiry');
             const bias = data.signal.bias;
 
             dirEl.innerText = bias;
             lockMsg.classList.add('hidden');
+
+            if ((bias === "LONG" || bias === "SHORT") && data.signal.duration) {
+                expiryEl.innerText = `Valid for ~${data.signal.duration}`;
+                expiryEl.classList.remove('hidden');
+                expiryEl.classList.add('animate-fade-in-up');
+            } else {
+                expiryEl.classList.add('hidden');
+                expiryEl.classList.remove('animate-fade-in-up');
+            }
 
             if (bias === "LONG") {
                 dirEl.className = "text-5xl md:text-8xl font-black tracking-tighter text-emerald-400 leading-none";
@@ -687,7 +685,7 @@
                      glow.classList.remove('hidden');
                      lockMsg.innerHTML = `<i data-lucide="eye" class="w-3 h-3 inline mr-1"></i> BIAS DETECTED. WAITING FOR CONFIRMATION...`;
                 } else {
-                     lockMsg.innerHTML = `<i data-lucide="activity" class="w-3 h-3 inline mr-1"></i> SCANNING FOR VOLATILITY...`;
+                     lockMsg.innerHTML = `<i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> NO EDGE. CAPITAL PRESERVED.`;
                 }
             }
 
@@ -712,21 +710,21 @@
         }
     }
 
-    // --- INIT SEQUENCE (Force Alive Look) ---
+    // --- INIT SEQUENCE ---
     document.addEventListener("DOMContentLoaded", () => {
-        // Fast sequence to populate logs
         setTimeout(() => logMessage(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
         setTimeout(() => logMessage(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 1000);
         setTimeout(() => logMessage(">> CONNECTING TO DARK POOL FEED...", "text-slate-500"), 1500);
 
-        // Start continuous background noise
         initMaintenanceLoop();
 
         if(window.lucide) lucide.createIcons();
     });
 
-    // --- ALPHA SCANNER (TICKER ANIMATION & GRACEFUL FAIL) ---
+    // --- ALPHA SCANNER ---
     async function findWinningMarket() {
+        document.getElementById('suggestions').classList.add('hidden');
+
         const overlay = document.getElementById('scan-overlay');
         const scanText = document.getElementById('scan-text');
         overlay.classList.remove('hidden');
@@ -751,7 +749,6 @@
             const iconContainer = document.getElementById('alpha-icon-container');
             const subTitle = document.getElementById('alpha-subtitle');
 
-            // --- GRACEFUL "NO ALPHA" HANDLING ---
             if (data.status === "success") {
                 const trade = data.trade;
                 iconMain.setAttribute('data-lucide', 'trophy');
@@ -773,7 +770,6 @@
                 window.foundSymbol = trade.symbol;
                 modal.classList.remove('hidden');
             } else {
-                // "No Alpha" State (Blue/Safe - NOT ERROR)
                 iconMain.setAttribute('data-lucide', 'shield-check');
                 iconMain.className = "w-10 h-10 text-blue-400 relative z-10";
                 iconContainer.className = "inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-500/5 border border-blue-500/30 mb-6 relative group";

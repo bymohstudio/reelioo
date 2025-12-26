@@ -17,7 +17,7 @@ class CryptoQuantEngine:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
 
-    # (Keep your PATHS dict and _load_models method exactly the same)
+    # Paths to your trained models
     PATHS = {
         "xgb_long": os.path.join(MODEL_DIR, "xgb_long.json"),
         "xgb_short": os.path.join(MODEL_DIR, "xgb_short.json"),
@@ -83,15 +83,13 @@ class CryptoQuantEngine:
             log.error(f"Prediction Error: {e}")
             return self._neutral_result(last['close'], "Model Error")
 
-        # 2. THE CASINO "HOUSE RULES" (Tier 4 Execution Logic)
-
+        # 2. THE CASINO "HOUSE RULES"
         bias = "HOLD"
         score = max(pL, pS)
 
         # Context Variables
         rsi = last['rsi_14']
         vwap_dist = last['vwap_dist']
-        cvd_div = last.get('cvd_divergence', 0)
         liq_sweep = last.get('liq_sweep', 0)
         vol_slope = last.get('volatility_slope', 0)
 
@@ -104,67 +102,67 @@ class CryptoQuantEngine:
         is_downtrend = (price < ema_20) and (ema_20 < ema_50)
 
         # --- DATA-DRIVEN SNIPER THRESHOLDS ---
-        # LONG: 70.0% is the "Bank Mode" (High Win Rate).
-        # SHORT: 99.0% (Disabled because Short model was weak/dormant).
         LONG_THRESH = 70.0
         SHORT_THRESH = 99.0
 
         if trade_style == "SCALP":
-            LONG_THRESH -= 5.0  # Scalping allows slightly looser entries
+            LONG_THRESH -= 5.0
 
-        # --- LONG LOGIC (The Money Maker) ---
+        # --- LONG LOGIC ---
         if pL > LONG_THRESH:
-            if rsi < 75:  # Don't buy extreme tops
-                if vwap_dist < 0.04:  # Don't buy if price is >4% extended
-                    # Filter 3: Must have Trend OR massive Volatility/Sweep
+            if rsi < 75:
+                if vwap_dist < 0.04:
                     if is_uptrend or vol_slope > 0.1 or liq_sweep == 1:
                         bias = "LONG"
                         score = pL
-                        # Bonus: Liquidity Sweep Confirmation
                         if liq_sweep == 1: score += 5
 
-        # --- SHORT LOGIC (The Shield - STRICT) ---
+        # --- SHORT LOGIC ---
         elif pS > SHORT_THRESH:
             if rsi > 25:
                 if vwap_dist > -0.04:
-                    if is_downtrend:  # Shorts strictly require downtrend
+                    if is_downtrend:
                         bias = "SHORT"
                         score = pS
                         if liq_sweep == -1: score += 5
 
         # --- SAFETY VALVE ---
         if bias == "LONG" and not is_uptrend and trade_style != "SCALP":
-            # Only allow counter-trend Longs if it's a Liquidity Sweep
             if liq_sweep != 1: bias = "HOLD"
 
         if bias == "SHORT" and not is_downtrend:
             bias = "HOLD"
 
-        # 3. TRADE MANAGEMENT (1.5R High Win Rate Strategy)
+        # 3. TRADE MANAGEMENT (Risk Engine)
         atr = float(last.get('atr_14', price * 0.01))
 
         if trade_style == "SCALP":
             stop_mult, tgt_mult = 1.0, 1.5
             duration = "15m - 2h"
         elif trade_style == "SWING":
-            stop_mult, tgt_mult = 2.0, 3.0  # Swings get more room
+            stop_mult, tgt_mult = 2.5, 4.0
             duration = "1 - 3 Days"
-        else:  # DAY (Default Sniper Mode)
-            # 1.5R Stop / 1.5R Target ensures we capture the win quickly
-            # This matches our "High Win Rate" philosophy
+        else:  # DAY
             stop_mult, tgt_mult = 1.5, 1.5
             duration = "4h - 24h"
 
-        if bias == "LONG":
+        calc_direction = bias
+        if bias == "HOLD":
+            if pL >= pS:
+                calc_direction = "LONG"
+            else:
+                calc_direction = "SHORT"
+
+        if calc_direction == "LONG":
             stop = price - (atr * stop_mult)
             t1 = price + (atr * tgt_mult)
-        elif bias == "SHORT":
+        elif calc_direction == "SHORT":
             stop = price + (atr * stop_mult)
             t1 = price - (atr * tgt_mult)
         else:
             stop, t1 = price, price
 
-        # 4. EXPLAINABILITY
+        # 4. EXPLAINABILITY & NARRATIVE
         drivers = []
         if vol_slope > 0.1:
             drivers.append({"feature": "Energy", "desc": "VOLATILITY SPIKE", "importance": 95})
@@ -177,6 +175,9 @@ class CryptoQuantEngine:
             drivers.append({"feature": "Trend", "desc": "AI MOMENTUM", "importance": 80})
 
         dist = abs(t1 - price)
+
+        # HUMAN NARRATIVE GENERATOR
+        narrative = self._generate_narrative(bias, drivers, rsi, is_uptrend, liq_sweep)
 
         return SimpleNamespace(
             bias=bias,
@@ -192,12 +193,31 @@ class CryptoQuantEngine:
             regime_color="green" if bias == "LONG" else "red" if bias == "SHORT" else "gray",
             whale_zscore=round(float(last.get('whale_z', 0)), 2),
             whale_label="Whale Active" if abs(last.get('whale_z', 0)) > 2.0 else "Normal",
-            top_features=drivers
+            top_features=drivers,
+            narrative=narrative  # NEW FIELD
         )
+
+    def _generate_narrative(self, bias, drivers, rsi, is_uptrend, liq_sweep):
+        if bias == "HOLD":
+            if not is_uptrend: return "Market structure is broken. Protecting capital."
+            if rsi > 70: return "Asset is overextended. Waiting for pullback."
+            return "Volume is too low for a safe entry. Staying passive."
+
+        main_driver = drivers[0]['desc'] if drivers else "MOMENTUM"
+
+        if liq_sweep != 0:
+            return "Whales swept liquidity stops. Reversal imminent."
+        if "VOLATILITY" in main_driver:
+            return "Volatility expansion detected. Breakout likely."
+        if "FAIR VALUE" in main_driver:
+            return "Price reclaimed VWAP baseline. Institutional entry zone."
+
+        return "Trend alignment confirmed with strong volume."
 
     def _neutral_result(self, price, reason="Neutral"):
         return SimpleNamespace(
             bias="HOLD", score=50, entry=price, stop=price, target1=price, target2=price,
             target3=price, rr_ratio=0, expected_duration="--", regime=reason,
-            regime_color="gray", whale_zscore=0, whale_label="Normal", top_features=[]
+            regime_color="gray", whale_zscore=0, whale_label="Normal", top_features=[],
+            narrative="System initializing data streams..."
         )
