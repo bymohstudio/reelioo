@@ -384,6 +384,7 @@ def cron_scan_trigger(request, secret_key):
     from .models import JournalEntry
     from django.contrib.auth.models import User
 
+    # Security Check
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
@@ -401,6 +402,18 @@ def cron_scan_trigger(request, secret_key):
             if df is None or df.empty: continue
 
             res = engine.analyze(df, "INTRADAY")
+
+            # --- SAFETY VALVE (Added) ---
+            # Calculate volatility to prevent spamming during dead markets
+            last_open = float(df['open'].iloc[-1])
+            last_close = float(df['close'].iloc[-1])
+            move_pct = abs(last_close - last_open) / last_close
+
+            # If price moved less than 0.2%, skip this symbol
+            if move_pct < 0.002:
+                logs.append(f"{symbol}: SKIPPED (Low Volatility {move_pct:.4f})")
+                continue
+            # -----------------------------
 
             # 1. SNIPER SIGNAL
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
@@ -441,15 +454,20 @@ def cron_scan_trigger(request, secret_key):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
-
 def send_discord_alert(symbol, data, alert_type="SNIPER"):
     webhook_url = os.getenv('DISCORD_URL')
     if not webhook_url: return
 
+    # --- DYNAMIC NARRATIVE (Added) ---
+    # Attempts to get the 'narrative' from the engine, defaults if missing
+    narrative = getattr(data, 'narrative', "High Conviction Setup Confirmed.")
+    # ---------------------------------
+
     if alert_type == "SNIPER":
         color = 5763719 if data.bias == 'LONG' else 15548997
         title = f"🚨 SNIPER SIGNAL: {symbol}"
-        desc = "**HIGH CONVICTION SETUP CONFIRMED.**"
+        # Use the dynamic narrative in the description
+        desc = f"**{narrative}**"
     else:
         color = 16776960
         title = f"🛡️ SHIELD ACTIVE: {symbol}"
@@ -477,7 +495,6 @@ def send_discord_alert(symbol, data, alert_type="SNIPER"):
         requests.post(webhook_url, json=payload)
     except Exception as e:
         print(f"Discord Error: {e}")
-
 
 # --- LEGAL PAGES ---
 def terms_view(request): return render(request, 'core/legal/terms.html')

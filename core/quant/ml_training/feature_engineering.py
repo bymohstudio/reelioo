@@ -101,37 +101,39 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     return df.fillna(0)
 
 
-# --- ASYMMETRIC PHYSICS (THE FIX) ---
+# --- ASYMMETRIC PHYSICS (REWRITTEN) ---
 def generate_targets(df: pd.DataFrame, risk_reward=2.0, stop_mult=1.0, candles=24) -> pd.DataFrame:
     """
-    Applies asymmetric logic for Crypto Markets:
-    - LONGS: Look for Trends (24h horizon, 2.0x ATR)
-    - SHORTS: Look for Dumps (12h horizon, 1.5x ATR)
+    Applies SNIPER LOGIC for both sides:
+    - LONGS: Did price hit (Entry + 1.5 ATR) at any point? (Max High)
+    - SHORTS: Did price hit (Entry - 1.5 ATR) at any point? (Min Low)
     """
     data = df.copy()
     atr = data['atr_14']
     close = data['close']
+    low = data['low']
+    high = data['high']  # <--- Added High
 
-    # --- LONG LOGIC (Trend Following) ---
-    # Horizon: 24 Candles (Keep original setting)
-    future_close_long = close.shift(-candles)
-    target_long = atr * risk_reward  # 2.0 ATR
+    # --- LONG LOGIC (Pump Catching) ---
+    # Old Logic: Wait 24h, check Close (Too strict).
+    # New Logic: Look ahead 16h, check Max High.
 
-    # Must move 2.0 ATR up
+    # We reduce horizon to 16h (faster) and target 1.5 ATR (standard scalp)
+    future_max_high = high.rolling(window=16).max().shift(-16)
+    target_long = atr * 1.5
+
     data['target_long'] = np.where(
-        future_close_long > close + target_long,
+        future_max_high > close + target_long,
         1, 0
     )
 
-    # --- SHORT LOGIC (Panic Catching) ---
-    # Horizon: 12 Candles (Faster)
-    # Logic: Dumps happen fast. If it hasn't dumped in 12h, it's not a dump.
-    future_close_short = close.shift(-12)
-    target_short = atr * 1.5  # 1.5 ATR (Easier target for shorts)
+    # --- SHORT LOGIC (Crash Catching) ---
+    # Logic: Look ahead 12h, check Min Low.
+    future_min_low = low.rolling(window=12).min().shift(-12)
+    target_short = atr * 1.5
 
-    # Must move 1.5 ATR down
     data['target_short'] = np.where(
-        future_close_short < close - target_short,
+        future_min_low < close - target_short,
         1, 0
     )
 
