@@ -4,6 +4,7 @@ from catboost import CatBoostClassifier
 import os
 import logging
 import traceback
+import numpy as np
 from core.quant.ml_training.feature_engineering import generate_features, FEATURES
 
 log = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class CryptoBacktestEngine:
         self.trades = []
         self.models = {}
 
-        # --- PATH FIX ---
+        # --- PATH SETUP ---
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             core_dir = os.path.dirname(current_dir)
@@ -73,30 +74,37 @@ class CryptoBacktestEngine:
                 return self._empty_result()
 
             # 2. Config & Multipliers
-            stop_mult = 2.0
-            tgt_mult = 3.0
-            if trade_style == "SCALP": stop_mult, tgt_mult = 1.0, 1.5
-            if trade_style == "SWING": stop_mult, tgt_mult = 2.5, 4.0
+            # Updated Multipliers to match "Sniper" Logic
+            stop_mult = 1.5
+            tgt_mult = 2.5
 
-            # 3. Batch Predict (Raw Intelligence)
+            if trade_style == "SCALP": stop_mult, tgt_mult = 1.0, 1.5
+            if trade_style == "SWING": stop_mult, tgt_mult = 2.0, 4.0
+
+            # 3. Batch Predict (Ensemble Logic)
             try:
                 X = df[FEATURES].astype(float)
                 dmat = xgb.DMatrix(X)
+
+                # XGBoost
                 xl = self.models['xgb_long'].predict(dmat)
                 xs = self.models['xgb_short'].predict(dmat)
 
+                # LightGBM
                 if 'lgb_long' in self.models:
                     ll = self.models['lgb_long'].predict(X)
                     ls = self.models['lgb_short'].predict(X)
                 else:
                     ll, ls = xl, xs
 
+                # CatBoost
                 if 'cat_long' in self.models:
                     cl = self.models['cat_long'].predict_proba(X)[:, 1]
                     cs = self.models['cat_short'].predict_proba(X)[:, 1]
                 else:
                     cl, cs = xl, xs
 
+                # Ensemble Average (Weights: 33/33/33)
                 df['ens_long'] = ((xl + ll + cl) / 3) * 100
                 df['ens_short'] = ((xs + ls + cs) / 3) * 100
 
@@ -104,93 +112,110 @@ class CryptoBacktestEngine:
                 print(f"❌ Prediction Error: {e}")
                 return self._empty_result()
 
-            # 4. Simulation Loop (THE CASINO LOGIC)
+            # 4. Simulation Loop
             position = None
             entry_price = 0
             stop_loss = 0
             take_profit = 0
-            trades = []
 
-            # Start after rolling windows (50)
-            start_idx = 50
+            # Fee Simulation (0.05% Maker/Taker avg per side = 0.1% round trip)
+            TRADING_FEE_PCT = 0.1
+
+            start_idx = 50  # Skip warmup period
 
             for i in range(start_idx, len(df)):
                 curr = df.iloc[i]
                 price = curr['close']
+
+                # Calculate ATR for dynamic stops
                 atr = curr.get('atr_14', price * 0.01)
 
                 # --- EXIT LOGIC ---
                 if position:
                     res = None
-                    pnl = 0
+                    raw_pnl = 0
+
                     if position == 'LONG':
                         if curr['low'] <= stop_loss:
-                            res, pnl = "LOSS", -1.0
+                            res = "LOSS"
+                            # Calculate exact loss based on SL hit
+                            exit_price = stop_loss
+                            raw_pnl = (exit_price - entry_price) / entry_price * 100
                         elif curr['high'] >= take_profit:
-                            res, pnl = "WIN", (take_profit - entry_price) / entry_price * 100
+                            res = "WIN"
+                            exit_price = take_profit
+                            raw_pnl = (exit_price - entry_price) / entry_price * 100
+
                     elif position == 'SHORT':
                         if curr['high'] >= stop_loss:
-                            res, pnl = "LOSS", -1.0
+                            res = "LOSS"
+                            exit_price = stop_loss
+                            raw_pnl = (entry_price - exit_price) / entry_price * 100
                         elif curr['low'] <= take_profit:
-                            res, pnl = "WIN", (entry_price - take_profit) / entry_price * 100
+                            res = "WIN"
+                            exit_price = take_profit
+                            raw_pnl = (entry_price - exit_price) / entry_price * 100
 
                     if res:
-                        self.trades.append({"result": res, "pnl": round(pnl, 2), "entry": entry_price})
+                        # DEDUCT FEES (The Reality Check)
+                        net_pnl = raw_pnl - TRADING_FEE_PCT
+
+                        self.trades.append({
+                            "result": res,
+                            "pnl": round(net_pnl, 2),
+                            "entry": entry_price
+                        })
                         position = None
                         continue
 
-                # --- ENTRY LOGIC (THE HOUSE RULES) ---
+                # --- ENTRY LOGIC (Sniper Rules) ---
                 if not position:
-                    # 1. Get Raw Scores
+
+                    # 1. SAFETY VALVE: Volatility Check
+                    # Matches your Cron/Live Engine logic
+                    last_open = float(curr['open'])
+                    last_close = float(curr['close'])
+                    move_pct = abs(last_close - last_open) / last_open
+                    if move_pct < 0.002:  # Ignore dead candles (<0.2%)
+                        continue
+
+                    # 2. Get Scores
                     p_l = curr.get('ens_long', 0)
                     p_s = curr.get('ens_short', 0)
 
-                    # 2. Get Context (The Filter)
+                    # 3. Context Filters
                     rsi = curr.get('rsi_14', 50)
                     vwap_dist = curr.get('vwap_dist', 0)
-                    liq_sweep = curr.get('liq_sweep', 0)
-                    cvd_div = curr.get('cvd_divergence', 0)
 
-                    # 3. Apply "House Rules"
                     bias = "HOLD"
-                    CONF_THRESH = 65.0  # Base Threshold
 
-                    # --- LONG ---
+                    # 4. Thresholds (UPDATED: Matches Retraining)
+                    # Use 70% as the "High Conviction" line
+                    CONF_THRESH = 70.0
+
+                    # --- LONG LOGIC ---
                     if p_l > CONF_THRESH:
-                        # Rule A: Don't Buy Top
-                        if rsi < 70:
-                            # Rule B: Value Check (Or Momentum Override)
+                        # RSI Filter: Don't buy overbought
+                        if rsi < 75:
+                            # Value Filter: Don't buy if price is >2% above VWAP
                             if vwap_dist < 0.02:
-                                # BONUS: Trap Boost
-                                score = p_l
-                                if liq_sweep == 1: score += 5
-                                if cvd_div == 1: score += 5
+                                bias = "LONG"
 
-                                # Final Trigger
-                                if score >= CONF_THRESH:
-                                    bias = "LONG"
-
-                    # --- SHORT ---
+                    # --- SHORT LOGIC ---
                     elif p_s > CONF_THRESH:
-                        # Rule A: Don't Short Bottom
-                        if rsi > 30:
-                            # Rule B: Value Check
+                        # RSI Filter: Don't sell oversold
+                        if rsi > 25:
+                            # Value Filter: Don't sell if price is >2% below VWAP
                             if vwap_dist > -0.02:
-                                # BONUS: Trap Boost
-                                score = p_s
-                                if liq_sweep == -1: score += 5
-                                if cvd_div == -1: score += 5
+                                bias = "SHORT"
 
-                                # Final Trigger
-                                if score >= CONF_THRESH:
-                                    bias = "SHORT"
-
-                    # Execute
+                    # Execute Trade
                     if bias == 'LONG':
                         position = 'LONG'
                         entry_price = price
                         stop_loss = price - (atr * stop_mult)
                         take_profit = price + (atr * tgt_mult)
+
                     elif bias == 'SHORT':
                         position = 'SHORT'
                         entry_price = price
@@ -207,16 +232,23 @@ class CryptoBacktestEngine:
     def _generate_stats(self):
         total = len(self.trades)
         if total == 0: return self._empty_result()
-        wins = [t for t in self.trades if t['result'] == 'WIN']
+
+        # Calculate Win Rate
+        # Note: A "WIN" in result might still be negative PnL if fee > profit (Breakeven trades)
+        wins = [t for t in self.trades if t['pnl'] > 0]
         wr = (len(wins) / total * 100)
 
-        loss_sum = abs(sum(t['pnl'] for t in self.trades if t['pnl'] < 0))
-        pf = (sum(t['pnl'] for t in wins) / loss_sum) if loss_sum > 0 else 10.0
+        # Calculate Profit Factor
+        gross_profit = sum(t['pnl'] for t in wins)
+        gross_loss = abs(sum(t['pnl'] for t in self.trades if t['pnl'] < 0))
+
+        pf = (gross_profit / gross_loss) if gross_loss > 0 else 10.0
 
         return {
             "win_rate": round(wr, 1),
             "profit_factor": round(pf, 2),
             "total_trades": total,
+            # Return last 20 trades for UI
             "trades_log": self.trades[-20:]
         }
 
