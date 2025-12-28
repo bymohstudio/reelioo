@@ -451,39 +451,69 @@ def send_discord_alert(symbol, data, alert_type="SNIPER"):
     webhook_url = os.getenv('DISCORD_URL')
     if not webhook_url: return
 
-    # --- DYNAMIC NARRATIVE (Added) ---
-    # Attempts to get the 'narrative' from the engine, defaults if missing
-    narrative = getattr(data, 'narrative', "High Conviction Setup Confirmed.")
-    # ---------------------------------
+    # --- 1. GENERATE DEEP LINK ---
+    # This link opens the terminal and auto-scans the specific coin
+    terminal_link = f"https://reelioo.app/terminal?ticker={symbol}"
+
+    # --- 2. DESIGN THE TEASER ---
+    # We use neutral colors and generic terms to avoid leaking 'Long' vs 'Short'
 
     if alert_type == "SNIPER":
-        color = 5763719 if data.bias == 'LONG' else 15548997
-        title = f"🚨 SNIPER SIGNAL: {symbol}"
-        # Use the dynamic narrative in the description
-        desc = f"**{narrative}**"
-    else:
-        color = 16776960
-        title = f"🛡️ SHIELD ACTIVE: {symbol}"
-        desc = f"*High Volatility Detected ({data.score}%), but Risk Check Failed. Blocking trade.*"
+        # Purple/Blue gradient feel (Hex: 5865F2 - Discord Blurple)
+        # We don't use Green/Red here so they don't guess the direction.
+        color = 5814783
+        title = f"🎯 SNIPER TARGET IDENTIFIED: {symbol}"
+        description = (
+            "**Institutional Activity Detected.**\n"
+            "Neural engines have locked onto a high-probability setup.\n\n"
+            "Analyzing Order Flow, Whale Volume, and Trend Vectors..."
+        )
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/3121/3121575.png"  # Target Icon
 
-    avatar = "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"
+    else:
+        # Orange/Yellow for Warning
+        color = 16776960
+        title = f"📡 RADAR CONTACT: {symbol}"
+        description = (
+            "**Volatility Spike Detected.**\n"
+            "Abnormal market behavior observed. Risk protocols active."
+        )
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/564/564619.png"  # Radar Icon
+
+    # --- 3. CONSTRUCT PAYLOAD ---
     payload = {
-        "username": "Reelioo Terminal Bot",
-        "avatar_url": avatar,
+        "username": "Reelioo Intelligence",
+        "avatar_url": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
         "embeds": [{
             "title": title,
-            "description": desc,
+            "description": description,
             "color": color,
+            "thumbnail": {"url": thumbnail},
             "fields": [
-                {"name": "Bias", "value": f"**{data.bias}**", "inline": True},
-                {"name": "Confidence", "value": f"**{data.score}%**", "inline": True},
-                {"name": "Price", "value": f"`${data.entry}`", "inline": True},
-                {"name": "Stop", "value": f"${data.stop}", "inline": True},
-                {"name": "Target", "value": f"${data.target2}", "inline": True}
+                {
+                    "name": "Asset",
+                    "value": f"`{symbol}`",
+                    "inline": True
+                },
+                {
+                    "name": "Signal Strength",
+                    "value": "██████▒▒▒▒ **[HIDDEN]**",  # Visual bar to tease
+                    "inline": True
+                },
+                {
+                    "name": "Full Analysis",
+                    "value": f"👉 [**CLICK TO REVEAL DATA**]({terminal_link})",
+                    "inline": False
+                }
             ],
-            "footer": {"text": "Reelioo Institutional Terminal"}
+            "footer": {
+                "text": "🔒 Auth Required • Reelioo Terminal",
+                "icon_url": "https://cdn-icons-png.flaticon.com/512/2913/2913133.png"
+            },
+            "timestamp": datetime.utcnow().isoformat()
         }]
     }
+
     try:
         requests.post(webhook_url, json=payload)
     except Exception as e:

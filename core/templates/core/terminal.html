@@ -245,7 +245,7 @@
     </div>
 
     <div id="backtest-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4">
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[95%] sm:max-w-xl relative shadow-2xl flex flex-col max-h-[85vh] overflow-hidden m-auto">
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[90%] sm:max-w-lg relative shadow-2xl flex flex-col max-h-[80vh] overflow-hidden m-auto">
             <div class="p-3 sm:p-4 border-b border-white/5 bg-white/5 flex justify-between items-center flex-shrink-0">
                 <div>
                     <h3 class="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
@@ -304,7 +304,7 @@
     </div>
 
     <div id="alpha-modal" class="hidden fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-        <div class="relative w-full max-w-lg bg-[#050505] border border-emerald-500/50 rounded-2xl shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden transform transition-all scale-100 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="relative w-[90%] sm:w-full sm:max-w-md bg-[#050505] border border-emerald-500/50 rounded-2xl shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden transform transition-all scale-100 max-h-[85vh] overflow-y-auto custom-scrollbar">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-white to-emerald-500 animate-shimmer z-20 opacity-50"></div>
             <button onclick="closeAlpha()" class="absolute top-4 right-4 text-slate-500 hover:text-white z-30 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
 
@@ -755,6 +755,19 @@
 
         initMaintenanceLoop();
         initTicker();
+
+        // --- AUTO SCAN LOGIC ADDED HERE ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const tickerParam = urlParams.get('ticker');
+        if (tickerParam) {
+            // Auto-fill and scan
+            document.getElementById('symbol-input').value = tickerParam;
+
+            // Wait 1.5s for the "System Online" animation, then trigger scan
+            setTimeout(() => {
+                initScan();
+            }, 1500);
+        }
 
         if(window.lucide) lucide.createIcons();
     });
