@@ -384,7 +384,7 @@ def cron_scan_trigger(request, secret_key):
     from .models import JournalEntry
     from django.contrib.auth.models import User
 
-    # Security Check
+    # 1. Security Check
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
@@ -393,65 +393,58 @@ def cron_scan_trigger(request, secret_key):
     scanned = 0
     logs = []
 
-    try:
-        engine = CryptoQuantEngine()
-        target_user = User.objects.filter(is_superuser=True).first()
+    engine = CryptoQuantEngine()
+    target_user = User.objects.filter(is_superuser=True).first()
 
-        for symbol in watchlist:
-            df = MarketService.get_historical_data(symbol, "AUTO", "INTRADAY")
-            if df is None or df.empty: continue
+    for symbol in watchlist:
+        try:
+            # 2. Use "PERP" to match Terminal Data exactly
+            df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
+
+            if df is None or df.empty:
+                logs.append(f"❌ {symbol}: No Data")
+                continue
 
             res = engine.analyze(df, "INTRADAY")
 
-            # --- SAFETY VALVE (Added) ---
-            # Calculate volatility to prevent spamming during dead markets
-            last_open = float(df['open'].iloc[-1])
-            last_close = float(df['close'].iloc[-1])
-            move_pct = abs(last_close - last_open) / last_close
+            # 3. Log the score for debugging
+            logs.append(f"🔍 {symbol}: Score {res.score}% | Bias {res.bias}")
 
-            # If price moved less than 0.2%, skip this symbol
-            if move_pct < 0.002:
-                logs.append(f"{symbol}: SKIPPED (Low Volatility {move_pct:.4f})")
-                continue
-            # -----------------------------
-
-            # 1. SNIPER SIGNAL
+            # 4. Trigger Condition (Threshold 65%)
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
-                send_discord_alert(symbol, res, alert_type="SNIPER")
+
+                # Double Check: Ensure we haven't alerted this recently (4 hours)
+                recent_alert = False
                 if target_user:
-                    recent = JournalEntry.objects.filter(
-                        user=target_user, symbol=symbol, status='PENDING',
+                    recent_alert = JournalEntry.objects.filter(
+                        user=target_user,
+                        symbol=symbol,
+                        status='PENDING',
                         created_at__gte=timezone.now() - timedelta(hours=4)
                     ).exists()
-                    if not recent:
+
+                if not recent_alert:
+                    send_discord_alert(symbol, res, alert_type="SNIPER")
+
+                    # Log to DB
+                    if target_user:
                         JournalEntry.objects.create(
                             user=target_user, symbol=symbol, bias=res.bias,
                             entry_price=res.entry, stop_loss=res.stop, target=res.target1,
                             confidence=res.score, status='PENDING', leverage='Low'
                         )
-                logs.append(f"{symbol}: SNIPER SENT ({res.score}%)")
+                    logs.append(f"✅ {symbol}: ALERT SENT")
+                else:
+                    logs.append(f"⚠️ {symbol}: Alert suppressed (Already Active)")
 
-            # 2. SHIELD EVENT
-            elif res.score >= 55 and res.bias == 'HOLD':
-                if target_user:
-                    recent_shield = JournalEntry.objects.filter(
-                        user=target_user, symbol=symbol, status='SHIELD',
-                        created_at__gte=timezone.now() - timedelta(hours=1)
-                    ).exists()
-                    if not recent_shield:
-                        JournalEntry.objects.create(
-                            user=target_user, symbol=symbol, bias="BLOCKED",
-                            entry_price=res.entry, stop_loss=res.stop, target=res.target1,
-                            confidence=res.score, status='SHIELD', leverage='None'
-                        )
-                logs.append(f"{symbol}: SHIELD LOGGED")
+        except Exception as e:
+            # 5. Error Handler INSIDE loop prevents one crash from stopping others
+            logs.append(f"💀 {symbol}: CRASH - {str(e)}")
+            continue
 
-            scanned += 1
+        scanned += 1
 
-        return JsonResponse({'status': 'success', 'scanned': scanned, 'logs': logs})
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'success', 'scanned': scanned, 'logs': logs})
 
 
 def send_discord_alert(symbol, data, alert_type="SNIPER"):
