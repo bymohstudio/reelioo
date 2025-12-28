@@ -7,6 +7,7 @@ import traceback
 from datetime import datetime, timedelta
 
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -229,16 +230,62 @@ def settings_view(request):
 # --- JOURNAL ---
 @login_required
 def journal_view(request):
+    # --- SECURITY CHECK ---
+    profile = request.user.profile
+    if not profile.is_access_granted():
+        messages.warning(request, "Access Expired. Upgrade to View Journal.")
+        return redirect('pricing')
+    # ----------------------
+
     from .models import JournalEntry
     entries_list = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
+
+    # --- NEW: CALCULATE ROI METRICS ---
+    net_roi = 0.0
+    gross_profit = 0.0
+    gross_loss = 0.0
+
+    # We iterate through closed trades to calculate performance
+    # (Doing this in Python is fine for < 1000 trades. For scaling, use DB aggregation later)
+    for trade in entries_list:
+        if trade.status in ['WIN', 'LOSS']:
+            # Calculate expected % move based on Entry/Target/Stop
+            try:
+                if trade.bias == 'LONG':
+                    potential_win = (trade.target - trade.entry_price) / trade.entry_price
+                    potential_loss = (trade.entry_price - trade.stop_loss) / trade.entry_price
+                else:  # SHORT
+                    potential_win = (trade.entry_price - trade.target) / trade.entry_price
+                    potential_loss = (trade.stop_loss - trade.entry_price) / trade.entry_price
+
+                # Add Leverage Multiplier (Simulated 10x for "Low" lev, or just raw %)
+                # For now, let's show RAW asset PnL (Safer/Cleaner)
+
+                if trade.status == 'WIN':
+                    net_roi += potential_win
+                    gross_profit += potential_win
+                elif trade.status == 'LOSS':
+                    net_roi -= potential_loss
+                    gross_loss += potential_loss
+            except ZeroDivisionError:
+                continue
+
+    # Format for display
+    display_roi = round(net_roi * 100, 2)
+    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else (
+        round(gross_profit, 2) if gross_profit > 0 else 0)
+
+    # Pagination
     paginator = Paginator(entries_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    total_trades = entries_list.count()
-    wins = entries_list.filter(status='WIN').count()
-    win_rate = round((wins / total_trades * 100), 1) if total_trades > 0 else 0
-    context = {'page_obj': page_obj, 'total_trades': total_trades, 'win_rate': win_rate,
-               'active_pending': entries_list.filter(status='PENDING').count()}
+
+    context = {
+        'page_obj': page_obj,
+        'net_roi': display_roi,  # Replaces Win Rate
+        'profit_factor': profit_factor,  # New Metric
+        'active_pending': entries_list.filter(status='PENDING').count()
+    }
     return render(request, 'core/journal.html', context)
 
 
@@ -381,7 +428,7 @@ def sitemap_view(request):
 
 # --- CRON JOB TRIGGER ---
 def cron_scan_trigger(request, secret_key):
-    from .models import JournalEntry
+    from .models import JournalEntry, UserProfile
     from django.contrib.auth.models import User
 
     # 1. Security Check
@@ -391,60 +438,88 @@ def cron_scan_trigger(request, secret_key):
 
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
     scanned = 0
+    signals_sent = 0
     logs = []
 
     engine = CryptoQuantEngine()
-    target_user = User.objects.filter(is_superuser=True).first()
+
+    # 2. Get ALL Valid Users (Admins + Active Subscribers/Trial)
+    now = timezone.now()
+    # "is_access_granted" logic generally checks if subscription_end_date > now
+    active_users = User.objects.filter(
+        Q(is_superuser=True) |
+        Q(profile__subscription_end_date__gt=now)
+    ).distinct()
 
     for symbol in watchlist:
         try:
-            # 2. Use "PERP" to match Terminal Data exactly
+            # Use PERP to match Terminal
             df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
-
             if df is None or df.empty:
                 logs.append(f"❌ {symbol}: No Data")
                 continue
 
             res = engine.analyze(df, "INTRADAY")
 
-            # 3. Log the score for debugging
-            logs.append(f"🔍 {symbol}: Score {res.score}% | Bias {res.bias}")
-
-            # 4. Trigger Condition (Threshold 65%)
+            # 3. TRIGGER LOGIC
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
 
-                # Double Check: Ensure we haven't alerted this recently (4 hours)
-                recent_alert = False
-                if target_user:
-                    recent_alert = JournalEntry.objects.filter(
-                        user=target_user,
+                # Check Global Duplication (via Admin's Journal)
+                master_admin = User.objects.filter(is_superuser=True).first()
+                recent_signal_exists = False
+
+                if master_admin:
+                    recent_signal_exists = JournalEntry.objects.filter(
+                        user=master_admin,
                         symbol=symbol,
                         status='PENDING',
                         created_at__gte=timezone.now() - timedelta(hours=4)
                     ).exists()
 
-                if not recent_alert:
+                if not recent_signal_exists:
+                    # A. Send Discord Alert (Public Teaser)
                     send_discord_alert(symbol, res, alert_type="SNIPER")
 
-                    # Log to DB
-                    if target_user:
-                        JournalEntry.objects.create(
-                            user=target_user, symbol=symbol, bias=res.bias,
-                            entry_price=res.entry, stop_loss=res.stop, target=res.target1,
-                            confidence=res.score, status='PENDING', leverage='Low'
-                        )
-                    logs.append(f"✅ {symbol}: ALERT SENT")
+                    # B. DISTRIBUTE TO ALL VALID USERS
+                    for user in active_users:
+                        user_has_trade = JournalEntry.objects.filter(
+                            user=user,
+                            symbol=symbol,
+                            status__in=['PENDING', 'SHIELD'],
+                            created_at__gte=timezone.now() - timedelta(hours=4)
+                        ).exists()
+
+                        if not user_has_trade:
+                            JournalEntry.objects.create(
+                                user=user,
+                                symbol=symbol,
+                                bias=res.bias,
+                                entry_price=res.entry,
+                                stop_loss=res.stop,
+                                target=res.target1,
+                                confidence=res.score,
+                                status='PENDING',
+                                leverage='Low'
+                            )
+
+                    logs.append(f"✅ {symbol}: Signal Distributed to {active_users.count()} users.")
+                    signals_sent += 1
                 else:
-                    logs.append(f"⚠️ {symbol}: Alert suppressed (Already Active)")
+                    logs.append(f"⚠️ {symbol}: Signal Active. Distribution skipped.")
 
         except Exception as e:
-            # 5. Error Handler INSIDE loop prevents one crash from stopping others
-            logs.append(f"💀 {symbol}: CRASH - {str(e)}")
+            logs.append(f"💀 {symbol}: Error - {str(e)}")
             continue
 
         scanned += 1
 
-    return JsonResponse({'status': 'success', 'scanned': scanned, 'logs': logs})
+    return JsonResponse({
+        'status': 'success',
+        'scanned': scanned,
+        'signals_distributed': signals_sent,
+        'users_reached': active_users.count(),
+        'logs': logs
+    })
 
 
 def send_discord_alert(symbol, data, alert_type="SNIPER"):
@@ -576,8 +651,6 @@ def debug_models_view(request):
     return JsonResponse(report, json_dumps_params={'indent': 2})
 
 
-# views.py
-
 @login_required
 def ops_dashboard_view(request):
     # SECURITY: Lock this to Superusers only
@@ -607,5 +680,4 @@ def ops_dashboard_view(request):
         'win_rate': win_rate,
         'recent_signals': recent_signals
     }
-    # Update template reference here
     return render(request, 'core/ops_dashboard.html', context)

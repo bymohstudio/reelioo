@@ -5,18 +5,54 @@
 
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-        <div class="col-span-1 md:col-span-2">
-            <h1 class="text-3xl font-black text-white mb-2">Trade Journal</h1>
-            <p class="text-sm text-slate-500">Track your quant signals and performance.</p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-white mb-2">Performance Journal</h1>
+            <p class="text-sm text-slate-500">Your personal trading ledger.</p>
         </div>
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 flex items-center justify-between">
-            <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest">Win Rate</span>
-            <span class="text-2xl font-black {% if win_rate >= 50 %}text-emerald-400{% else %}text-slate-400{% endif %}">{{ win_rate }}%</span>
         </div>
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 flex items-center justify-between">
-            <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest">Active Signals</span>
-            <span class="text-2xl font-black text-blue-400">{{ active_pending }}</span>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Net Growth (ROI)</span>
+                    <span class="text-3xl font-black tracking-tighter {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                        {% if net_roi > 0 %}+{% endif %}{{ net_roi }}%
+                    </span>
+                </div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
+                    <i data-lucide="trending-up" class="w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span>
+                    <span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
+                </div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
+                    <i data-lucide="scale" class="w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span>
+                    <span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span>
+                </div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
+                    <i data-lucide="activity" class="w-5 h-5"></i>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -147,6 +183,8 @@
 
 <script>
     if (window.lucide) lucide.createIcons();
+
+    // Auto-Format Dates to Local Time
     document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.local-time').forEach(el => {
             const raw = el.getAttribute('data-timestamp');
@@ -183,10 +221,13 @@
         if (type === 'success') { colorClass = "border-emerald-500/50 bg-emerald-900/80 text-emerald-200"; icon = "check-circle"; }
         if (type === 'error') { colorClass = "border-red-500/50 bg-red-900/80 text-red-200"; icon = "alert-circle"; }
         if (type === 'loading') { colorClass = "border-slate-500/50 bg-slate-800/90 text-slate-300"; icon = "loader-2"; }
+
         toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-md shadow-2xl text-xs font-bold uppercase tracking-wider animate-slide-in ${colorClass}`;
         toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 ${type === 'loading' ? 'animate-spin' : ''}"></i> <span>${message}</span>`;
+
         container.appendChild(toast);
         if (window.lucide) lucide.createIcons();
+
         setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(10px)';
@@ -199,20 +240,25 @@
         let icon = btn.querySelector('svg') || btn.querySelector('i');
         const badgeDiv = document.getElementById(`status-badge-${id}`);
         const originalBadge = badgeDiv.innerHTML;
+
         if (icon) icon.classList.add('animate-spin');
         btn.disabled = true;
+
         badgeDiv.innerHTML = `
             <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-wide">
                 <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Syncing...
             </span>`;
         if(window.lucide) lucide.createIcons();
+
         showToast("Syncing with live market...", "loading");
+
         try {
             const res = await fetch(`/api/journal/refresh/${id}/`, {
                 method: 'POST',
                 headers: {'X-CSRFToken': getCookie('csrftoken')}
             });
             const data = await res.json();
+
             if(data.status === 'success') {
                 if (data.new_status === "PENDING" || data.new_status === "SHIELD") {
                     badgeDiv.innerHTML = `
@@ -230,7 +276,10 @@
                         <span class="inline-flex items-center px-3 py-1 rounded-full border ${colorClass} text-[10px] font-bold uppercase tracking-wide animate-pulse">
                             ${data.new_status}
                         </span>`;
+
+                    // Refresh page to update top stats after a short delay
                     showToast(`Trade Closed: ${data.new_status}`, data.new_status === 'WIN' || data.new_status === 'SAVED' ? 'success' : 'info');
+                    setTimeout(() => window.location.reload(), 1500);
                 }
             } else {
                 throw new Error(data.message || "Unknown error");
@@ -249,6 +298,7 @@
     let deleteTargetId = null;
     function openDeleteModal(id) { deleteTargetId = id; document.getElementById('delete-modal').classList.remove('hidden'); }
     function closeDeleteModal() { deleteTargetId = null; document.getElementById('delete-modal').classList.add('hidden'); }
+
     async function commitDelete() {
         if (!deleteTargetId) return;
         const id = deleteTargetId;
@@ -256,6 +306,7 @@
         closeDeleteModal();
         row.style.opacity = '0.5';
         row.style.pointerEvents = 'none';
+
         try {
             const res = await fetch(`/api/journal/delete/${id}/`, {
                 method: 'DELETE',
@@ -266,6 +317,8 @@
                 row.style.opacity = '0';
                 setTimeout(() => row.remove(), 300);
                 showToast("Entry Deleted Successfully", "success");
+                // Reload to update stats
+                setTimeout(() => window.location.reload(), 1000);
             } else {
                 throw new Error("API Error");
             }
