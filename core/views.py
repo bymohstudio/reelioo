@@ -430,30 +430,42 @@ def sitemap_view(request):
 def cron_scan_trigger(request, secret_key):
     from .models import JournalEntry, UserProfile
     from django.contrib.auth.models import User
+    from django.db.models import Q
+    from django.utils import timezone
+    from datetime import timedelta
 
-    # 1. Security Check
+    # 1. SECURITY CHECK
     required_secret = getattr(settings, 'CRON_SECRET', 'super-secret-password-123')
     if secret_key != required_secret:
         return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
 
+    logs = []
+
+    # 2. DATA RETENTION POLICY (CLEANUP)
+    # Automatically delete signals older than 90 days to keep DB fast
+    retention_cutoff = timezone.now() - timedelta(days=90)
+    deleted_count, _ = JournalEntry.objects.filter(created_at__lt=retention_cutoff).delete()
+    if deleted_count > 0:
+        logs.append(f"🧹 MAINTENANCE: Purged {deleted_count} old entries.")
+
+    # 3. SETUP SCANNER
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
     scanned = 0
     signals_sent = 0
-    logs = []
-
     engine = CryptoQuantEngine()
 
-    # 2. Get ALL Valid Users (Admins + Active Subscribers/Trial)
+    # 4. GET ALL VALID USERS (Admins + Active Subscribers)
+    # We find everyone who should receive the trade
     now = timezone.now()
-    # "is_access_granted" logic generally checks if subscription_end_date > now
     active_users = User.objects.filter(
         Q(is_superuser=True) |
         Q(profile__subscription_end_date__gt=now)
     ).distinct()
 
+    # 5. START SCAN LOOP
     for symbol in watchlist:
         try:
-            # Use PERP to match Terminal
+            # Use PERP data to match Terminal accuracy
             df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
             if df is None or df.empty:
                 logs.append(f"❌ {symbol}: No Data")
@@ -461,10 +473,10 @@ def cron_scan_trigger(request, secret_key):
 
             res = engine.analyze(df, "INTRADAY")
 
-            # 3. TRIGGER LOGIC
+            # 6. TRIGGER LOGIC (Score > 65% + Directional Bias)
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
 
-                # Check Global Duplication (via Admin's Journal)
+                # Check Global Duplication (via Admin's Journal as Master Record)
                 master_admin = User.objects.filter(is_superuser=True).first()
                 recent_signal_exists = False
 
@@ -477,11 +489,13 @@ def cron_scan_trigger(request, secret_key):
                     ).exists()
 
                 if not recent_signal_exists:
-                    # A. Send Discord Alert (Public Teaser)
+                    # A. Send "Teaser" Alert to Discord
                     send_discord_alert(symbol, res, alert_type="SNIPER")
 
-                    # B. DISTRIBUTE TO ALL VALID USERS
+                    # B. DISTRIBUTE TRADE TO ALL ACTIVE USERS
+                    # This ensures when they click the link, the trade is ALREADY in their Journal
                     for user in active_users:
+                        # Double check specific user doesn't have it
                         user_has_trade = JournalEntry.objects.filter(
                             user=user,
                             symbol=symbol,
