@@ -574,3 +574,38 @@ def debug_models_view(request):
             report["load_tests"][filename] = f"❌ ERROR: {str(e)}"
 
     return JsonResponse(report, json_dumps_params={'indent': 2})
+
+
+# views.py
+
+@login_required
+def ops_dashboard_view(request):
+    # SECURITY: Lock this to Superusers only
+    if not request.user.is_superuser:
+        return redirect('terminal')
+
+    from django.contrib.auth.models import User
+    from .models import JournalEntry, UserProfile
+    from django.db.models import Sum
+
+    # 1. High Level Metrics
+    total_users = User.objects.count()
+    active_subs = UserProfile.objects.filter(is_premium=True).count()
+
+    # 2. PnL Stats (All Users)
+    total_signals = JournalEntry.objects.count()
+    wins = JournalEntry.objects.filter(status='WIN').count()
+    win_rate = round((wins / total_signals * 100), 1) if total_signals > 0 else 0
+
+    # 3. Recent Signals Feed
+    recent_signals = JournalEntry.objects.select_related('user').order_by('-created_at')[:20]
+
+    context = {
+        'total_users': total_users,
+        'active_subs': active_subs,
+        'total_signals': total_signals,
+        'win_rate': win_rate,
+        'recent_signals': recent_signals
+    }
+    # Update template reference here
+    return render(request, 'core/ops_dashboard.html', context)

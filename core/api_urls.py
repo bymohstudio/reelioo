@@ -19,6 +19,7 @@ urlpatterns = [
     path("settings/cancel/", views.cancel_subscription_view, name="cancel_subscription"),
     path('robots.txt', robots_view, name='robots'),
     path('sitemap.xml', sitemap_view, name='sitemap'),
+    path('ops/console/', views.ops_dashboard_view, name='ops_dashboard'),
 
     # Auth
     path("auth/login/", views.login_view, name="login"),
