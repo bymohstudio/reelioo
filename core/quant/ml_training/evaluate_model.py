@@ -1,6 +1,5 @@
 # core/quant/evaluate_model.py
 import sys
-
 import pandas as pd
 import numpy as np
 import xgboost as xgb
@@ -11,18 +10,18 @@ import time
 import os
 from datetime import datetime, timedelta
 
-# Import the NEW Asymmetric Logic
 from core.quant.ml_training.feature_engineering import generate_features, generate_targets, FEATURES
 
+# --- CONFIGURATION (MATCHING CRYPTO_ENGINE) ---
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 INTERVAL = "1h"
-LOOKBACK = 90  # Last 3 months
+LOOKBACK = 90
+THRESHOLD = 75.0  # <--- UPDATED TO MATCH ENGINE (Was 70.0)
 
-current_dir = os.path.dirname(os.path.abspath(__file__))  # core/quant/ml_training
-parent_dir = os.path.dirname(current_dir)                 # core/quant
-MODEL_DIR = os.path.join(parent_dir, "ml_models")         # core/quant/ml_models
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+MODEL_DIR = os.path.join(parent_dir, "ml_models")
 
-# 2. Fix Import Paths so we can run as a module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))))
 
 PATHS = {
@@ -80,7 +79,7 @@ def load_models():
 
 
 def evaluate():
-    print(f"\n🔍 EVALUATING LIVE PERFORMANCE (Threshold: 70%)")
+    print(f"\n🔍 EVALUATING PURIST PERFORMANCE (Threshold: {THRESHOLD}%)")
     print(f"=================================================")
 
     models = load_models()
@@ -88,7 +87,6 @@ def evaluate():
         print("❌ Models not found.")
         return
 
-    # METRICS
     l_trades, l_wins = 0, 0
     s_trades, s_wins = 0, 0
 
@@ -96,49 +94,46 @@ def evaluate():
         df = fetch_data(sym)
         if df.empty: continue
 
-        # Feature Engineering + New Targets
         df = generate_features(df)
-        df = generate_targets(df)  # Applies the new "Crash" logic for validation
+        df = generate_targets(df)
 
         X = df[FEATURES]
         dmat = xgb.DMatrix(X)
 
-        # Predict
         try:
-            p_l = (models['xgb_long'].predict(dmat) + models['lgb_long'].predict(X) + models['cat_long'].predict_proba(
-                X)[:, 1]) / 3 * 100
-            p_s = (models['xgb_short'].predict(dmat) + models['lgb_short'].predict(X) + models[
-                                                                                            'cat_short'].predict_proba(
-                X)[:, 1]) / 3 * 100
+            p_l = (models['xgb_long'].predict(dmat) + models['lgb_long'].predict(X) + models['cat_long'].predict_proba(X)[:, 1]) / 3 * 100
+            p_s = (models['xgb_short'].predict(dmat) + models['lgb_short'].predict(X) + models['cat_short'].predict_proba(X)[:, 1]) / 3 * 100
         except:
             continue
 
-        # Simulate
         for i in range(len(df)):
             if pd.isna(df['target_long'].iloc[i]): continue
 
             score_l, score_s = p_l[i], p_s[i]
 
-            # Long Logic (Sniper)
-            if score_l > 70 and score_l > score_s:
+            # --- PURIST LOGIC (MATCHING ENGINE) ---
+            # Threshold raised to 75.0
+            # No +5 artificial boosts added here
+
+            # Long Logic
+            if score_l > THRESHOLD and score_l > score_s:
                 l_trades += 1
                 if df['target_long'].iloc[i] == 1: l_wins += 1
 
-            # Short Logic (Crash Hunter)
-            elif score_s > 70 and score_s > score_l:
+            # Short Logic
+            elif score_s > THRESHOLD and score_s > score_l:
                 s_trades += 1
                 if df['target_short'].iloc[i] == 1: s_wins += 1
 
-    print("\n📊 FINAL TEST RESULTS (Last 90 Days)")
+    print(f"\n📊 FINAL PURIST RESULTS (Last 90 Days - >{THRESHOLD}%)")
     print("------------------------------------")
     print(f"🔹 LONG (Sniper):    {l_trades} trades | WR: {(l_wins / l_trades * 100) if l_trades else 0:.1f}%")
     print(f"🔸 SHORT (Crash):    {s_trades} trades | WR: {(s_wins / s_trades * 100) if s_trades else 0:.1f}%")
 
     if s_trades > 0 and (s_wins / s_trades) > 0.5:
-        print("\n✅ SYSTEM IS GREEN. READY FOR DEPLOYMENT.")
+        print("\n✅ SYSTEM ALIGNED. THIS REFLECTS REALITY.")
     else:
         print("\n⚠️ SYSTEM NEEDS TUNING.")
-
 
 if __name__ == "__main__":
     evaluate()

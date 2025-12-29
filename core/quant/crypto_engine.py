@@ -110,16 +110,17 @@ class CryptoQuantEngine:
                 log.warning(f"Flow Inference Failed: {ex}")
 
         # ---------------------------------------------------------
-        # 🔴 LOGIC: CALIBRATION & VETO
+        # 🔴 LOGIC: CALIBRATION & VETO (PURIST MODE)
         # ---------------------------------------------------------
 
-        # A) CALIBRATION: Boost confidence if flow aligns
+        # A) CALIBRATION: Boost REMOVED to prevent hallucination.
+        # We only keep the PENALTY (Veto) to save us from bad trades.
         if pL > pS:
-            if flow_score > 0.70: pL += 5.0
-            if flow_score < 0.30: pL -= 10.0
+            # if flow_score > 0.70: pL += 5.0  <-- DELETED (No Artificial Boost)
+            if flow_score < 0.30: pL -= 10.0   # Veto Kept
         else:
-            if flow_score < 0.30: pS += 5.0
-            if flow_score > 0.70: pS -= 10.0
+            # if flow_score < 0.30: pS += 5.0  <-- DELETED (No Artificial Boost)
+            if flow_score > 0.70: pS -= 10.0   # Veto Kept
 
         # B) SELECT BIAS
         bias = "HOLD"
@@ -136,14 +137,15 @@ class CryptoQuantEngine:
 
         # TREND DEFINITIONS
         is_uptrend = (price > ema_20) and (ema_20 > ema_50)
-        # We relax Short requirements: If Price < EMA20, it's weak enough to dump (even if EMA20 > EMA50)
         is_weakness = (price < ema_20)
 
-        # --- THRESHOLDS (UPDATED) ---
-        LONG_THRESH = 70.0
-        SHORT_THRESH = 70.0  # UNLOCKED (Was 99.0)
+        # --- THRESHOLDS (TIGHTENED) ---
+        # Increased to 75% to filter out "maybe" trades
+        LONG_THRESH = 75.0
+        SHORT_THRESH = 75.0
 
         if trade_style == "SCALP":
+            # Scalps are faster, so we allow slightly lower conviction
             LONG_THRESH -= 5.0
             SHORT_THRESH -= 5.0
 
@@ -156,7 +158,6 @@ class CryptoQuantEngine:
 
         elif pS > SHORT_THRESH:
             if rsi > 25 and vwap_dist > -0.04:
-                # REPLACED: Strict `is_downtrend` with relaxed `is_weakness`
                 if is_weakness or vol_slope > 0.2:
                     bias = "SHORT"
                     score = pS
@@ -167,7 +168,6 @@ class CryptoQuantEngine:
             if liq_sweep != 1: bias = "HOLD"
 
         if bias == "SHORT" and not is_weakness:
-            # If we are trying to short but price is ABOVE EMA20, it's too risky (Bear Trap)
             bias = "HOLD"
 
         # C) FLOW VETO

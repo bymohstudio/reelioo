@@ -295,6 +295,11 @@ def add_journal_entry(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+
+            # --- FILTER REMOVED: USER FREEDOM RESTORED ---
+            # We accept whatever confidence the user/terminal sends.
+            # You are the trader; you decide what goes in the journal.
+
             JournalEntry.objects.create(
                 user=request.user,
                 symbol=data.get('symbol'),
@@ -302,25 +307,13 @@ def add_journal_entry(request):
                 entry_price=float(data.get('entry')),
                 stop_loss=float(data.get('stop')),
                 target=float(data.get('target')),
-                confidence=float(data.get('confidence', 0)),
+                confidence=float(data.get('confidence', 0)),  # Saves exact score (e.g. 38.5)
                 leverage=data.get('leverage', 'Low')
             )
-            return JsonResponse({'status': 'success', 'message': 'Signal saved to Watchlist'})
+            return JsonResponse({'status': 'success', 'message': 'Trade saved to Journal.'})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
-
-
-@login_required
-def delete_journal_entry(request, entry_id):
-    from .models import JournalEntry
-    if request.method == "DELETE":
-        try:
-            entry = JournalEntry.objects.get(id=entry_id, user=request.user)
-            entry.delete()
-            return JsonResponse({'status': 'success'})
-        except JournalEntry.DoesNotExist:
-            return JsonResponse({'status': 'error', 'message': 'Not found'}, status=404)
 
 
 @login_required
@@ -331,42 +324,29 @@ def refresh_journal_entry(request, entry_id):
         try:
             entry = JournalEntry.objects.get(id=entry_id, user=request.user)
 
-            # 1. GET MARKET DATA
+            # 1. GET MARKET DATA (SCALP precision for accuracy)
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
             if df is None or df.empty:
                 return JsonResponse({'status': 'error', 'message': 'Market data unavailable'})
 
             current_price = float(df['close'].iloc[-1])
             new_status = entry.status
-            new_confidence = entry.confidence
 
-            # 2. SIGNAL LIFECYCLE & DECAY
+            # 2. SIGNAL LIFECYCLE
             now = timezone.now()
             duration = now - entry.created_at
             hours_open = duration.total_seconds() / 3600
-            MAX_DURATION = 12  # Tighter window for Day Trades
+            MAX_DURATION = 24  # Keep trades active for 24h before timing out
 
-            # A. CONFIDENCE DECAY
-            # If the trade is older than 2 hours and still pending, decay the score.
-            # Retail needs to see the signal "cooling off".
-            if entry.status in ["PENDING", "SHIELD"] and hours_open > 2:
-                decay_amount = (hours_open - 2) * 1.5  # Drop 1.5% per hour after 2nd hour
-                new_confidence = max(0, float(entry.confidence) - decay_amount)
-                entry.confidence = round(new_confidence, 1)
-
-            # B. SMART EXPIRATION (Outcomes)
+            # 3. SMART EXPIRATION
             if entry.status in ["PENDING", "SHIELD"] and hours_open > MAX_DURATION:
-                # Determine outcome based on price action relative to entry/stop
-                # Assuming Bias is LONG for simplicity (Sniper)
                 if current_price < entry.entry_price:
-                    # Price went down -> We avoided a loss or are in drawdown
                     if current_price <= entry.stop_loss:
-                        new_status = "AVOIDED LOSS" if entry.status == "SHIELD" else "LOSS"
+                        new_status = "LOSS"
                     else:
-                        new_status = "AVOIDED CHOP" if entry.status == "SHIELD" else "TIMEOUT"
+                        new_status = "TIMEOUT"  # Price didn't move
                 else:
-                    # Price went up but didn't hit target
-                    new_status = "STAGNANT"
+                    new_status = "STAGNANT"  # Price moved up but didn't hit target
 
                 entry.status = new_status
                 entry.save()
@@ -377,7 +357,7 @@ def refresh_journal_entry(request, entry_id):
                     'confidence': entry.confidence
                 })
 
-            # 3. CHECK STANDARD OUTCOMES (Win/Loss)
+            # 4. CHECK STANDARD OUTCOMES
             if entry.status == "PENDING":
                 if entry.bias == "LONG":
                     if current_price >= entry.target:
@@ -390,16 +370,15 @@ def refresh_journal_entry(request, entry_id):
                     elif current_price >= entry.stop_loss:
                         new_status = "LOSS"
 
-            # 4. CHECK SHIELD OUTCOMES (Hypothetical)
+            # 5. CHECK SHIELD OUTCOMES
             elif entry.status == "SHIELD":
-                # Assuming intended direction was LONG (Sniper logic)
                 if current_price >= entry.target:
-                    new_status = "MISSED"  # Shield blocked a win
+                    new_status = "MISSED"
                 elif current_price <= entry.stop_loss:
-                    new_status = "SAVED"  # Shield blocked a loss
+                    new_status = "SAVED"
 
-            # 5. SAVE UPDATE
-            if new_status != entry.status or new_confidence != entry.confidence:
+            # 6. SAVE UPDATE
+            if new_status != entry.status:
                 entry.status = new_status
                 entry.save()
 
@@ -414,6 +393,18 @@ def refresh_journal_entry(request, entry_id):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
     return JsonResponse({'status': 'error', 'message': 'Invalid Method'}, status=405)
+
+
+@login_required
+def delete_journal_entry(request, entry_id):
+    from .models import JournalEntry
+    if request.method == "DELETE":
+        try:
+            entry = JournalEntry.objects.get(id=entry_id, user=request.user)
+            entry.delete()
+            return JsonResponse({'status': 'success'})
+        except JournalEntry.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Not found'}, status=404)
 
 
 def robots_view(request):
