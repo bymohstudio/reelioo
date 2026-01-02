@@ -1,26 +1,341 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-{% if not is_premium %}
-<div class="bg-blue-900/20 border-b border-blue-500/20 text-center py-2 relative z-50 backdrop-blur-md">
-    <p class="text-[10px] text-blue-300 font-bold uppercase tracking-widest">
-        Trial Status: <span class="text-white">{{ days_left|default:"21" }} Days Remaining</span>.
-        <a href="{% url 'pricing' %}" class="ml-2 underline hover:text-white decoration-blue-500/50">Upgrade to Monthly Plan</a>
-    </p>
-</div>
-{% endif %}
+<script>
+    function getCookie(name) { let c = null; if(document.cookie && document.cookie !== '') { document.cookie.split(';').forEach(el => { let [k,v] = el.trim().split('='); if(k === name) c = decodeURIComponent(v); }); } return c; }
 
-<div class="fixed inset-0 z-0 pointer-events-none"
-     style="background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px); background-size: 40px 40px;">
-</div>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('terminal', () => ({
+            // --- State ---
+            symbol: '',
+            mode: 'INTRADAY',
+            isLoading: false,
+            showDashboard: false,
+            logs: [],
+            suggestions: [],
+            allSymbols: [],
 
-<div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full min-h-screen flex flex-col font-mono text-slate-300 overflow-x-hidden">
+            // --- Scanner Data ---
+            data: {
+                symbol: '--', price: '--',
+                regime: { phase: '--', color: '' },
+                signal: { bias: 'NEUTRAL', probability: 0, entry: '--', stop: '--', target2: '--', duration: '' },
+                whales: { label: '--' },
+                explainability: [],
+                sentiment: { news_feed: [] }
+            },
+
+            // --- Alpha Modal State ---
+            showAlpha: false,
+            isScanningAlpha: false,
+            alphaScanText: 'INITIALIZING...',
+            alphaResult: { found: false, symbol: '--', bias: '--', entry: '--', stop: '--', target: '--', explanation: '--' },
+
+            // --- Backtest State ---
+            showBacktest: false,
+            btLoading: false,
+            btResult: null,
+
+            // --- Calculator State ---
+            calc: { cap: 10000, risk: 1.0 },
+
+            // --- Init ---
+            async init() {
+                // Load Symbols
+                try {
+                    const res = await fetch('/api/symbols/');
+                    const s = await res.json();
+                    this.allSymbols = Array.isArray(s) ? s : ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+                } catch(e) { this.allSymbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]; }
+
+                // Initial Logs
+                setTimeout(() => this.log(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
+                setTimeout(() => this.log(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 1000);
+
+                // Auto Scan URL Param
+                const params = new URLSearchParams(window.location.search);
+                if(params.get('ticker')) {
+                    this.symbol = params.get('ticker');
+                    setTimeout(() => this.scan(), 1500);
+                }
+
+                // Maintenance Loop
+                setInterval(() => {
+                    if(this.showDashboard) this.log("Optimizing Execution Latency Vectors...", "text-slate-600");
+                }, 5000);
+            },
+
+            // --- Actions ---
+            handleInput() {
+                if(this.symbol.length < 1) { this.suggestions = []; return; }
+                const upper = this.symbol.toUpperCase();
+                this.suggestions = this.allSymbols.filter(s => s.includes(upper)).slice(0, 6);
+            },
+
+            selectSuggestion(sym) {
+                this.symbol = sym;
+                this.suggestions = [];
+                this.scan();
+            },
+
+            async scan() {
+                if(!this.symbol) return;
+                let raw = this.symbol.toUpperCase().trim();
+                if(!raw.includes("USDT")) raw += "USDT";
+                this.symbol = raw;
+                this.suggestions = [];
+
+                // UI Transition
+                this.showDashboard = false;
+                this.isLoading = true;
+
+                // Mock Loading Logs
+                const logs = ["ESTABLISHING SECURE HANDSHAKE...", "PARSING L2 ORDER BOOK...", "CALCULATING IV SURFACE...", "DETECTING WHALE FLOW..."];
+                let logIdx = 0;
+                // Clear previous loading text (optional, but cleaner)
+                const logContainer = document.getElementById('loading-text');
+                if(logContainer) logContainer.innerHTML = '<p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING NEURAL BRIDGE...</p>';
+
+                const logInt = setInterval(() => {
+                    if(logIdx < logs.length && logContainer) {
+                        logContainer.innerHTML += `<p class="text-slate-400 font-mono text-[10px] mt-1 border-l-2 border-slate-800 pl-2">${logs[logIdx]}</p>`;
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                        logIdx++;
+                    }
+                }, 400);
+
+                try {
+                    const res = await fetch("/api/analyze/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie('csrftoken') },
+                        body: JSON.stringify({ symbol: raw, market_type: "PERP", trade_style: this.mode })
+                    });
+
+                    if(!res.ok) throw new Error("Connection Failed");
+                    this.data = await res.json();
+
+                    clearInterval(logInt);
+                    this.isLoading = false;
+                    this.showDashboard = true;
+                    this.log(`SCAN COMPLETE: ${raw}`, "text-emerald-500");
+
+                    // Re-init icons for new content
+                    this.$nextTick(() => { if(window.lucide) lucide.createIcons(); });
+
+                } catch(e) {
+                    clearInterval(logInt);
+                    this.isLoading = false;
+                    Swal.fire({
+                        title: 'SYSTEM ERROR',
+                        text: e.message || 'Network timeout.',
+                        icon: 'error',
+                        background: '#0a0a0a',
+                        color: '#fff',
+                        confirmButtonColor: '#dc2626',
+                        confirmButtonText: 'ACKNOWLEDGE'
+                    });
+                }
+            },
+
+            async findAlpha() {
+                this.suggestions = [];
+                this.isScanningAlpha = true;
+                document.getElementById('scan-overlay').classList.remove('hidden');
+
+                // Polling animation
+                const tickers = ["BTC", "ETH", "SOL", "WIF", "SUI"];
+                const actions = ["SCANNING", "DECODING", "ANALYZING"];
+                const interval = setInterval(() => {
+                    const t = tickers[Math.floor(Math.random() * tickers.length)];
+                    const a = actions[Math.floor(Math.random() * actions.length)];
+                    this.alphaScanText = `${a} ${t}...`;
+                }, 120);
+
+                try {
+                    const res = await fetch("/api/find_best_opportunity/");
+                    const result = await res.json();
+
+                    clearInterval(interval);
+                    this.isScanningAlpha = false;
+                    document.getElementById('scan-overlay').classList.add('hidden');
+
+                    if(result.status === 'success') {
+                        this.alphaResult = {
+                            found: true,
+                            symbol: result.trade.symbol,
+                            bias: result.trade.bias,
+                            entry: result.trade.entry,
+                            stop: result.trade.stop,
+                            target: result.trade.target,
+                            explanation: result.trade.explanation
+                        };
+                    } else {
+                        this.alphaResult = {
+                            found: false,
+                            symbol: 'NO EDGE',
+                            bias: 'CAPITAL PRESERVATION',
+                            explanation: 'MARKET CONDITIONS CHOPPY / LOW VOLUME',
+                            entry: '--', stop: '--', target: '--'
+                        };
+                    }
+                    this.showAlpha = true;
+                    this.$nextTick(() => { if(window.lucide) lucide.createIcons(); });
+
+                } catch(e) {
+                    clearInterval(interval);
+                    this.isScanningAlpha = false;
+                    document.getElementById('scan-overlay').classList.add('hidden');
+                    Swal.fire('Scan Failed', 'Network timeout.', 'error');
+                }
+            },
+
+            loadAlpha() {
+                this.showAlpha = false;
+                if(this.alphaResult.found) {
+                    this.symbol = this.alphaResult.symbol;
+                    this.scan();
+                }
+            },
+
+            async saveJournal() {
+                const btn = document.getElementById('btn-journal'); // Use vanilla ref for specific button animation
+                if (this.data.signal.bias === "NEUTRAL") {
+                    Swal.fire({toast:true, position:'top-end', icon:'error', title:'NO SIGNAL', text:'Cannot save neutral signal.', background:'#0a0a0a', color:'#fff', showConfirmButton:false, timer:2000});
+                    return;
+                }
+
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> SAVING...`;
+                if(window.lucide) lucide.createIcons();
+
+                try {
+                    const payload = {
+                        symbol: this.data.symbol,
+                        bias: this.data.signal.bias,
+                        entry: parseFloat(String(this.data.signal.entry).replace(/,/g,'')) || 0,
+                        stop: parseFloat(String(this.data.signal.stop).replace(/,/g,'')) || 0,
+                        target: parseFloat(String(this.data.signal.target2).replace(/,/g,'')) || 0,
+                        confidence: parseFloat(String(this.data.signal.probability).replace('%','')) || 0,
+                        leverage: "Low"
+                    };
+
+                    const res = await fetch("/api/journal/add/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie('csrftoken') },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if(res.ok) {
+                        btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
+                        btn.className = "flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500 px-4 py-2 rounded transition shadow-[0_0_20px_rgba(16,185,129,0.5)] ring-1 ring-emerald-500/50";
+                        this.log(`>> JOURNAL ENTRY SAVED: ${this.data.symbol}`, "text-emerald-400");
+                        setTimeout(() => {
+                            btn.innerHTML = originalHTML;
+                            btn.className = "flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition";
+                            if(window.lucide) lucide.createIcons();
+                        }, 2000);
+                    } else { throw new Error(); }
+                } catch(e) {
+                    btn.innerHTML = `<i data-lucide="x" class="w-3 h-3"></i> ERROR`;
+                    btn.classList.add('text-red-400');
+                    setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('text-red-400'); if(window.lucide) lucide.createIcons(); }, 2000);
+                }
+            },
+
+            async initBacktest() {
+                if(this.data.signal.bias === "NEUTRAL") {
+                    Swal.fire({toast:true, position:'top-end', icon:'info', title:'No Data', text:'Run a scan first.', background:'#0a0a0a', color:'#fff'});
+                    return;
+                }
+                this.showBacktest = true;
+                this.btLoading = true;
+                this.btResult = null;
+
+                try {
+                    const res = await fetch("/api/backtest/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie('csrftoken') },
+                        body: JSON.stringify({ symbol: this.data.symbol, trade_style: this.mode })
+                    });
+                    this.btResult = await res.json();
+                } catch(e) { console.error(e); }
+                finally { this.btLoading = false; }
+            },
+
+            // --- Helpers ---
+            log(msg, color="text-slate-500") {
+                const time = new Date().toLocaleTimeString('en-US', {hour12:false});
+                this.logs.push({time, msg, color});
+                if(this.logs.length > 50) this.logs.shift();
+                this.$nextTick(() => {
+                    const el = document.getElementById('scanner-log');
+                    if(el) el.scrollTop = el.scrollHeight;
+                });
+            },
+
+            formatPrice(p) {
+                if(!p || p === '--' || p === '---') return '--';
+                const n = parseFloat(p);
+                if(isNaN(n)) return '--';
+                return n < 1 ? n.toFixed(5) : n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            },
+
+            calcSize() {
+                const entry = parseFloat(String(this.data.signal.entry).replace(/,/g, ''));
+                if(!entry || isNaN(entry)) return '--';
+                return ((this.calc.cap * (this.calc.risk / 100)) / entry).toFixed(4) + " units";
+            },
+
+            // Computed Class Logic for Signal Box
+            getSignalBoxClass() {
+                const b = this.data.signal.bias;
+                if(b === 'LONG') return "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]";
+                if(b === 'SHORT') return "bg-red-900/10 border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.1)]";
+                if(this.data.signal.probability >= 60 && b === 'NEUTRAL') return "bg-yellow-900/10 border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]"; // Watch mode
+                return "bg-[#0a0a0a] border-white/10";
+            },
+
+            getDirectionClass() {
+                const b = this.data.signal.bias;
+                if(b === 'LONG') return "text-emerald-400";
+                if(b === 'SHORT') return "text-red-500";
+                if(this.data.signal.probability >= 60 && b === 'NEUTRAL') return "text-yellow-500";
+                return "text-slate-600 opacity-80";
+            },
+
+            // Ensure logic matches user request: "when hold signal earlier no entry stops were shown"
+            // We use a getter to return '---' if neutral or hold
+            get displayEntry() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.entry); },
+            get displayStop() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.stop); },
+            get displayTarget() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.target2); }
+        }))
+    })
+</script>
+
+<div x-data="terminal()" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full min-h-screen flex flex-col font-mono text-slate-300 overflow-x-hidden">
+
+    {% if not is_premium %}
+    <div class="bg-blue-900/20 border-b border-blue-500/20 text-center py-2 relative z-50 backdrop-blur-md">
+        <p class="text-[10px] text-blue-300 font-bold uppercase tracking-widest">
+            Trial Status: <span class="text-white">{{ days_left|default:"21" }} Days Remaining</span>.
+            <a href="{% url 'pricing' %}" class="ml-2 underline hover:text-white decoration-blue-500/50">Upgrade to Monthly Plan</a>
+        </p>
+    </div>
+    {% endif %}
+
+    <div class="fixed inset-0 z-0 pointer-events-none" style="background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px); background-size: 40px 40px;"></div>
 
     <div class="w-full bg-[#050505] border-y border-white/10 mb-8 sm:mb-10 overflow-hidden relative shadow-2xl">
         <div class="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-black to-transparent z-10"></div>
         <div class="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-black to-transparent z-10"></div>
-        <div class="marquee-track flex items-center gap-12 sm:gap-16 py-3 whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-widest text-slate-500" id="live-marquee">
-            <span class="flex items-center gap-2 animate-pulse">ESTABLISHING UPLINK...</span>
+        <div class="marquee-track flex items-center gap-12 sm:gap-16 py-3 whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-widest text-slate-500">
+             <template x-for="i in 4">
+                 <div class="flex items-center gap-16">
+                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">BTC</span><span class="text-slate-400">$96,420</span><span class="text-emerald-500 text-[9px] flex items-center gap-1">▲ +1.2%</span></div>
+                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">ETH</span><span class="text-slate-400">$2,750</span><span class="text-emerald-500 text-[9px] flex items-center gap-1">▲ +0.8%</span></div>
+                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">SOL</span><span class="text-slate-400">$145.20</span><span class="text-red-500 text-[9px] flex items-center gap-1">▼ -2.1%</span></div>
+                 </div>
+             </template>
         </div>
     </div>
 
@@ -32,32 +347,37 @@
 
                 <div class="relative flex items-center flex-grow bg-transparent pr-2 border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0">
                     <span class="pl-3 pr-3 text-emerald-500 font-bold text-xl md:text-2xl">></span>
-                    <input id="symbol-input" type="text" placeholder="ENTER ASSET..."
-                           class="w-full bg-transparent border-none text-white text-lg md:text-2xl font-black placeholder-slate-800 focus:ring-0 focus:outline-none uppercase tracking-widest h-12 p-0"
-                           autocomplete="off" oninput="handleTickerInput(this.value)" onkeydown="handleEnter(event)">
+                    <input x-model="symbol" @input="handleInput" @keydown.enter="scan" type="text" placeholder="ENTER ASSET..."
+                           class="w-full bg-transparent border-none text-white text-lg md:text-2xl font-black placeholder-slate-800 focus:ring-0 focus:outline-none uppercase tracking-widest h-12 p-0" autocomplete="off">
 
-                    <div id="suggestions" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg hidden z-[60] shadow-2xl max-h-60 overflow-y-auto custom-scrollbar pointer-events-auto"></div>
+                    <div x-show="suggestions.length > 0" @click.outside="suggestions = []" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg z-[60] shadow-2xl max-h-60 overflow-y-auto custom-scrollbar pointer-events-auto" x-cloak>
+                        <template x-for="s in suggestions">
+                            <div @click="selectSuggestion(s)" class="px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors">
+                                <span class="text-sm font-bold text-white"><span class="text-blue-500 font-black" x-text="symbol.toUpperCase()"></span><span x-text="s.replace(symbol.toUpperCase(), '')"></span></span>
+                            </div>
+                        </template>
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between sm:justify-end gap-2 pl-0 sm:pl-3 pt-2 sm:pt-0">
                     <div class="w-full sm:w-auto">
-                        <select id="mode-select" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 cursor-pointer hover:bg-white/5 transition">
+                        <select x-model="mode" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 cursor-pointer hover:bg-white/5 transition">
                             <option value="INTRADAY">🛡️ Safe (Day)</option>
                             <option value="SCALP">⚡ Scalp (Risk)</option>
                         </select>
                     </div>
 
-                    <button onclick="initScan()" id="btn-scan" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex items-center justify-center gap-2">
+                    <button @click="scan" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex items-center justify-center gap-2">
                         <span>SCAN</span> <i data-lucide="radar" class="w-3 h-3"></i>
                     </button>
 
-                    <button onclick="findWinningMarket()" id="btn-alpha" class="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] items-center gap-2 animate-pulse border border-emerald-400/30 whitespace-nowrap">
+                    <button @click="findAlpha" class="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] items-center gap-2 animate-pulse border border-emerald-400/30 whitespace-nowrap">
                         <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> ALPHA
                     </button>
                 </div>
             </div>
 
-            <button onclick="document.getElementById('suggestions').classList.add('hidden'); findWinningMarket()" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30 relative z-30 pointer-events-auto">
+            <button @click="findAlpha" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30 relative z-30 pointer-events-auto">
                  <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> SCAN FOR ALPHA EDGE
             </button>
 
@@ -78,7 +398,7 @@
         </div>
 
         <div class="grid grid-cols-3 gap-2 sm:gap-6">
-            <div onclick="quickScan('BTC')" class="bg-[#0a0a0a] border border-orange-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(249,115,22,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+            <div @click="selectSuggestion('BTCUSDT')" class="bg-[#0a0a0a] border border-orange-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(249,115,22,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition"></div>
                 <div class="relative z-10 text-center">
                     <div class="bg-orange-500/20 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-3 mx-auto text-orange-400 group-hover:scale-110 transition"><i data-lucide="bitcoin" class="w-4 h-4 sm:w-5 sm:h-5"></i></div>
@@ -86,7 +406,7 @@
                     <span class="text-[8px] sm:text-[10px] text-orange-400/80 font-bold tracking-widest mt-0.5 sm:mt-1 block">MARKET LEADER</span>
                 </div>
             </div>
-            <div onclick="quickScan('ETH')" class="bg-[#0a0a0a] border border-blue-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+            <div @click="selectSuggestion('ETHUSDT')" class="bg-[#0a0a0a] border border-blue-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition"></div>
                 <div class="relative z-10 text-center">
                     <div class="bg-blue-500/20 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-3 mx-auto text-blue-400 group-hover:scale-110 transition"><i data-lucide="layers" class="w-4 h-4 sm:w-5 sm:h-5"></i></div>
@@ -94,7 +414,7 @@
                     <span class="text-[8px] sm:text-[10px] text-blue-400/80 font-bold tracking-widest mt-0.5 sm:mt-1 block">SMART MONEY</span>
                 </div>
             </div>
-            <div onclick="quickScan('SOL')" class="bg-[#0a0a0a] border border-purple-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
+            <div @click="selectSuggestion('SOLUSDT')" class="bg-[#0a0a0a] border border-purple-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-purple-500/5 group-hover:bg-purple-500/10 transition"></div>
                 <div class="relative z-10 text-center">
                     <div class="bg-purple-500/20 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-3 mx-auto text-purple-400 group-hover:scale-110 transition"><i data-lucide="zap" class="w-4 h-4 sm:w-5 sm:h-5"></i></div>
@@ -105,7 +425,7 @@
         </div>
     </div>
 
-    <div id="processing-ui" class="hidden w-full max-w-3xl mx-auto mb-12 px-2">
+    <div x-show="isLoading" class="w-full max-w-3xl mx-auto mb-12 px-2" x-cloak>
         <div class="bg-black border border-green-500/30 rounded-lg p-6 font-mono text-xs shadow-[0_0_30px_rgba(16,185,129,0.1)] relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500/50 to-transparent animate-shimmer opacity-50"></div>
             <div class="flex justify-between border-b border-white/10 pb-2 mb-4 text-slate-500 relative z-10">
@@ -118,29 +438,55 @@
         </div>
     </div>
 
-    <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 w-full opacity-0 translate-y-4 transition-all duration-700">
+    <div x-show="showDashboard" x-transition.opacity.duration.700ms class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full" x-cloak>
+
         <div class="col-span-1 lg:col-span-12">
-            <div id="signal-box" class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center">
-                <div id="signal-glow" class="absolute inset-0 opacity-0 transition-opacity z-0"></div>
+            <div class="border rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center"
+                 :class="getSignalBoxClass()">
+
+                <div class="absolute inset-0 blur-3xl opacity-100"
+                     :class="{
+                         'bg-emerald-500/10': data.signal.bias === 'LONG',
+                         'bg-red-500/10': data.signal.bias === 'SHORT',
+                         'bg-yellow-500/10': data.signal.probability >= 60 && data.signal.bias === 'NEUTRAL',
+                         'hidden': data.signal.bias === 'NEUTRAL' && data.signal.probability < 60
+                     }"></div>
+
                 <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-0">
                     <div>
                         <div class="flex items-center gap-3 mb-2 flex-wrap">
-                             <span id="lbl-status" class="text-[10px] bg-white/5 border border-white/10 text-slate-400 px-2 py-1 rounded tracking-widest uppercase font-bold">SIGNAL</span>
-                             <h2 id="res-symbol" class="text-sm font-bold text-slate-500 tracking-widest uppercase">--</h2>
-                             <span id="res-price" class="text-sm font-bold text-white tracking-widest">--</span>
-                             <span id="res-regime-tag" class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all">--</span>
+                             <span class="text-[10px] bg-white/5 border border-white/10 text-slate-400 px-2 py-1 rounded tracking-widest uppercase font-bold">SIGNAL</span>
+                             <h2 class="text-sm font-bold text-slate-500 tracking-widest uppercase" x-text="data.symbol"></h2>
+                             <span class="text-sm font-bold text-white tracking-widest" x-text="'$'+formatPrice(data.price)"></span>
+
+                             <span class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all"
+                                   :class="{
+                                       'text-emerald-400 border-emerald-500/20 bg-emerald-500/10': data.regime.color === 'green',
+                                       'text-red-400 border-red-500/20 bg-red-500/10': data.regime.color === 'red',
+                                       'text-slate-500 border-white/10 bg-white/5': !data.regime.color
+                                   }"
+                                   x-text="data.regime.phase || data.regime"></span>
                         </div>
 
                         <div class="flex items-baseline gap-4">
-                            <h1 id="res-direction" class="text-4xl md:text-8xl font-black tracking-tighter text-slate-500 leading-none">NEUTRAL</h1>
+                            <h1 class="text-4xl md:text-8xl font-black tracking-tighter leading-none"
+                                :class="getDirectionClass()"
+                                x-text="(data.signal.probability >= 60 && data.signal.bias === 'NEUTRAL') ? 'WATCHING' : data.signal.bias"></h1>
                         </div>
-                        <p id="signal-expiry" class="mt-1 text-[10px] text-slate-400 font-mono uppercase tracking-wider hidden transition-all animate-fade-in-up">Valid for ~--</p>
-                        <p id="lock-msg" class="text-xs text-blue-300 mt-2 font-bold hidden"><i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> NO EDGE. CAPITAL PRESERVED.</p>
+
+                        <p x-show="data.signal.bias === 'LONG' || data.signal.bias === 'SHORT'" class="mt-1 text-[10px] text-slate-400 font-mono uppercase tracking-wider animate-fade-in-up" x-text="'Valid for ~' + data.signal.duration"></p>
+
+                        <p x-show="data.signal.bias === 'NEUTRAL'" class="text-xs text-blue-300 mt-2 font-bold flex items-center">
+                            <i x-show="data.signal.probability < 60" data-lucide="shield" class="w-3 h-3 inline mr-1"></i>
+                            <i x-show="data.signal.probability >= 60" data-lucide="eye" class="w-3 h-3 inline mr-1"></i>
+                            <span x-text="data.signal.probability >= 60 ? 'BIAS DETECTED. WAITING FOR CONFIRMATION...' : 'NO EDGE. CAPITAL PRESERVED.'"></span>
+                        </p>
+
                         <div class="flex items-center gap-3 mt-4">
-                             <button onclick="addToJournal()" id="btn-journal" class="flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition">
+                             <button @click="saveJournal" id="btn-journal" class="flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition">
                                 <i data-lucide="bookmark" class="w-3 h-3"></i> SAVE
                             </button>
-                            <button onclick="initBacktest()" class="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-white bg-transparent hover:bg-white/5 border border-white/10 px-4 py-2 rounded transition">
+                            <button @click="initBacktest" class="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-white bg-transparent hover:bg-white/5 border border-white/10 px-4 py-2 rounded transition">
                                 <i data-lucide="history" class="w-3 h-3"></i> BACKTEST
                             </button>
                         </div>
@@ -148,10 +494,10 @@
                     <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0">
                          <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Signal Strength</span>
                          <div class="flex items-center md:justify-end gap-3">
-                             <span id="res-score" class="text-5xl md:text-7xl font-bold text-white tracking-tighter">0%</span>
+                             <span class="text-5xl md:text-7xl font-bold text-white tracking-tighter" x-text="data.signal.probability + '%'"></span>
                          </div>
                          <div class="mt-2 text-right hidden md:block">
-                            <span id="exec-status" class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">MARKET SCANNING...</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">MARKET SCANNING...</span>
                          </div>
                     </div>
                 </div>
@@ -162,19 +508,19 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-blue-500/30 transition">
                     <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Entry Zone</span>
-                    <span id="res-entry" class="block text-lg md:text-2xl font-mono font-bold text-white mt-1 break-all">--</span>
+                    <span class="block text-lg md:text-2xl font-mono font-bold text-white mt-1 break-all" x-text="displayEntry"></span>
                 </div>
                 <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-red-500/30 transition">
                     <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Stop Loss</span>
-                    <span id="res-stop" class="block text-lg md:text-2xl font-mono font-bold text-red-500 mt-1 break-all">--</span>
+                    <span class="block text-lg md:text-2xl font-mono font-bold text-red-500 mt-1 break-all" x-text="displayStop"></span>
                 </div>
                 <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-emerald-500/30 transition">
                     <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Target</span>
-                    <span id="res-target2" class="block text-lg md:text-2xl font-mono font-bold text-emerald-500 mt-1 break-all">--</span>
+                    <span class="block text-lg md:text-2xl font-mono font-bold text-emerald-500 mt-1 break-all" x-text="displayTarget"></span>
                 </div>
                 <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition">
                     <span class="text-[9px] uppercase text-slate-500 tracking-widest font-bold">Whale Flow</span>
-                    <span id="res-whale-tag" class="block text-lg md:text-2xl font-bold text-blue-400 mt-1 truncate">--</span>
+                    <span class="block text-lg md:text-2xl font-bold text-blue-400 mt-1 truncate" x-text="data.whales.label"></span>
                 </div>
             </div>
         </div>
@@ -187,18 +533,32 @@
                     </h4>
                     <span class="text-[9px] text-slate-500 font-mono">ML EXPLAINABILITY</span>
                 </div>
-                <div id="shap-box" class="space-y-5">
-                    <div class="text-[10px] text-slate-600 italic text-center py-4">Run scan to view factors.</div>
+                <div class="space-y-5">
+                    <template x-for="item in data.explainability.slice(0,3)">
+                        <div class="mb-4 last:mb-0">
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                    <i data-lucide="activity" class="w-3 h-3 text-slate-400"></i> <span x-text="item.desc"></span>
+                                </span>
+                                <span class="text-[10px] font-mono text-slate-400" x-text="item.importance.toFixed(1)"></span>
+                            </div>
+                            <div class="w-full bg-[#111] h-1.5 rounded-full overflow-hidden">
+                                <div class="h-full bg-slate-500 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.1)]" :style="`width: ${Math.min(item.importance, 100)}%`"></div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="data.explainability.length === 0 || data.signal.probability < 60" class="text-[10px] text-slate-600 italic text-center py-4">Vectors appear only when execution-grade edge exists.</div>
                 </div>
             </div>
+
             <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
                 <div class="text-[10px] uppercase text-slate-500 font-bold mb-4 flex items-center gap-2">
                     <i data-lucide="calculator" class="w-3 h-3"></i> Position Sizing
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div><label class="block text-[9px] text-slate-600 mb-1">CAPITAL ($)</label><input id="cap-input" placeholder="10000" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
-                    <div><label class="block text-[9px] text-slate-600 mb-1">RISK (%)</label><input id="risk-input" placeholder="1.0" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
-                    <div><label class="block text-[9px] text-slate-600 mb-1">SIZE</label><div id="pos-size" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-emerald-400 font-bold flex items-center h-[34px]">--</div></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">CAPITAL ($)</label><input x-model="calc.cap" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">RISK (%)</label><input x-model="calc.risk" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">SIZE</label><div class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-emerald-400 font-bold flex items-center h-[34px]" x-text="calcSize()"></div></div>
                 </div>
             </div>
         </div>
@@ -214,7 +574,11 @@
                         <h4 class="text-xs font-bold text-white uppercase tracking-widest">Scanner Log</h4>
                     </div>
                 </div>
-                <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 overflow-y-auto custom-scrollbar flex-grow flex flex-col justify-end relative z-10"></div>
+                <div id="scanner-log" class="font-mono text-[9px] text-slate-400 space-y-2 overflow-y-auto custom-scrollbar flex-grow flex flex-col justify-end relative z-10">
+                    <template x-for="l in logs">
+                         <div class="animate-fade-in"><span class="text-slate-600 font-bold" x-text="'['+l.time+']'"></span> <span :class="l.color" x-text="l.msg"></span></div>
+                    </template>
+                </div>
                 <div class="absolute bottom-0 right-0 p-16 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
             </div>
 
@@ -222,60 +586,15 @@
                 <div class="flex justify-between items-center mb-4 pb-4 border-b border-white/5">
                     <span class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Intel Feed</span>
                 </div>
-                <div id="news-feed" class="space-y-3 overflow-y-auto custom-scrollbar">
-                    <div class="text-[10px] text-slate-600 italic">Waiting for uplink...</div>
+                <div class="space-y-3 overflow-y-auto custom-scrollbar">
+                    <template x-for="item in data.sentiment.news_feed">
+                        <a :href="item.url" target="_blank" class="block group border-b border-white/5 pb-2 last:border-0">
+                            <h5 class="text-[10px] text-slate-300 font-medium group-hover:text-blue-400 transition-colors mb-0.5" x-text="item.title"></h5>
+                            <span class="text-[8px] text-slate-600 font-mono uppercase" x-text="item.source"></span>
+                        </a>
+                    </template>
+                    <div x-show="!data.sentiment.news_feed.length" class="text-[10px] text-slate-600 italic">Waiting for uplink...</div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="error-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl max-w-sm w-full p-6 shadow-[0_0_50px_rgba(220,38,38,0.2)] text-center">
-            <h3 id="error-title" class="text-lg font-bold text-white mb-2 tracking-wide">SYSTEM ERROR</h3>
-            <p id="error-msg" class="text-xs text-slate-400 font-mono mb-6 leading-relaxed">--</p>
-            <button onclick="closeError()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded text-xs tracking-widest transition-all">ACKNOWLEDGE</button>
-        </div>
-    </div>
-
-    <div id="backtest-modal" class="hidden fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4">
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[85%] sm:w-full sm:max-w-md relative shadow-2xl flex flex-col max-h-[80vh] overflow-hidden m-auto">
-            <div class="p-3 sm:p-4 border-b border-white/5 bg-white/5 flex justify-between items-center flex-shrink-0">
-                <div>
-                    <h3 class="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
-                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-500"></i> Strategy Report
-                    </h3>
-                    <p class="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Performance / Past 500 Candles</p>
-                </div>
-                <button onclick="closeBacktest()" class="text-slate-400 hover:text-white transition bg-white/5 p-1.5 rounded-full hover:bg-white/10"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
-            <div class="flex-grow overflow-y-auto custom-scrollbar p-0">
-                <div id="bt-loader" class="flex flex-col items-center justify-center py-16">
-                    <div class="w-10 h-10 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-3"></div>
-                    <p class="text-[10px] text-slate-400 font-mono animate-pulse">RUNNING SIMULATION...</p>
-                </div>
-                <div id="bt-results" class="hidden">
-                    <div class="grid grid-cols-3 gap-px bg-white/5 border-b border-white/5">
-                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
-                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Win Rate</span>
-                            <span id="bt-winrate" class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tighter">--</span>
-                        </div>
-                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
-                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Profit Factor</span>
-                            <span id="bt-pnl" class="text-xl sm:text-2xl font-black text-blue-400 tracking-tighter">--</span>
-                        </div>
-                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
-                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Trades</span>
-                            <span id="bt-trades" class="text-xl sm:text-2xl font-black text-white tracking-tighter">--</span>
-                        </div>
-                    </div>
-                    <div class="p-4 bg-[#050505]">
-                        <h4 class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Trade Ledger</h4>
-                        <div class="space-y-1" id="bt-log"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-2 bg-[#0a0a0a] border-t border-white/5 text-center flex-shrink-0">
-                <p class="text-[8px] text-slate-600 italic">Past performance is not indicative of future results.</p>
             </div>
         </div>
     </div>
@@ -287,7 +606,7 @@
             <div class="absolute inset-4 bg-emerald-500/10 rounded-full animate-pulse"></div>
             <i data-lucide="crosshair" class="absolute inset-0 m-auto w-10 h-10 text-emerald-400"></i>
         </div>
-        <h2 class="text-2xl font-black text-white tracking-widest mb-2" id="scan-text">INITIALIZING...</h2>
+        <h2 class="text-2xl font-black text-white tracking-widest mb-2" x-text="alphaScanText">INITIALIZING...</h2>
         <p class="text-xs text-emerald-500 font-mono">NEURAL NETWORK ACTIVE</p>
         <div class="mt-8 text-[10px] font-mono text-slate-500 text-center space-y-1 opacity-50">
             <p>fetching::deep_pool::perp_agg_trade</p>
@@ -296,51 +615,114 @@
         </div>
     </div>
 
-    <div id="alpha-modal" class="hidden fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+    <div x-show="showAlpha" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4" x-cloak x-transition>
         <div class="relative w-[85%] sm:w-full sm:max-w-md bg-[#050505] border border-emerald-500/50 rounded-2xl shadow-[0_0_100px_rgba(16,185,129,0.2)] overflow-hidden transform transition-all scale-100 max-h-[85vh] overflow-y-auto custom-scrollbar">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-white to-emerald-500 animate-shimmer z-20 opacity-50"></div>
-            <button onclick="closeAlpha()" class="absolute top-4 right-4 text-slate-500 hover:text-white z-30 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
+            <button @click="showAlpha = false" class="absolute top-4 right-4 text-slate-500 hover:text-white z-30 transition"><i data-lucide="x" class="w-6 h-6"></i></button>
 
             <div class="p-4 sm:p-8 text-center relative z-10">
-                <div id="alpha-icon-container" class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500/5 border border-emerald-500/30 mb-4 sm:mb-6 relative group">
-                    <div class="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse"></div>
-                    <i data-lucide="trophy" class="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400 relative z-10" id="alpha-main-icon"></i>
+                <div class="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-4 sm:mb-6 relative group"
+                     :class="alphaResult.found ? 'bg-emerald-500/5 border border-emerald-500/30' : 'bg-blue-500/5 border border-blue-500/30'">
+                    <div class="absolute inset-0 blur-xl rounded-full animate-pulse" :class="alphaResult.found ? 'bg-emerald-500/20' : 'bg-blue-500/20'"></div>
+                    <i :data-lucide="alphaResult.found ? 'trophy' : 'shield-check'" class="w-8 h-8 sm:w-10 sm:h-10 relative z-10" :class="alphaResult.found ? 'text-emerald-400' : 'text-blue-400'"></i>
                 </div>
-                <h2 class="text-[10px] sm:text-xs font-bold text-emerald-500 uppercase tracking-[0.3em] mb-2" id="alpha-subtitle">Highest Probability Setup</h2>
 
-                <h1 id="alpha-symbol" class="text-4xl sm:text-6xl font-black text-white tracking-tighter mb-1 text-glow">--</h1>
-                <p id="alpha-bias" class="text-xl sm:text-2xl font-bold text-slate-400 tracking-widest mb-6 sm:mb-8">--</p>
+                <h2 class="text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] mb-2"
+                    :class="alphaResult.found ? 'text-emerald-500' : 'text-blue-500'"
+                    x-text="alphaResult.found ? 'Highest Probability Setup' : 'Risk Management Protocol'"></h2>
+
+                <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tighter mb-1 text-glow" x-text="alphaResult.symbol.replace('USDT','')"></h1>
+                <p class="text-xl sm:text-2xl font-bold tracking-widest mb-6 sm:mb-8"
+                   :class="{'text-emerald-400 text-glow': alphaResult.bias === 'LONG', 'text-red-500 text-glow': alphaResult.bias === 'SHORT', 'text-slate-400': !alphaResult.found}"
+                   x-text="alphaResult.bias"></p>
 
                 <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
                     <div class="bg-[#0f0f0f] p-2 sm:p-4 rounded-xl border border-white/5 relative overflow-hidden group">
                         <div class="absolute top-0 left-0 w-full h-0.5 bg-slate-700 group-hover:bg-white transition"></div>
                         <span class="text-[8px] sm:text-[9px] text-slate-500 uppercase block mb-1 font-bold tracking-wider">Entry</span>
-                        <span id="alpha-entry" class="text-sm sm:text-lg font-mono font-bold text-white">--</span>
+                        <span class="text-sm sm:text-lg font-mono font-bold text-white" x-text="formatPrice(alphaResult.entry)"></span>
                     </div>
                     <div class="bg-[#0f0f0f] p-2 sm:p-4 rounded-xl border border-white/5 relative overflow-hidden group">
                         <div class="absolute top-0 left-0 w-full h-0.5 bg-red-900 group-hover:bg-red-500 transition"></div>
                         <span class="text-[8px] sm:text-[9px] text-slate-500 uppercase block mb-1 font-bold tracking-wider">Stop Loss</span>
-                        <span id="alpha-stop" class="text-sm sm:text-lg font-mono font-bold text-red-500">--</span>
+                        <span class="text-sm sm:text-lg font-mono font-bold text-red-500" x-text="formatPrice(alphaResult.stop)"></span>
                     </div>
                     <div class="bg-emerald-900/10 p-2 sm:p-4 rounded-xl border border-emerald-500/30 relative overflow-hidden group shadow-[0_0_20px_rgba(16,185,129,0.1)]">
                         <div class="absolute top-0 left-0 w-full h-0.5 bg-emerald-500"></div>
                         <span class="text-[8px] sm:text-[9px] text-emerald-400 uppercase block mb-1 font-bold tracking-wider">Target</span>
-                        <span id="alpha-target" class="text-sm sm:text-lg font-mono font-bold text-emerald-400 text-glow">--</span>
+                        <span class="text-sm sm:text-lg font-mono font-bold text-emerald-400 text-glow" x-text="formatPrice(alphaResult.target)"></span>
                     </div>
                 </div>
                 <div class="bg-[#0a0a0a] border border-white/10 p-3 sm:p-4 rounded-lg mb-6 flex items-center justify-center gap-3">
                     <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i>
                     <p class="text-[9px] sm:text-[10px] text-slate-400 font-mono uppercase">
-                        DRIVER: <span id="alpha-reason" class="font-bold text-blue-400">--</span>
+                        DRIVER: <span class="font-bold text-blue-400" x-text="alphaResult.explanation"></span>
                     </p>
                 </div>
-                <button onclick="loadIntoTerminal()" class="w-full bg-white hover:bg-slate-200 text-black font-black py-3 sm:py-4 rounded-xl transition uppercase tracking-[0.2em] text-[10px] sm:text-xs shadow-xl transform hover:-translate-y-1">
+                <button @click="loadAlpha" class="w-full bg-white hover:bg-slate-200 text-black font-black py-3 sm:py-4 rounded-xl transition uppercase tracking-[0.2em] text-[10px] sm:text-xs shadow-xl transform hover:-translate-y-1">
                     RETURN TO TERMINAL
                 </button>
             </div>
         </div>
     </div>
 
+    <div x-show="showBacktest" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-4" x-cloak x-transition>
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[85%] sm:w-full sm:max-w-md relative shadow-2xl flex flex-col max-h-[80vh] overflow-hidden m-auto" @click.outside="showBacktest = false">
+            <div class="p-3 sm:p-4 border-b border-white/5 bg-white/5 flex justify-between items-center flex-shrink-0">
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-500"></i> Strategy Report
+                    </h3>
+                    <p class="text-[9px] text-slate-500 uppercase tracking-widest mt-0.5">Performance / Past 500 Candles</p>
+                </div>
+                <button @click="showBacktest = false" class="text-slate-400 hover:text-white transition bg-white/5 p-1.5 rounded-full hover:bg-white/10"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto custom-scrollbar p-0">
+                <div x-show="btLoading" class="flex flex-col items-center justify-center py-16">
+                    <div class="w-10 h-10 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-3"></div>
+                    <p class="text-[10px] text-slate-400 font-mono animate-pulse">RUNNING SIMULATION...</p>
+                </div>
+
+                <div x-show="!btLoading && btResult" class="animate-fade-in">
+                    <div class="grid grid-cols-3 gap-px bg-white/5 border-b border-white/5">
+                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Win Rate</span>
+                            <span class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tighter" x-text="btResult?.win_rate + '%'"></span>
+                        </div>
+                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Profit Factor</span>
+                            <span class="text-xl sm:text-2xl font-black text-blue-400 tracking-tighter" x-text="btResult?.profit_factor"></span>
+                        </div>
+                        <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Trades</span>
+                            <span class="text-xl sm:text-2xl font-black text-white tracking-tighter" x-text="btResult?.total_trades"></span>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-[#050505] space-y-1">
+                        <template x-for="t in btResult?.trades_log">
+                             <div class="flex justify-between items-center bg-[#0f0f0f] border border-white/5 p-3 rounded-lg hover:border-white/10 transition mb-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px]"
+                                         :class="t.result === 'WIN' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'"
+                                         x-text="t.result === 'WIN' ? 'W' : 'L'"></div>
+                                    <div><span class="text-xs font-bold text-slate-300 block" x-text="t.result"></span><span class="text-[9px] text-slate-600 font-mono" x-text="'ENTRY: ' + formatPrice(t.entry)"></span></div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-sm font-mono font-bold block" :class="t.result === 'WIN' ? 'text-emerald-400' : 'text-red-500'" x-text="(t.result==='WIN' ? '+' : '') + t.pnl + '%'"></span>
+                                    <span class="text-[9px] text-slate-600 block">ROI</span>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="!btResult?.trades_log?.length" class="text-center text-slate-600 italic py-10">No trades generated.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-2 bg-[#0a0a0a] border-t border-white/5 text-center flex-shrink-0">
+                <p class="text-[8px] text-slate-600 italic">Past performance is not indicative of future results.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -360,503 +742,4 @@
     body { font-family: 'Inter', sans-serif; background-color: #020202; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
 </style>
-
-<script>
-    let SYMBOL_MAP = [];
-    async function loadSymbols() {
-        try {
-            const res = await fetch('/api/symbols/');
-            const data = await res.json();
-            if (Array.isArray(data)) { SYMBOL_MAP = data; }
-        } catch (e) { SYMBOL_MAP = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]; }
-    }
-    loadSymbols();
-
-    const IDLE_LOGS = [
-        "Analyzing Order Book Dept. (L2 Data)...",
-        "Calibrating Neural Weights [Batch 42]...",
-        "Scanning Dark Pool Liquidity Blocks...",
-        "Calculating Implied Volatility Surface...",
-        "Detecting Institutional Wash Trading...",
-        "Parsing Whale Wallet Order Flows...",
-        "Optimizing Execution Latency Vectors...",
-        "Verifying API Heartbeat (12ms)...",
-        "Cross-Exchange Arbitrage Check...",
-        "Updating Tensor Core Parameters..."
-    ];
-
-    const TICKER_DATA = [
-        { sym: "BTC", price: "96,420", move: "+1.2%" },
-        { sym: "ETH", price: "2,750", move: "+0.8%" },
-        { sym: "SOL", price: "145.20", move: "-2.1%" },
-        { sym: "BNB", price: "612.50", move: "+0.5%" },
-        { sym: "XRP", price: "0.65", move: "+4.2%" },
-        { sym: "DOGE", price: "0.12", move: "-1.5%" },
-        { sym: "ADA", price: "0.45", move: "+0.2%" },
-        { sym: "AVAX", price: "35.80", move: "+3.4%" },
-    ];
-
-    function initTicker() {
-        const marquee = document.getElementById('live-marquee');
-        if(!marquee) return;
-
-        let contentHtml = '';
-        for(let i=0; i<4; i++) {
-            TICKER_DATA.forEach(item => {
-                const color = item.move.startsWith('+') ? 'text-emerald-500' : 'text-red-500';
-                const icon = item.move.startsWith('+') ? '▲' : '▼';
-                contentHtml += `
-                    <div class="flex items-center gap-2 mx-8">
-                        <span class="text-white font-bold">${item.sym}</span>
-                        <span class="text-slate-400">$${item.price}</span>
-                        <span class="${color} text-[9px] flex items-center gap-1">
-                            ${icon} ${item.move}
-                        </span>
-                    </div>
-                `;
-            });
-        }
-        marquee.innerHTML = contentHtml;
-    }
-
-    function handleTickerInput(val) {
-        const box = document.getElementById('suggestions');
-        const input = val.toUpperCase().trim();
-        if (input.length < 1) { box.classList.add('hidden'); return; }
-        const matches = SYMBOL_MAP.filter(s => s.includes(input)).slice(0, 6);
-        box.innerHTML = '';
-        if (matches.length > 0) {
-            box.classList.remove('hidden');
-            matches.forEach(sym => {
-                const div = document.createElement('div');
-                div.className = "px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors";
-                const highlighted = sym.replace(input, `<span class="text-blue-500 font-black">${input}</span>`);
-                div.innerHTML = `<span class="text-sm font-bold text-white">${highlighted}</span>`;
-                div.onclick = () => { document.getElementById('symbol-input').value = sym; box.classList.add('hidden'); initScan(); };
-                box.appendChild(div);
-            });
-        } else { box.classList.add('hidden'); }
-    }
-
-    document.addEventListener('click', function(e) {
-        const box = document.getElementById('suggestions');
-        const input = document.getElementById('symbol-input');
-        if (!input.contains(e.target) && !box.contains(e.target)) { box.classList.add('hidden'); }
-    });
-
-    function getCookie(name) { let cookieValue = null; if (document.cookie && document.cookie !== '') { const cookies = document.cookie.split(';'); for (let i = 0; i < cookies.length; i++) { const cookie = cookies[i].trim(); if (cookie.substring(0, name.length + 1) === (name + '=')) { cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); break; } } } return cookieValue; }
-    function showError(title, msg) { document.getElementById('error-title').innerText = title; document.getElementById('error-msg').innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg; document.getElementById('error-modal').classList.remove('hidden'); }
-    function closeError() { document.getElementById('error-modal').classList.add('hidden'); }
-    function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
-    function formatPrice(value) { const num = parseFloat(value); if (isNaN(num)) return "--"; return num < 1.0 ? num.toFixed(5) : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-    function logMessage(msg, colorClass="text-slate-500") {
-        const log = document.getElementById('scanner-log');
-        if(!log) return;
-        const time = new Date().toLocaleTimeString([], {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'});
-        const row = `<div class="opacity-0 animate-fade-in"><span class="text-slate-600 font-bold">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`;
-        log.insertAdjacentHTML('beforeend', row);
-        log.scrollTop = log.scrollHeight;
-        if(log.children.length > 50) log.firstElementChild.remove();
-    }
-
-    function initMaintenanceLoop() {
-        setInterval(() => {
-            const dash = document.getElementById('dashboard');
-            if(dash && !dash.classList.contains('hidden')) {
-                logMessage(IDLE_LOGS[Math.floor(Math.random() * IDLE_LOGS.length)], "text-slate-600");
-            }
-        }, 3000);
-    }
-
-    async function initBacktest() {
-        const symbol = document.getElementById('res-symbol').innerText;
-        const modeSelect = document.getElementById('mode-select');
-        const style = modeSelect ? modeSelect.value : "INTRADAY";
-        if (!symbol || symbol === "--") { showError("NO DATA", "Run a scan before backtesting."); return; }
-
-        const modal = document.getElementById('backtest-modal');
-        const loader = document.getElementById('bt-loader');
-        const results = document.getElementById('bt-results');
-        const logBox = document.getElementById('bt-log');
-
-        modal.classList.remove('hidden');
-        loader.classList.remove('hidden');
-        results.classList.add('hidden');
-        logBox.innerHTML = '';
-
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const res = await fetch("/api/backtest/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-                body: JSON.stringify({ symbol: symbol, trade_style: style })
-            });
-            if (!res.ok) throw new Error("Backtest API failed");
-            const data = await res.json();
-
-            setTimeout(() => {
-                loader.classList.add('hidden');
-                results.classList.remove('hidden');
-                safeSetText('bt-winrate', (data.win_rate !== undefined ? data.win_rate : 0) + "%");
-                safeSetText('bt-pnl', data.profit_factor !== undefined ? data.profit_factor : 0);
-                safeSetText('bt-trades', data.total_trades !== undefined ? data.total_trades : 0);
-
-                if(data.trades_log && data.trades_log.length > 0) {
-                    data.trades_log.reverse().forEach(t => {
-                        const isWin = t.result === "WIN";
-                        const colorClass = isWin ? 'text-emerald-400' : 'text-red-500';
-                        const sign = isWin ? '+' : '';
-                        const row = `
-                            <div class="flex justify-between items-center bg-[#0f0f0f] border border-white/5 p-3 rounded-lg hover:border-white/10 transition mb-2">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full flex items-center justify-center ${isWin ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} font-bold text-[10px]">${isWin ? 'W' : 'L'}</div>
-                                    <div><span class="text-xs font-bold text-slate-300 block">${t.result}</span><span class="text-[9px] text-slate-600 font-mono">ENTRY: ${formatPrice(t.entry)}</span></div>
-                                </div>
-                                <div class="text-right"><span class="text-sm ${colorClass} font-mono font-bold block">${sign}${t.pnl}%</span><span class="text-[9px] text-slate-600 block">ROI</span></div>
-                            </div>`;
-                        logBox.insertAdjacentHTML('beforeend', row);
-                    });
-                } else {
-                    logBox.innerHTML = `<div class="text-center text-slate-600 italic py-10 flex flex-col items-center gap-2"><span>No trades generated in simulation period.</span></div>`;
-                }
-                if(window.lucide) lucide.createIcons();
-            }, 500);
-        } catch (e) {
-            console.error(e);
-            loader.innerHTML = `<div class="text-center py-4 text-red-400 font-bold">CALCULATION ERROR</div>`;
-        }
-    }
-
-    function closeBacktest() { document.getElementById('backtest-modal').classList.add('hidden'); }
-
-    async function addToJournal() {
-        const btn = document.getElementById('btn-journal');
-        const symbol = document.getElementById('res-symbol').innerText;
-        const direction = document.getElementById('res-direction').innerText;
-        const entry = document.getElementById('res-entry').innerText;
-        const stop = document.getElementById('res-stop').innerText;
-        const target = document.getElementById('res-target2').innerText;
-        const score = document.getElementById('res-score').innerText;
-        const mode = document.getElementById('mode-select') ? document.getElementById('mode-select').value : "INTRADAY";
-
-        if (symbol === "--" || direction === "NEUTRAL") { showError("NO SIGNAL", "Cannot save an empty signal."); return; }
-
-        const originalContent = btn.innerHTML;
-        const originalClasses = btn.className;
-        btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> SAVING...`;
-        if(window.lucide) lucide.createIcons();
-
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const cleanPrice = (p) => { if(!p || p.includes('--')) return 0.0; return parseFloat(p.replace(/[^0-9.]/g, '')) || 0.0; };
-            const cleanScore = (s) => parseFloat(s.replace('%', '')) || 0.0;
-
-            const payload = { symbol: symbol, bias: direction, entry: cleanPrice(entry), stop: cleanPrice(stop), target: cleanPrice(target), confidence: cleanScore(score), leverage: "Low" };
-            const res = await fetch("/api/journal/add/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify(payload) });
-
-            if (res.ok) {
-                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
-                btn.className = "flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500 px-4 py-2 rounded transition shadow-[0_0_20px_rgba(16,185,129,0.5)] ring-1 ring-emerald-500/50";
-                logMessage(`>> JOURNAL ENTRY SAVED: ${symbol}`, "text-emerald-400");
-                setTimeout(() => { btn.innerHTML = originalContent; btn.className = originalClasses; if(window.lucide) lucide.createIcons(); }, 2000);
-            } else {
-                const errorData = await res.json(); showError("SAVE FAILED", errorData.message || "Unknown error");
-            }
-        } catch (e) {
-            btn.innerHTML = `<i data-lucide="x" class="w-3 h-3"></i> ERROR`; btn.classList.add('text-red-400');
-            setTimeout(() => { btn.innerHTML = originalContent; btn.className = originalClasses; if(window.lucide) lucide.createIcons(); }, 2000);
-        }
-    }
-
-    function updateDrivers(explanation, show) {
-        const container = document.getElementById("shap-box");
-        container.innerHTML = "";
-        if (!show || !explanation || explanation.length === 0) {
-            container.innerHTML = `<div class="text-[10px] text-slate-600 italic text-center py-4">Vectors appear only when execution-grade edge exists.</div>`;
-            return;
-        }
-        explanation.slice(0, 3).forEach((item) => {
-            let mainColor = "bg-slate-500"; let textColor = "text-slate-400"; let icon = "activity";
-            const desc = item.desc ? item.desc.toUpperCase() : "";
-            if (desc.includes("WHALE") || desc.includes("ACCUMULATION")) { mainColor = "bg-blue-500"; textColor = "text-blue-400"; icon = "waves"; }
-            else if (desc.includes("TREND") || desc.includes("MOMENTUM")) { mainColor = "bg-emerald-500"; textColor = "text-emerald-400"; icon = "trending-up"; }
-            else if (desc.includes("SQUEEZE") || desc.includes("VOLATILITY")) { mainColor = "bg-purple-500"; textColor = "text-purple-400"; icon = "zap"; }
-
-            const width = Math.min(item.importance, 100);
-            const row = `
-                <div class="mb-4 last:mb-0">
-                    <div class="flex justify-between items-end mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5"><i data-lucide="${icon}" class="w-3 h-3 ${textColor}"></i> ${item.desc}</span>
-                        <span class="text-[10px] font-mono ${textColor}">${item.importance.toFixed(1)}</span>
-                    </div>
-                    <div class="w-full bg-[#111] h-1.5 rounded-full overflow-hidden">
-                        <div class="h-full ${mainColor} rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.1)]" style="width: ${width}%"></div>
-                    </div>
-                </div>`;
-            container.insertAdjacentHTML('beforeend', row);
-        });
-        if(window.lucide) lucide.createIcons();
-    }
-
-    function updateNews(newsData) {
-        const box = document.getElementById('news-feed'); box.innerHTML = '';
-        if (!newsData || newsData.length === 0) { box.innerHTML = `<div class="text-[10px] text-slate-500 italic text-center mt-4">No significant headlines.</div>`; return; }
-        newsData.forEach(item => {
-            const row = `<a href="${item.url}" target="_blank" class="block group border-b border-white/5 pb-2 last:border-0"><h5 class="text-[10px] text-slate-300 font-medium group-hover:text-blue-400 transition-colors mb-0.5">${item.title}</h5><span class="text-[8px] text-slate-600 font-mono uppercase">${item.source}</span></a>`;
-            box.insertAdjacentHTML('beforeend', row);
-        });
-        if (window.lucide) lucide.createIcons();
-    }
-
-    const LOADING_LOGS = [
-        ">> ESTABLISHING SECURE HANDSHAKE...",
-        ">> PARSING L2 ORDER BOOK DEPTH...",
-        ">> CALCULATING IMPLIED VOLATILITY SURFACE...",
-        ">> DETECTING INSTITUTIONAL ORDER FLOW...",
-        ">> ALIGNING TENSOR VECTORS [DIM: 128]...",
-        ">> FILTERING RETAIL NOISE PATTERNS...",
-        ">> CHECKING ON-CHAIN LIQUIDITY POOLS...",
-        ">> OPTIMIZING ENTRY/EXIT VECTORS...",
-        ">> VALIDATING SIGNAL CONFIDENCE INTERVALS...",
-        ">> FINALIZING STRATEGY MATRIX..."
-    ];
-
-    async function initScan() {
-        const input = document.getElementById('symbol-input');
-        const modeSelect = document.getElementById('mode-select');
-        let raw = input.value.trim().toUpperCase();
-        const tradeStyle = modeSelect ? modeSelect.value : "INTRADAY";
-
-        document.getElementById('suggestions').classList.add('hidden');
-
-        if (!raw) return;
-        if (!raw.includes("USDT")) raw += "USDT";
-
-        const dash = document.getElementById('dashboard');
-        const loader = document.getElementById('processing-ui');
-        const logText = document.getElementById('loading-text');
-
-        dash.classList.add('hidden'); dash.classList.add('opacity-0'); loader.classList.remove('hidden');
-        logText.innerHTML = `<p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING ${tradeStyle} PROTOCOL...</p>`;
-
-        let logIndex = 0;
-        const logInterval = setInterval(() => {
-            if (logIndex < LOADING_LOGS.length) {
-                const line = LOADING_LOGS[logIndex];
-                const p = document.createElement('p');
-                p.className = "text-slate-400 font-mono text-[10px] mt-1 border-l-2 border-slate-800 pl-2";
-                p.innerText = line;
-                logText.appendChild(p);
-                logText.scrollTop = logText.scrollHeight;
-                logIndex++;
-            }
-        }, 600);
-
-        try {
-            const csrftoken = getCookie('csrftoken');
-            const res = await fetch("/api/analyze/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken }, body: JSON.stringify({ symbol: raw, market_type: "PERP", trade_style: tradeStyle }) });
-            if (!res.ok) throw new Error("Connection Failed");
-            const data = await res.json();
-
-            clearInterval(logInterval);
-
-            safeSetText('res-symbol', data.symbol);
-            safeSetText('res-price', `$${formatPrice(data.price)}`);
-            // FORCE PRICE DISPLAY ON SCAN
-            document.getElementById('res-price').classList.remove('hidden');
-
-            const regTag = document.getElementById('res-regime-tag');
-            let regColor = data.regime.color || 'gray';
-            regTag.innerText = data.regime.phase || data.regime;
-            if(regColor === 'green') regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-emerald-400 border-emerald-500/20 bg-emerald-500/10";
-            else if(regColor === 'red') regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-red-400 border-red-500/20 bg-red-500/10";
-            else regTag.className = "text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-slate-500 border-white/10 bg-white/5";
-
-            safeSetText('res-whale-tag', (data.whales && data.whales.label) ? data.whales.label : "--");
-            safeSetText('res-score', data.signal.probability + "%");
-
-            const dirEl = document.getElementById('res-direction');
-            const sigBox = document.getElementById('signal-box');
-            const glow = document.getElementById('signal-glow');
-            const lockMsg = document.getElementById('lock-msg');
-            const expiryEl = document.getElementById('signal-expiry');
-            const bias = data.signal.bias;
-
-            dirEl.innerText = bias;
-            lockMsg.classList.add('hidden');
-
-            if ((bias === "LONG" || bias === "SHORT") && data.signal.duration) {
-                expiryEl.innerText = `Valid for ~${data.signal.duration}`;
-                expiryEl.classList.remove('hidden');
-                expiryEl.classList.add('animate-fade-in-up');
-            } else {
-                expiryEl.classList.add('hidden');
-                expiryEl.classList.remove('animate-fade-in-up');
-            }
-
-            if (bias === "LONG") {
-                dirEl.className = "text-5xl md:text-8xl font-black tracking-tighter text-emerald-400 leading-none";
-                sigBox.className = "bg-emerald-900/10 border border-emerald-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(16,185,129,0.1)]";
-                glow.className = "absolute inset-0 bg-emerald-500/10 blur-3xl opacity-100";
-            } else if (bias === "SHORT") {
-                dirEl.className = "text-5xl md:text-8xl font-black tracking-tighter text-red-500 leading-none";
-                sigBox.className = "bg-red-900/10 border border-red-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(239,68,68,0.1)]";
-                glow.className = "absolute inset-0 bg-red-500/10 blur-3xl opacity-100";
-            } else {
-                dirEl.className = "text-4xl md:text-7xl font-black tracking-tighter text-slate-600 leading-none opacity-80";
-                sigBox.className = "bg-[#0a0a0a] border border-white/5 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center";
-                glow.className = "hidden";
-                lockMsg.classList.remove('hidden');
-                if(data.signal.probability >= 60) {
-                     dirEl.innerText = "WATCHING";
-                     dirEl.className = "text-4xl md:text-7xl font-black tracking-tighter text-yellow-500 leading-none";
-                     sigBox.className = "bg-yellow-900/10 border border-yellow-500/30 rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center shadow-[0_0_30px_rgba(234,179,8,0.1)]";
-                     glow.className = "absolute inset-0 bg-yellow-500/10 blur-3xl opacity-100";
-                     glow.classList.remove('hidden');
-                     lockMsg.innerHTML = `<i data-lucide="eye" class="w-3 h-3 inline mr-1"></i> BIAS DETECTED. WAITING FOR CONFIRMATION...`;
-                } else {
-                     lockMsg.innerHTML = `<i data-lucide="shield" class="w-3 h-3 inline mr-1"></i> NO EDGE. CAPITAL PRESERVED.`;
-                }
-            }
-
-            if(bias !== "NEUTRAL" && bias !== "HOLD") {
-                safeSetText('res-entry', formatPrice(data.signal.entry));
-                safeSetText('res-stop', formatPrice(data.signal.stop));
-                safeSetText('res-target2', formatPrice(data.signal.target2));
-            } else {
-                safeSetText('res-entry', '---'); safeSetText('res-stop', '---'); safeSetText('res-target2', '---');
-            }
-
-            updateDrivers(data.explainability, data.signal.probability >= 60);
-            if (data.sentiment && data.sentiment.news_feed) updateNews(data.sentiment.news_feed);
-
-            loader.classList.add('hidden');
-            dash.classList.remove('hidden');
-            setTimeout(() => { dash.classList.remove('opacity-0', 'translate-y-4'); }, 50);
-        } catch (e) {
-            clearInterval(logInterval);
-            loader.classList.add('hidden');
-            showError("CONNECTION INTERRUPTION", e.message);
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-        setTimeout(() => logMessage(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
-        setTimeout(() => logMessage(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 1000);
-        setTimeout(() => logMessage(">> CONNECTING TO DARK POOL FEED...", "text-slate-500"), 1500);
-
-        initMaintenanceLoop();
-        initTicker();
-
-        // --- AUTO SCAN LOGIC ADDED HERE ---
-        const urlParams = new URLSearchParams(window.location.search);
-        const tickerParam = urlParams.get('ticker');
-        if (tickerParam) {
-            // Auto-fill and scan
-            document.getElementById('symbol-input').value = tickerParam;
-
-            // Wait 1.5s for the "System Online" animation, then trigger scan
-            setTimeout(() => {
-                initScan();
-            }, 1500);
-        }
-
-        if(window.lucide) lucide.createIcons();
-    });
-
-    async function findWinningMarket() {
-        document.getElementById('suggestions').classList.add('hidden');
-
-        const overlay = document.getElementById('scan-overlay');
-        const scanText = document.getElementById('scan-text');
-        overlay.classList.remove('hidden');
-
-        const tickers = ["BTC", "ETH", "SOL", "WIF", "SUI", "DOGE", "AVAX"];
-        const actions = ["SCANNING", "DECODING", "ANALYZING", "CALCULATING"];
-        const interval = setInterval(() => {
-            const t = tickers[Math.floor(Math.random() * tickers.length)];
-            const a = actions[Math.floor(Math.random() * actions.length)];
-            scanText.innerText = `${a} ${t}...`;
-        }, 120);
-
-        try {
-            const res = await fetch("/api/find_best_opportunity/");
-            const data = await res.json();
-
-            clearInterval(interval);
-            overlay.classList.add('hidden');
-
-            const modal = document.getElementById('alpha-modal');
-            const iconMain = document.getElementById('alpha-main-icon');
-            const iconContainer = document.getElementById('alpha-icon-container');
-            const subTitle = document.getElementById('alpha-subtitle');
-
-            if (data.status === "success") {
-                const trade = data.trade;
-                iconMain.setAttribute('data-lucide', 'trophy');
-                iconMain.className = "w-8 h-8 sm:w-10 sm:h-10 text-emerald-400 relative z-10";
-                iconContainer.className = "inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500/5 border border-emerald-500/30 mb-4 sm:mb-6 relative group";
-                subTitle.innerText = "Highest Probability Setup";
-                subTitle.className = "text-[10px] sm:text-xs font-bold text-emerald-500 uppercase tracking-[0.3em] mb-2";
-
-                document.getElementById('alpha-symbol').innerText = trade.symbol.replace("USDT", "");
-                const biasEl = document.getElementById('alpha-bias');
-                biasEl.innerText = trade.bias;
-                if(trade.bias === "LONG") biasEl.className = "text-xl sm:text-2xl font-bold text-emerald-400 tracking-widest mb-6 sm:mb-8 text-glow";
-                else biasEl.className = "text-xl sm:text-2xl font-bold text-red-500 tracking-widest mb-6 sm:mb-8 text-glow";
-
-                document.getElementById('alpha-entry').innerText = formatPrice(trade.entry);
-                document.getElementById('alpha-stop').innerText = formatPrice(trade.stop);
-                document.getElementById('alpha-target').innerText = formatPrice(trade.target);
-                document.getElementById('alpha-reason').innerText = trade.explanation;
-                window.foundSymbol = trade.symbol;
-                modal.classList.remove('hidden');
-            } else {
-                iconMain.setAttribute('data-lucide', 'shield-check');
-                iconMain.className = "w-8 h-8 sm:w-10 sm:h-10 text-blue-400 relative z-10";
-                iconContainer.className = "inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-500/5 border border-blue-500/30 mb-4 sm:mb-6 relative group";
-                subTitle.innerText = "Risk Management Protocol";
-                subTitle.className = "text-[10px] sm:text-xs font-bold text-blue-500 uppercase tracking-[0.3em] mb-2";
-
-                document.getElementById('alpha-symbol').innerText = "NO EDGE";
-                const biasEl = document.getElementById('alpha-bias');
-                biasEl.innerText = "CAPITAL PRESERVATION";
-                biasEl.className = "text-xl font-bold text-slate-400 tracking-widest mb-6 sm:mb-8";
-
-                document.getElementById('alpha-entry').innerText = "---";
-                document.getElementById('alpha-stop').innerText = "---";
-                document.getElementById('alpha-target').innerText = "---";
-                document.getElementById('alpha-reason').innerText = "MARKET CONDITIONS CHOPPY / LOW VOLUME";
-                window.foundSymbol = null;
-                modal.classList.remove('hidden');
-            }
-            if(window.lucide) lucide.createIcons();
-        } catch(e) {
-             clearInterval(interval);
-             overlay.classList.add('hidden');
-             showError("SCAN FAILED", "Network timeout.");
-        }
-    }
-
-    function closeAlpha() { document.getElementById('alpha-modal').classList.add('hidden'); }
-    function loadIntoTerminal() { closeAlpha(); if(window.foundSymbol) { document.getElementById('symbol-input').value = window.foundSymbol; initScan(); } }
-
-    function handleEnter(e) { if(e.key === 'Enter') initScan(); }
-    function quickScan(ticker) { document.getElementById('symbol-input').value = ticker; initScan(); }
-
-    function updateLeverage(score) {
-        let text = "Low"; if (score >= 80) text = "High"; else if (score >= 65) text = "Mod";
-        const el = document.getElementById("res-leverage"); if(el) el.innerText = text;
-    }
-    function calcPositionSize() {
-        const cap = parseFloat(document.getElementById("cap-input")?.value);
-        const risk = parseFloat(document.getElementById("risk-input")?.value);
-        const entry = parseFloat(document.getElementById("res-entry").innerText.replace(/,/g, ""));
-        if (!cap || !risk || !entry || isNaN(entry)) return;
-        document.getElementById("pos-size").innerText = ((cap * (risk / 100)) / entry).toFixed(4) + " units";
-    }
-    document.getElementById("cap-input")?.addEventListener("input", calcPositionSize);
-    document.getElementById("risk-input")?.addEventListener("input", calcPositionSize);
-</script>
 {% endblock %}

@@ -1,6 +1,7 @@
 {% extends "core/base.html" %}
 {% block content %}
-<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans">
+<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans"
+     x-data="pricing()">
 
     <div class="mb-12">
         {% if is_trial_expired %}
@@ -36,8 +37,10 @@
             <li class="flex items-center gap-3"><i data-lucide="lock" class="text-emerald-500 w-5 h-5"></i> <span>Prioritized <strong>Server Access</strong></span></li>
         </ul>
 
-        <button id="rzp-button1" type="button" class="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-slate-200 transition shadow-lg text-xs uppercase tracking-widest flex justify-center items-center gap-2">
-            <span>ACTIVATE SUBSCRIPTION</span>
+        <button @click="initPayment" :disabled="loading"
+                class="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-slate-200 transition shadow-lg text-xs uppercase tracking-widest flex justify-center items-center gap-2">
+            <span x-show="!loading">ACTIVATE SUBSCRIPTION</span>
+            <span x-show="loading" class="flex items-center gap-2"><i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> REDIRECTING...</span>
         </button>
 
         <div class="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-600">
@@ -48,54 +51,60 @@
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-    const razorpayKey = "{{ key_id|default:'' }}";
-    const subId = "{{ sub_id|default:'' }}";
-    const userEmail = "{{ user_email|default:'' }}";
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('pricing', () => ({
+            loading: false,
+            initPayment() {
+                this.loading = true;
+                const razorpayKey = "{{ key_id|default:'' }}";
+                const subId = "{{ sub_id|default:'' }}";
+                const userEmail = "{{ user_email|default:'' }}";
+                const callbackUrl = window.location.origin + "{% url 'payment_success' %}";
 
-    // 🚀 CRITICAL: Full URL for Redirect Mode
-    const callbackUrl = window.location.origin + "{% url 'payment_success' %}";
+                if (!razorpayKey || !subId || subId === "error") {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Configuration Error',
+                        text: 'Payment configuration missing. Please refresh.',
+                        background: '#0a0a0a',
+                        color: '#fff'
+                    });
+                    this.loading = false;
+                    return;
+                }
 
-    document.getElementById('rzp-button1').onclick = function(e){
-        e.preventDefault();
-        e.stopPropagation();
+                var options = {
+                    "key": razorpayKey,
+                    "subscription_id": subId,
+                    "name": "Reelioo Intelligence",
+                    "description": "Monthly Quant Access",
+                    "image": "https://cdn-icons-png.flaticon.com/512/217/217853.png",
+                    "callback_url": callbackUrl,
+                    "redirect": true,
+                    "prefill": { "email": userEmail },
+                    "theme": { "color": "#2563eb" },
+                    "modal": {
+                        "ondismiss": () => {
+                            this.loading = false;
+                        }
+                    }
+                };
 
-        if (!razorpayKey || !subId || subId === "error") {
-            alert("System Error: Payment config missing. Please refresh.");
-            return;
-        }
-
-        const btn = this;
-        btn.innerText = "REDIRECTING TO BANK...";
-        btn.disabled = true;
-
-        var options = {
-            "key": razorpayKey,
-            "subscription_id": subId,
-            "name": "Reelioo Intelligence",
-            "description": "Monthly Quant Access",
-            "image": "https://cdn-icons-png.flaticon.com/512/217/217853.png",
-
-            // 🚀 REDIRECT MODE (Fixes White Popup Freeze)
-            "callback_url": callbackUrl,
-            "redirect": true,
-
-            "prefill": { "email": userEmail },
-            "theme": { "color": "#2563eb" },
-            "modal": {
-                "ondismiss": function(){
-                    btn.innerText = "ACTIVATE SUBSCRIPTION";
-                    btn.disabled = false;
+                try {
+                    var rzp1 = new Razorpay(options);
+                    rzp1.open();
+                } catch (err) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gateway Error',
+                        text: 'Could not connect to payment gateway.',
+                        background: '#0a0a0a',
+                        color: '#fff'
+                    });
+                    this.loading = false;
                 }
             }
-        };
-
-        try {
-            var rzp1 = new Razorpay(options);
-            rzp1.open();
-        } catch (err) {
-            alert("Gateway Error. Please try again.");
-            btn.disabled = false;
-        }
-    }
+        }));
+    });
 </script>
 {% endblock %}

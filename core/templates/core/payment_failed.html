@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+<div class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4" x-data="{ loading: false }">
     <div class="bg-[#0a0a0a] border border-red-600/30 rounded-2xl p-10 max-w-sm w-full text-center relative overflow-hidden shadow-[0_0_100px_rgba(220,38,38,0.2)] animate-shake">
 
         <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-red-600/20 blur-[50px] rounded-full pointer-events-none"></div>
@@ -16,8 +16,9 @@
             The neural link could not be established.
         </p>
 
-        <a href="{% url 'pricing' %}" class="block w-full py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">
-            TRY AGAIN
+        <a href="{% url 'pricing' %}" @click="loading = true" class="block w-full py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition flex items-center justify-center gap-2">
+            <span x-show="!loading">TRY AGAIN</span>
+            <span x-show="loading"><i data-lucide="loader-2" class="animate-spin w-4 h-4"></i></span>
         </a>
     </div>
 </div>
@@ -30,8 +31,4 @@
     }
     .animate-shake { animation: shake 0.4s ease-in-out; }
 </style>
-
-<script>
-    if (window.lucide) lucide.createIcons();
-</script>
 {% endblock %}

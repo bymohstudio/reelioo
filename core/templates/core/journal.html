@@ -1,15 +1,12 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 font-sans min-h-screen relative">
-
-    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 font-sans min-h-screen relative" x-data="journal()">
 
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
             <h1 class="text-3xl font-black text-white mb-2">Performance Journal</h1>
             <p class="text-sm text-slate-500">Your personal trading ledger.</p>
-
             <p class="text-[10px] text-slate-600 mt-2 flex items-center gap-1.5 bg-white/5 w-fit px-2 py-1 rounded border border-white/5">
                 <i data-lucide="database" class="w-3 h-3 text-slate-500"></i>
                 <span>Data Retention Policy: Signals older than 90 days are automatically overwritten.</span>
@@ -18,7 +15,6 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-
         <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
             <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
             <div class="flex justify-between items-start relative z-10">
@@ -28,35 +24,21 @@
                         {% if net_roi > 0 %}+{% endif %}{{ net_roi }}%
                     </span>
                 </div>
-                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
-                    <i data-lucide="trending-up" class="w-5 h-5"></i>
-                </div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
             </div>
         </div>
-
         <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
             <div class="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
             <div class="flex justify-between items-start relative z-10">
-                <div>
-                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span>
-                    <span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
-                </div>
-                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
-                    <i data-lucide="scale" class="w-5 h-5"></i>
-                </div>
+                <div><span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span><span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span></div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="scale" class="w-5 h-5"></i></div>
             </div>
         </div>
-
         <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
             <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
             <div class="flex justify-between items-start relative z-10">
-                <div>
-                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span>
-                    <span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span>
-                </div>
-                <div class="p-2 bg-white/5 rounded-lg text-slate-400">
-                    <i data-lucide="activity" class="w-5 h-5"></i>
-                </div>
+                <div><span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span><span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span></div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="activity" class="w-5 h-5"></i></div>
             </div>
         </div>
     </div>
@@ -77,82 +59,44 @@
                 </thead>
                 <tbody class="text-sm text-slate-300">
                     {% for entry in page_obj %}
-                    <tr class="border-b border-white/5 hover:bg-white/[0.02] transition group" id="row-{{ entry.id }}">
-
-                        <td class="p-5 font-mono text-xs text-slate-500 local-time" data-timestamp="{{ entry.created_at|date:'c' }}">
-                            {{ entry.created_at|date:"M d, H:i" }}
-                        </td>
-
+                    <tr class="border-b border-white/5 hover:bg-white/[0.02] transition group" x-show="!deleted.includes({{ entry.id }})">
+                        <td class="p-5 font-mono text-xs text-slate-500" x-data x-text="new Date('{{ entry.created_at|date:'c' }}').toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})"></td>
                         <td class="p-5 font-bold text-white">
                             {{ entry.symbol }}
                             <span class="block text-[9px] font-normal text-slate-500 font-mono">LEV: {{ entry.leverage }}</span>
                         </td>
-
                         <td class="p-5">
                             {% if entry.status == 'SHIELD' or entry.status == 'SAVED' or entry.status == 'MISSED' %}
-                                <span class="text-[10px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2 py-1 rounded flex items-center gap-1 w-fit">
-                                    <i data-lucide="shield" class="w-3 h-3"></i> BLOCKED
-                                </span>
-                                <div class="mt-1 text-[9px] text-slate-600 font-mono">Risk Filter Active</div>
+                                <span class="text-[10px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2 py-1 rounded flex items-center gap-1 w-fit"><i data-lucide="shield" class="w-3 h-3"></i> BLOCKED</span>
                             {% elif entry.bias == 'LONG' %}
                                 <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">LONG</span>
-                                <div class="mt-1 text-[9px] text-slate-600 font-mono">{{ entry.confidence }}% Conf.</div>
                             {% else %}
                                 <span class="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded">SHORT</span>
-                                <div class="mt-1 text-[9px] text-slate-600 font-mono">{{ entry.confidence }}% Conf.</div>
                             {% endif %}
+                            <div class="mt-1 text-[9px] text-slate-600 font-mono">{{ entry.confidence }}% Conf.</div>
                         </td>
-
                         <td class="p-5 text-right font-mono">{{ entry.entry_price }}</td>
                         <td class="p-5 text-right font-mono text-emerald-500/80">{{ entry.target }}</td>
-
                         <td class="p-5 text-right">
-                            <div id="status-badge-{{ entry.id }}" class="inline-block transition-all duration-300">
-                                {% if entry.status == 'PENDING' %}
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold uppercase tracking-wide">
-                                        <span class="w-1 h-1 rounded-full bg-yellow-500 animate-pulse"></span> Pending
-                                    </span>
-                                {% elif entry.status == 'WIN' %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wide">
-                                        WIN
-                                    </span>
-                                {% elif entry.status == 'LOSS' %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wide">
-                                        LOSS
-                                    </span>
-                                {% elif entry.status == 'SHIELD' %}
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-wide">
-                                        TRACKING...
-                                    </span>
-                                {% elif entry.status == 'SAVED' %}
-                                     <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wide">
-                                        <i data-lucide="shield-check" class="w-3 h-3"></i> GOOD SAVE
-                                     </span>
-                                {% elif entry.status == 'MISSED' %}
-                                     <span class="inline-flex items-center px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-bold uppercase tracking-wide">
-                                        MISSED
-                                     </span>
-                                {% endif %}
-                            </div>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
+                                {% if entry.status == 'PENDING' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-500
+                                {% elif entry.status == 'WIN' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400
+                                {% elif entry.status == 'LOSS' %}bg-red-500/10 border border-red-500/20 text-red-400
+                                {% else %}bg-slate-800 border border-slate-700 text-slate-400{% endif %}">
+                                {{ entry.status }}
+                            </span>
                         </td>
-
-                        <td class="p-5 text-right">
-                            <div class="flex justify-end gap-2">
-                                <button id="btn-check-{{ entry.id }}" onclick="checkResult({{ entry.id }})" class="p-2 hover:bg-blue-500/20 rounded-lg text-slate-500 hover:text-blue-400 transition" title="Check Market Result">
-                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                                </button>
-                                <button onclick="openDeleteModal({{ entry.id }})" class="p-2 hover:bg-red-500/20 rounded-lg text-slate-500 hover:text-red-400 transition" title="Remove">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                            </div>
+                        <td class="p-5 text-right flex justify-end gap-2">
+                            <button @click="checkResult({{ entry.id }})" class="p-2 hover:bg-blue-500/20 rounded-lg text-slate-500 hover:text-blue-400 transition">
+                                <i data-lucide="refresh-cw" class="w-4 h-4" :class="loading === {{ entry.id }} ? 'animate-spin' : ''"></i>
+                            </button>
+                            <button @click="deleteEntry({{ entry.id }})" class="p-2 hover:bg-red-500/20 rounded-lg text-slate-500 hover:text-red-400 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr>
-                        <td colspan="7" class="p-12 text-center text-slate-500 text-xs italic">
-                            No trades recorded yet. Go to Terminal to scan and save signals.
-                        </td>
-                    </tr>
+                    <tr><td colspan="7" class="p-12 text-center text-slate-500 text-xs italic">No trades recorded yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -172,173 +116,78 @@
     </div>
 </div>
 
-<div id="delete-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-[#0a0a0a] border border-red-500/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-[0_0_50px_rgba(239,68,68,0.15)] animate-scale-in">
-        <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
-            <i data-lucide="trash-2" class="w-8 h-8 text-red-500"></i>
-        </div>
-        <h3 class="text-xl font-black text-white mb-2">Delete Entry?</h3>
-        <p class="text-slate-400 text-xs leading-relaxed mb-8">This will permanently remove this signal from your performance metrics.</p>
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="closeDeleteModal()" class="py-3 bg-[#111] border border-white/10 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest hover:bg-white/5 transition">Cancel</button>
-            <button onclick="commitDelete()" class="py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] rounded-lg uppercase tracking-widest transition shadow-lg shadow-red-900/20">Delete</button>
-        </div>
-    </div>
-</div>
-
 <script>
-    if (window.lucide) lucide.createIcons();
+document.addEventListener('alpine:init', () => {
+    Alpine.data('journal', () => ({
+        loading: null,
+        deleted: [],
 
-    // Auto-Format Dates to Local Time
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll('.local-time').forEach(el => {
-            const raw = el.getAttribute('data-timestamp');
-            if(raw) {
-                const date = new Date(raw);
-                el.innerText = date.toLocaleDateString(undefined, {
-                    month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit'
+        async checkResult(id) {
+            this.loading = id;
+            const Toast = Swal.mixin({ toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000, background: '#1e293b', color: '#fff' });
+            Toast.fire({ icon: 'info', title: 'Syncing with live market...' });
+
+            try {
+                const res = await fetch(`/api/journal/refresh/${id}/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')}
                 });
-            }
-        });
-    });
+                const data = await res.json();
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        let colorClass = "border-blue-500/50 bg-blue-900/80 text-blue-200";
-        let icon = "info";
-        if (type === 'success') { colorClass = "border-emerald-500/50 bg-emerald-900/80 text-emerald-200"; icon = "check-circle"; }
-        if (type === 'error') { colorClass = "border-red-500/50 bg-red-900/80 text-red-200"; icon = "alert-circle"; }
-        if (type === 'loading') { colorClass = "border-slate-500/50 bg-slate-800/90 text-slate-300"; icon = "loader-2"; }
-
-        toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-md shadow-2xl text-xs font-bold uppercase tracking-wider animate-slide-in ${colorClass}`;
-        toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 ${type === 'loading' ? 'animate-spin' : ''}"></i> <span>${message}</span>`;
-
-        container.appendChild(toast);
-        if (window.lucide) lucide.createIcons();
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(10px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-
-    async function checkResult(id) {
-        const btn = document.querySelector(`#btn-check-${id}`);
-        let icon = btn.querySelector('svg') || btn.querySelector('i');
-        const badgeDiv = document.getElementById(`status-badge-${id}`);
-        const originalBadge = badgeDiv.innerHTML;
-
-        if (icon) icon.classList.add('animate-spin');
-        btn.disabled = true;
-
-        badgeDiv.innerHTML = `
-            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-wide">
-                <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Syncing...
-            </span>`;
-        if(window.lucide) lucide.createIcons();
-
-        showToast("Syncing with live market...", "loading");
-
-        try {
-            const res = await fetch(`/api/journal/refresh/${id}/`, {
-                method: 'POST',
-                headers: {'X-CSRFToken': getCookie('csrftoken')}
-            });
-            const data = await res.json();
-
-            if(data.status === 'success') {
-                if (data.new_status === "PENDING" || data.new_status === "SHIELD") {
-                    badgeDiv.innerHTML = `
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700 border border-slate-600 text-white text-[10px] font-bold uppercase tracking-wide">STILL OPEN</span>`;
-                    showToast(`Target not hit. Price: ${data.current_price || '--'}`, "info");
-                    setTimeout(() => { badgeDiv.innerHTML = originalBadge; }, 2500);
+                if(data.status === 'success') {
+                    if(data.new_status === 'PENDING') {
+                        Toast.fire({ icon: 'info', title: `Still Open. Price: ${data.current_price}` });
+                    } else {
+                        Toast.fire({ icon: 'success', title: `Closed: ${data.new_status}` });
+                        setTimeout(() => location.reload(), 1000);
+                    }
                 } else {
-                    let colorClass = "";
-                    if (data.new_status === 'WIN') colorClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
-                    else if (data.new_status === 'SAVED') colorClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
-                    else if (data.new_status === 'MISSED') colorClass = "bg-orange-500/10 border-orange-500/20 text-orange-400";
-                    else colorClass = "bg-red-500/10 border-red-500/20 text-red-400";
-
-                    badgeDiv.innerHTML = `
-                        <span class="inline-flex items-center px-3 py-1 rounded-full border ${colorClass} text-[10px] font-bold uppercase tracking-wide animate-pulse">
-                            ${data.new_status}
-                        </span>`;
-
-                    // Refresh page to update top stats after a short delay
-                    showToast(`Trade Closed: ${data.new_status}`, data.new_status === 'WIN' || data.new_status === 'SAVED' ? 'success' : 'info');
-                    setTimeout(() => window.location.reload(), 1500);
+                    throw new Error();
                 }
-            } else {
-                throw new Error(data.message || "Unknown error");
+            } catch(e) {
+                Toast.fire({ icon: 'error', title: 'Sync Failed' });
+            } finally {
+                this.loading = null;
             }
-        } catch(e) {
-            console.error(e);
-            badgeDiv.innerHTML = originalBadge;
-            showToast("Market data unavailable", "error");
-        } finally {
-            const liveIcon = btn.querySelector('svg') || btn.querySelector('i');
-            if (liveIcon) liveIcon.classList.remove('animate-spin');
-            btn.disabled = false;
-        }
-    }
+        },
 
-    let deleteTargetId = null;
-    function openDeleteModal(id) { deleteTargetId = id; document.getElementById('delete-modal').classList.remove('hidden'); }
-    function closeDeleteModal() { deleteTargetId = null; document.getElementById('delete-modal').classList.add('hidden'); }
-
-    async function commitDelete() {
-        if (!deleteTargetId) return;
-        const id = deleteTargetId;
-        const row = document.getElementById(`row-${id}`);
-        closeDeleteModal();
-        row.style.opacity = '0.5';
-        row.style.pointerEvents = 'none';
-
-        try {
-            const res = await fetch(`/api/journal/delete/${id}/`, {
-                method: 'DELETE',
-                headers: {'X-CSRFToken': getCookie('csrftoken')}
+        async deleteEntry(id) {
+            const result = await Swal.fire({
+                title: 'Delete Entry?',
+                text: "This cannot be undone.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                background: '#0a0a0a',
+                color: '#fff',
+                confirmButtonText: 'Yes, delete it'
             });
-            if(res.ok) {
-                row.style.transform = 'translateX(20px)';
-                row.style.opacity = '0';
-                setTimeout(() => row.remove(), 300);
-                showToast("Entry Deleted Successfully", "success");
-                // Reload to update stats
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                throw new Error("API Error");
-            }
-        } catch(e) {
-            row.style.opacity = '1';
-            row.style.pointerEvents = 'auto';
-            showToast("Failed to delete entry", "error");
-        }
-    }
-</script>
 
-<style>
-    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
-    @keyframes scaleIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
-    .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
-</style>
+            if (result.isConfirmed) {
+                try {
+                    const res = await fetch(`/api/journal/delete/${id}/`, {
+                        method: 'DELETE',
+                        headers: {'X-CSRFToken': getCookie('csrftoken')}
+                    });
+                    if(res.ok) {
+                        this.deleted.push(id);
+                        Swal.fire({
+                            title: 'Deleted!',
+                            icon: 'success',
+                            background: '#0a0a0a',
+                            color: '#fff',
+                            showConfirmButton: false,
+                            timer: 1000
+                        });
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                } catch(e) {
+                    Swal.fire('Error', 'Could not delete entry', 'error');
+                }
+            }
+        }
+    }));
+});
+</script>
 {% endblock %}

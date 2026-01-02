@@ -32,24 +32,24 @@
 </style>
 
 <div class="max-w-3xl mx-auto py-12 px-4">
-    
+
     <div class="text-center mb-10">
         <h1 class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-3">
             Improving The Algo
         </h1>
         <p class="text-slate-400 text-sm max-w-lg mx-auto">
-            Your feedback directly tunes the Reelioo V2 Quant Engine. 
+            Your feedback directly tunes the Reelioo V2 Quant Engine.
             Report hallucinations, latency, or winning signals to help us calibrate the models.
         </p>
     </div>
 
     <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 relative overflow-hidden">
-        
+
         <!-- Decoration -->
         <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none"></div>
 
         <form id="feedbackForm" onsubmit="submitFeedback(event)">
-            
+
             <!-- Context -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div>
@@ -109,7 +109,7 @@
     function setRating(type, val) {
         // Update hidden input
         document.getElementById(`fb-${type}-rating`).value = val;
-        
+
         // Update UI
         const btns = document.querySelectorAll(`#${type}-rating-group .rating-btn`);
         btns.forEach((b, idx) => {
@@ -120,7 +120,7 @@
 
     async function submitFeedback(e) {
         e.preventDefault();
-        
+
         const btn = document.getElementById('fb-submit');
         const originalText = btn.innerText;
         btn.innerText = "SENDING...";
@@ -140,7 +140,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            
+
             if (res.ok) {
                 btn.innerText = "THANK YOU!";
                 btn.classList.add('bg-emerald-600');
