@@ -33,6 +33,7 @@ urlpatterns = [
     path("legal/refund/", views.refund_view, name="refund"),
     path("legal/contact/", views.contact_view, name="contact"),
     path("legal/plans/", views.pricing_footer_view, name="plans"),
+    path("About/", views.about_view, name="about"),
 
 # Journal Routes
     path('journal/', views.journal_view, name='journal'),

@@ -1,108 +1,172 @@
 {% extends "core/base.html" %}
-{% block title %}Why Reelioo | The Quant Advantage{% endblock %}
+{% block title %}Research & Methodology | Reelioo{% endblock %}
 
 {% block content %}
-
 <style>
-    .font-tech { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
-    .glass-card {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 24px;
-        transition: all 0.3s ease;
+    /* Research Paper Aesthetic */
+    .font-mono-tech { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; }
+
+    .paper-card {
+        background: #050505;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        position: relative;
+        overflow: hidden;
     }
-    .glass-card:hover {
-        border-color: rgba(59, 130, 246, 0.4);
-        background: rgba(15, 23, 42, 0.8);
-        transform: translateY(-4px);
+
+    /* Subtle Grid Overlay */
+    .grid-overlay {
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 20px 20px;
+        opacity: 0.5;
+        pointer-events: none;
     }
-    .grad-text {
-        background: linear-gradient(to right, #60a5fa, #a78bfa);
-        -webkit-background-clip: text;
-        color: transparent;
+
+    /* Robust CSS Animations (No JS required for visibility) */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
+
+    .animate-reveal {
+        animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0; /* Hidden by default until animation starts */
+    }
+
+    .delay-100 { animation-delay: 0.1s; }
+    .delay-200 { animation-delay: 0.2s; }
+    .delay-300 { animation-delay: 0.3s; }
 </style>
 
-<div class="max-w-7xl mx-auto pt-20 pb-32 px-6 font-tech">
+<div class="min-h-screen bg-[#020202] text-slate-300 font-sans selection:bg-blue-900/30 overflow-x-hidden">
 
-    <div class="text-center mb-32">
-        <div class="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-bold uppercase tracking-widest mb-8">
-            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            Retail Education Series
+    <section class="max-w-4xl mx-auto pt-32 px-6 mb-24 relative">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-900/10 blur-[100px] rounded-full -z-10"></div>
+
+        <div class="border-l-2 border-blue-500 pl-6 mb-8 animate-reveal">
+            <span class="text-[10px] font-mono-tech text-blue-400 uppercase tracking-widest block mb-2">Technical Brief // v3.0</span>
+            <h1 class="text-4xl md:text-5xl font-bold text-white tracking-tight leading-tight">
+                Solving Information Asymmetry via <br> Multi-Layered Probability Ensembles.
+            </h1>
         </div>
-        <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-white mb-8 tracking-tight leading-[1.1]">
-            Stop Guessing.<br>
-            <span class="grad-text">Start Computing.</span>
-        </h1>
-        <p class="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed font-light">
-            90% of retail traders fail because they fight <strong>High-Frequency Algorithms</strong> with subjective lines on a chart. Reelioo equips you with the same mathematical weaponry used by institutional desks.
-        </p>
-    </div>
 
-    <div class="grid md:grid-cols-2 gap-16 items-center mb-40">
-        <div>
-            <h2 class="text-3xl font-bold text-white mb-6">The "Technical Analysis" Trap</h2>
-            <div class="h-1 w-24 bg-red-500 mb-8 rounded-full"></div>
-            <p class="text-slate-400 leading-relaxed mb-6">
-                You draw a support line at 24,000. Another trader draws it at 24,050. Who is right?
-                <strong>Subjectivity kills consistency.</strong>
+        <div class="prose prose-invert prose-lg text-slate-400 leading-relaxed animate-reveal delay-100">
+            <p>
+                Retail traders operate at a structural disadvantage. Institutional desks utilize high-frequency algorithms to detect liquidity vacuums and order flow imbalances milliseconds before price action occurs.
+                <span class="text-white font-medium">Reelioo bridges this gap.</span>
             </p>
-            <p class="text-slate-400 leading-relaxed">
-                Institutions don't guess. They use <strong>Quantitative Models</strong> that process Volatility, Theta Decay, and Momentum Velocity in real-time. Reelioo democratizes this technology.
+            <p>
+                We do not use subjective technical analysis. Instead, we deploy a <strong>3-Model Ensemble</strong> that filters noise, determines bias, and validates momentum before a signal is ever generated.
             </p>
         </div>
-        <div class="space-y-4">
-            <div class="glass-card p-6 border-l-4 border-l-red-500/50 flex items-start gap-4">
-                <i data-lucide="x-circle" class="w-6 h-6 text-red-400 shrink-0"></i>
-                <div>
-                    <h3 class="text-white font-bold text-sm">Subjective Bias</h3>
-                    <p class="text-xs text-slate-500 mt-1">"I feel the market looks bullish." (Markets don't care about feelings).</p>
-                </div>
-            </div>
-            <div class="glass-card p-6 border-l-4 border-l-red-500/50 flex items-start gap-4">
-                <i data-lucide="x-circle" class="w-6 h-6 text-red-400 shrink-0"></i>
-                <div>
-                    <h3 class="text-white font-bold text-sm">Lagging Indicators</h3>
-                    <p class="text-xs text-slate-500 mt-1">RSI and MACD tell you what <em>already</em> happened, not what comes next.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    </section>
 
-    <div class="mb-40 text-center">
-        <h2 class="text-4xl font-black text-white mb-16">The Quant Advantage</h2>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="glass-card p-10 text-center group">
-                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-blue-500/50 transition">
-                    <i data-lucide="binary" class="w-8 h-8 text-blue-400"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-4">Data, Not Lines</h3>
-                <p class="text-sm text-slate-400">We analyze raw data arrays (Price, Volume, Volatility) to find statistical anomalies invisible to the naked eye.</p>
-            </div>
-            <div class="glass-card p-10 text-center group">
-                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-purple-500/50 transition">
-                    <i data-lucide="brain-circuit" class="w-8 h-8 text-purple-400"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-4">22-Factor ML Engine</h3>
-                <p class="text-sm text-slate-400">Our Gradient Boosting model tracks 22 features simultaneously—including Volume Z-Scores and Trend Velocity.</p>
-            </div>
-            <div class="glass-card p-10 text-center group">
-                <div class="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-slate-700 group-hover:border-emerald-500/50 transition">
-                    <i data-lucide="shield-check" class="w-8 h-8 text-emerald-400"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-4">Dynamic Risk</h3>
-                <p class="text-sm text-slate-400">Stops widen in high volatility to prevent shakeouts and tighten in low volatility to protect capital.</p>
-            </div>
+    <section class="max-w-6xl mx-auto px-6 mb-32">
+        <div class="mb-12 border-b border-white/10 pb-4 flex justify-between items-end animate-reveal delay-200">
+            <h2 class="text-2xl font-bold text-white">The Architecture</h2>
+            <span class="text-[10px] font-mono-tech text-slate-500">SYSTEM ARCHITECTURE // LAYERS 1-3</span>
         </div>
-    </div>
 
-    <div class="text-center">
-        <h2 class="text-3xl font-bold text-white mb-6">Ready to trade with an Edge?</h2>
-        <a href="/" class="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-1">
-            <span>Launch Terminal</span>
-            <i data-lucide="arrow-right" class="w-5 h-5"></i>
-        </a>
+        <div class="grid md:grid-cols-3 gap-px bg-white/10 border border-white/10 animate-reveal delay-300">
+
+            <div class="paper-card p-8 group hover:bg-[#080808] transition duration-500">
+                <div class="grid-overlay absolute inset-0"></div>
+                <div class="relative z-10">
+                    <div class="w-10 h-10 border border-white/10 flex items-center justify-center mb-6 bg-black">
+                        <span class="font-mono-tech text-blue-500 text-xs">01</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Macro-Regime Detection</h3>
+                    <p class="text-xs font-mono text-blue-400 mb-4">TIMEFRAME: 4H // THE FILTER</p>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Before analyzing direction, we classify the market state. Our stochastic models measure volatility entropy to determine if the asset is in a <strong>Trend State</strong> or <strong>Mean Reversion (Chop) State</strong>.
+                    </p>
+                    <p class="text-sm text-slate-500 mt-2 italic">
+                        "If volatility is compressing below the historic mean, the system remains silent to preserve capital."
+                    </p>
+                </div>
+            </div>
+
+            <div class="paper-card p-8 group hover:bg-[#080808] transition duration-500">
+                <div class="grid-overlay absolute inset-0"></div>
+                <div class="relative z-10">
+                    <div class="w-10 h-10 border border-white/10 flex items-center justify-center mb-6 bg-black">
+                        <span class="font-mono-tech text-purple-500 text-xs">02</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Directional Probability Vectors</h3>
+                    <p class="text-xs font-mono text-purple-400 mb-4">TIMEFRAME: 1H // THE BIAS</p>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Once a trend regime is validated, we utilize <strong>Non-Linear Decision Trees</strong> to analyze Order Flow Imbalance and Momentum Physics. This layer calculates the raw probability of a Bullish vs. Bearish expansion.
+                    </p>
+                    <p class="text-sm text-slate-500 mt-2 italic">
+                        "We track the aggressive vs. passive buying pressure to determine true institutional intent."
+                    </p>
+                </div>
+            </div>
+
+            <div class="paper-card p-8 group hover:bg-[#080808] transition duration-500">
+                <div class="grid-overlay absolute inset-0"></div>
+                <div class="relative z-10">
+                    <div class="w-10 h-10 border border-white/10 flex items-center justify-center mb-6 bg-black">
+                        <span class="font-mono-tech text-emerald-500 text-xs">03</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Micro-Structure Validation</h3>
+                    <p class="text-xs font-mono text-emerald-400 mb-4">TIMEFRAME: 15M // THE TRIGGER</p>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        The final check. We analyze volume velocity on lower timeframes to ensure the breakout has sufficient liquidity backing. This prevents "fakeouts" by requiring a significant deviation in volume Z-scores.
+                    </p>
+                    <p class="text-sm text-slate-500 mt-2 italic">
+                        "A signal is only released if immediate execution conditions are mathematically favorable."
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="border-t border-white/10 bg-[#050505] py-20">
+        <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row justify-between items-start gap-12">
+
+            <div class="space-y-6 max-w-md">
+                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Corporate Governance</h4>
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Yuvneer Procommerce LLP</h2>
+                    <p class="text-xs text-slate-500 font-mono">Registered in India (MCA Compliant Entity)</p>
+                </div>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Reelioo is a proprietary software product of Yuvneer Procommerce LLP. We operate as a Software-as-a-Service (SaaS) provider specializing in quantitative data analysis tools.
+                </p>
+                <div class="text-xs text-slate-500 border-l border-white/10 pl-3">
+                    <p>We do not hold client funds, execute trades, or provide personalized financial advice (RIA).</p>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Compliance & Infrastructure</h4>
+                <ul class="space-y-3 text-sm text-slate-400">
+                    <li class="flex items-center gap-3">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i>
+                        <span>PCI-DSS Compliant Billing (Razorpay)</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <i data-lucide="lock" class="w-4 h-4 text-emerald-500"></i>
+                        <span>End-to-End Encrypted User Data (AES-256)</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <i data-lucide="server" class="w-4 h-4 text-emerald-500"></i>
+                        <span>High-Availability Cloud Infrastructure (99.9% Uptime)</span>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+    </section>
+
+    <div class="py-20 text-center px-6">
+        <blockquote class="text-lg md:text-xl font-serif italic text-slate-500 max-w-2xl mx-auto">
+            "In the short run, the market is a voting machine but in the long run, it is a weighing machine."
+        </blockquote>
+        <div class="mt-4 font-mono-tech text-xs text-blue-500 uppercase tracking-widest">— Benjamin Graham / Quant Principles</div>
     </div>
 
 </div>

@@ -602,6 +602,7 @@ def send_discord_alert(symbol, data, alert_type="SNIPER"):
 # --- LEGAL PAGES ---
 def terms_view(request): return render(request, 'core/legal/terms.html')
 
+def about_view(request): return render(request, 'core/why_reelioo.html')
 
 def privacy_view(request): return render(request, 'core/legal/privacy.html')
 

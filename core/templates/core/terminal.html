@@ -15,6 +15,9 @@
             suggestions: [],
             allSymbols: [],
 
+            // --- Live Ticker Data ---
+            tickerData: [],
+
             // --- Scanner Data ---
             data: {
                 symbol: '--', price: '--',
@@ -41,28 +44,57 @@
 
             // --- Init ---
             async init() {
-                // Load Symbols
+                // 1. Fetch Live Ticker Prices immediately
+                this.initTicker();
+
+                // 2. Load Symbols for Search
                 try {
                     const res = await fetch('/api/symbols/');
                     const s = await res.json();
                     this.allSymbols = Array.isArray(s) ? s : ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
                 } catch(e) { this.allSymbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]; }
 
-                // Initial Logs
+                // 3. Initial Logs
                 setTimeout(() => this.log(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
                 setTimeout(() => this.log(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 1000);
 
-                // Auto Scan URL Param
+                // 4. Auto Scan URL Param
                 const params = new URLSearchParams(window.location.search);
                 if(params.get('ticker')) {
                     this.symbol = params.get('ticker');
                     setTimeout(() => this.scan(), 1500);
                 }
 
-                // Maintenance Loop
+                // 5. Maintenance Loop
                 setInterval(() => {
                     if(this.showDashboard) this.log("Optimizing Execution Latency Vectors...", "text-slate-600");
                 }, 5000);
+            },
+
+            // --- Ticker Logic (Fixed) ---
+            async initTicker() {
+                try {
+                    // Fetch 24hr stats for major pairs from public Binance API
+                    const pairs = '["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT"]';
+                    const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${pairs}`);
+                    if(!res.ok) throw new Error();
+
+                    const raw = await res.json();
+                    this.tickerData = raw.map(item => ({
+                        sym: item.symbol.replace('USDT', ''),
+                        price: parseFloat(item.lastPrice).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+                        change: parseFloat(item.priceChangePercent).toFixed(2),
+                        isUp: parseFloat(item.priceChangePercent) >= 0
+                    }));
+                } catch(e) {
+                    // Fallback if API fails (e.g. adblocker), using realistic defaults
+                    this.tickerData = [
+                        { sym: "BTC", price: "98,420.00", change: "+1.20", isUp: true },
+                        { sym: "ETH", price: "2,950.00", change: "+0.80", isUp: true },
+                        { sym: "SOL", price: "145.20", change: "-2.10", isUp: false },
+                        { sym: "BNB", price: "612.50", change: "+0.50", isUp: true }
+                    ];
+                }
             },
 
             // --- Actions ---
@@ -92,7 +124,6 @@
                 // Mock Loading Logs
                 const logs = ["ESTABLISHING SECURE HANDSHAKE...", "PARSING L2 ORDER BOOK...", "CALCULATING IV SURFACE...", "DETECTING WHALE FLOW..."];
                 let logIdx = 0;
-                // Clear previous loading text (optional, but cleaner)
                 const logContainer = document.getElementById('loading-text');
                 if(logContainer) logContainer.innerHTML = '<p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING NEURAL BRIDGE...</p>';
 
@@ -119,7 +150,6 @@
                     this.showDashboard = true;
                     this.log(`SCAN COMPLETE: ${raw}`, "text-emerald-500");
 
-                    // Re-init icons for new content
                     this.$nextTick(() => { if(window.lucide) lucide.createIcons(); });
 
                 } catch(e) {
@@ -198,7 +228,7 @@
             },
 
             async saveJournal() {
-                const btn = document.getElementById('btn-journal'); // Use vanilla ref for specific button animation
+                const btn = document.getElementById('btn-journal');
                 if (this.data.signal.bias === "NEUTRAL") {
                     Swal.fire({toast:true, position:'top-end', icon:'error', title:'NO SIGNAL', text:'Cannot save neutral signal.', background:'#0a0a0a', color:'#fff', showConfirmButton:false, timer:2000});
                     return;
@@ -286,12 +316,11 @@
                 return ((this.calc.cap * (this.calc.risk / 100)) / entry).toFixed(4) + " units";
             },
 
-            // Computed Class Logic for Signal Box
             getSignalBoxClass() {
                 const b = this.data.signal.bias;
                 if(b === 'LONG') return "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]";
                 if(b === 'SHORT') return "bg-red-900/10 border-red-500/30 shadow-[0_0_30px_rgba(239,68,68,0.1)]";
-                if(this.data.signal.probability >= 60 && b === 'NEUTRAL') return "bg-yellow-900/10 border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]"; // Watch mode
+                if(this.data.signal.probability >= 60 && b === 'NEUTRAL') return "bg-yellow-900/10 border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]";
                 return "bg-[#0a0a0a] border-white/10";
             },
 
@@ -303,8 +332,6 @@
                 return "text-slate-600 opacity-80";
             },
 
-            // Ensure logic matches user request: "when hold signal earlier no entry stops were shown"
-            // We use a getter to return '---' if neutral or hold
             get displayEntry() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.entry); },
             get displayStop() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.stop); },
             get displayTarget() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.target2); }
@@ -329,11 +356,22 @@
         <div class="absolute left-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-r from-black to-transparent z-10"></div>
         <div class="absolute right-0 top-0 bottom-0 w-12 sm:w-24 bg-gradient-to-l from-black to-transparent z-10"></div>
         <div class="marquee-track flex items-center gap-12 sm:gap-16 py-3 whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-widest text-slate-500">
-             <template x-for="i in 4">
+             <template x-for="i in 2">
                  <div class="flex items-center gap-16">
-                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">BTC</span><span class="text-slate-400">$96,420</span><span class="text-emerald-500 text-[9px] flex items-center gap-1">▲ +1.2%</span></div>
-                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">ETH</span><span class="text-slate-400">$2,750</span><span class="text-emerald-500 text-[9px] flex items-center gap-1">▲ +0.8%</span></div>
-                     <div class="flex items-center gap-2 mx-8"><span class="text-white font-bold">SOL</span><span class="text-slate-400">$145.20</span><span class="text-red-500 text-[9px] flex items-center gap-1">▼ -2.1%</span></div>
+                     <template x-for="t in tickerData">
+                         <div class="flex items-center gap-2 mx-8">
+                             <span class="text-white font-bold" x-text="t.sym"></span>
+                             <span class="text-slate-400" x-text="'$'+t.price"></span>
+                             <span class="text-[9px] flex items-center gap-1"
+                                   :class="t.isUp ? 'text-emerald-500' : 'text-red-500'">
+                                 <span x-text="t.isUp ? '▲' : '▼'"></span>
+                                 <span x-text="(t.isUp ? '+' : '') + t.change + '%'"></span>
+                             </span>
+                         </div>
+                     </template>
+                     <div x-show="tickerData.length === 0" class="flex items-center gap-2 mx-8 animate-pulse">
+                         <span class="text-white font-bold">CONNECTING TO FEED...</span>
+                     </div>
                  </div>
              </template>
         </div>
