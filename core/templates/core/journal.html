@@ -117,6 +117,22 @@
 </div>
 
 <script>
+// Helper: Securely retrieve CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('journal', () => ({
         loading: null,
@@ -128,15 +144,23 @@ document.addEventListener('alpine:init', () => {
             Toast.fire({ icon: 'info', title: 'Syncing with live market...' });
 
             try {
+                const token = getCookie('csrftoken');
+
                 const res = await fetch(`/api/journal/refresh/${id}/`, {
                     method: 'POST',
-                    headers: {'X-CSRFToken': getCookie('csrftoken')}
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': token
+                    }
                 });
+
+                if (!res.ok) throw new Error();
+
                 const data = await res.json();
 
                 if(data.status === 'success') {
                     if(data.new_status === 'PENDING') {
-                        Toast.fire({ icon: 'info', title: `Still Open. Price: ${data.current_price}` });
+                        Toast.fire({ icon: 'info', title: `Still Open. Current: ${data.current_price || '--'}` });
                     } else {
                         Toast.fire({ icon: 'success', title: `Closed: ${data.new_status}` });
                         setTimeout(() => location.reload(), 1000);
@@ -145,6 +169,7 @@ document.addEventListener('alpine:init', () => {
                     throw new Error();
                 }
             } catch(e) {
+                // Silently handle error, show user-friendly message only
                 Toast.fire({ icon: 'error', title: 'Sync Failed' });
             } finally {
                 this.loading = null;
@@ -166,10 +191,12 @@ document.addEventListener('alpine:init', () => {
 
             if (result.isConfirmed) {
                 try {
+                    const token = getCookie('csrftoken');
                     const res = await fetch(`/api/journal/delete/${id}/`, {
                         method: 'DELETE',
-                        headers: {'X-CSRFToken': getCookie('csrftoken')}
+                        headers: {'X-CSRFToken': token}
                     });
+
                     if(res.ok) {
                         this.deleted.push(id);
                         Swal.fire({
@@ -181,9 +208,11 @@ document.addEventListener('alpine:init', () => {
                             timer: 1000
                         });
                         setTimeout(() => location.reload(), 1000);
+                    } else {
+                        throw new Error();
                     }
                 } catch(e) {
-                    Swal.fire('Error', 'Could not delete entry', 'error');
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Could not delete entry', background: '#0a0a0a', color: '#fff' });
                 }
             }
         }
