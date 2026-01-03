@@ -30,4 +30,4 @@ COPY . .
 RUN python manage.py collectstatic --noinput
 
 # 8. Start the application
-CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:$PORT
+CMD gunicorn reelioo.wsgi:application --workers 1 --threads 8 --timeout 120
