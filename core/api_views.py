@@ -42,17 +42,12 @@ class AnalyzeCryptoView(APIView):
             engine = CryptoQuantEngine()
             res = engine.analyze(df, trade_style)
 
-            # Safety Valve
-            if trade_style == "SCALP":
-                last_open = float(df['open'].iloc[-1])
-                last_close = float(df['close'].iloc[-1])
-                move_pct = abs(last_close - last_open) / last_close
-                if move_pct < 0.002:
-                    res.bias = "NEUTRAL"
-                    res.regime = "LOW VOLATILITY"
-                    res.regime_color = "gray"
-                    res.score = 50
-                    res.narrative = "Market is asleep. No trade edge."
+            # ---------------------------------------------------------------
+            # ❌ DELETED SAFETY VALVE BLOCK
+            # The Engine (v5.4) now handles volatility logic internally.
+            # It will correctly return "WATCH" (Yellow) or "HOLD" (Gray)
+            # without this external override blocking it.
+            # ---------------------------------------------------------------
 
             news_data = []
             try:
@@ -138,19 +133,34 @@ class FindAlphaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # 1. Check Cache (5 Minutes)
         cached_result = cache.get("alpha_opportunity_v1")
         if cached_result: return Response(cached_result)
 
-        vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT", "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"]
+        # 2. Define Scan List
+        vip_assets = [
+            "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
+            "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT",
+            "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT",
+            "PEPEUSDT", "RNDRUSDT", "FETUSDT", "LTCUSDT"
+        ]
+
         leaderboard = []
         engine = CryptoQuantEngine()
 
         def analyze_symbol(symbol):
             try:
+                # Fetch Data
                 df = MarketService.get_historical_data(symbol, market_type="PERP", trade_style="INTRADAY")
                 if df.empty: return None
+
+                # Analyze
                 res = engine.analyze(df, trade_style="INTRADAY")
-                if res.bias in ["LONG", "SHORT"] and res.score >= 60:
+
+                # --- STRICT SNIPER FILTER ---
+                # 1. Must be LONG or SHORT (No WATCH, No HOLD)
+                # 2. Score must be >= 70 (Confirmed Strength)
+                if res.bias in ["LONG", "SHORT"] and res.score >= 70:
                     return {
                         "symbol": symbol,
                         "bias": res.bias,
@@ -160,21 +170,35 @@ class FindAlphaView(APIView):
                         "target": res.target1,
                         "rr": res.rr_ratio,
                         "regime": res.regime,
-                        "explanation": getattr(res, 'narrative', "High Conviction") # USE NARRATIVE
+                        "explanation": getattr(res, 'narrative', "High Conviction Setup")
                     }
-            except Exception: return None
+            except Exception:
+                return None
             return None
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        # 3. Parallel Execution (Fast Scan)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(analyze_symbol, vip_assets))
 
         leaderboard = [r for r in results if r is not None]
 
+        # 4. Final Decision
         if not leaderboard:
-            result = {"status": "empty", "trade": {"symbol": "MARKET", "bias": "NEUTRAL", "explanation": "Low Volatility / Chop Detected", "entry": 0, "stop": 0, "target": 0}}
+            # EMPTY RESULT -> Triggers "Capital Preserved" Modal on Frontend
+            result = {
+                "status": "empty",
+                "trade": {
+                    "symbol": "MARKET",
+                    "bias": "NEUTRAL",
+                    "explanation": "No confirmed setups. Capital Preserved.",
+                    "entry": 0, "stop": 0, "target": 0
+                }
+            }
         else:
+            # Success -> Show Best Trade
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
             result = {"status": "success", "trade": leaderboard[0]}
 
+        # Cache Result
         cache.set("alpha_opportunity_v1", result, 300)
         return Response(result)

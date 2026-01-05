@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -82,15 +84,17 @@ WSGI_APPLICATION = 'reelioo.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# 1️⃣ If Postgres is present, use it
 if os.getenv("DATABASE_URL"):
-    import dj_database_url
     DATABASES = {
         "default": dj_database_url.parse(
             os.getenv("DATABASE_URL"),
             conn_max_age=600,
         )
     }
-else:
+
+# 2️⃣ Railway production → SQLite on volume
+elif os.getenv("RAILWAY_ENVIRONMENT") == "production":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -98,6 +102,15 @@ else:
             "OPTIONS": {
                 "timeout": 20,
             }
+        }
+    }
+
+# 3️⃣ Local development → normal SQLite
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }
 # If REDIS_URL exists (e.g. on Railway), use Redis.

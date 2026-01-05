@@ -4,256 +4,205 @@ from __future__ import annotations
 from types import SimpleNamespace
 import pandas as pd
 import numpy as np
-import xgboost as xgb
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-import os
 import logging
-from core.quant.ml_training.feature_engineering import generate_features, FEATURES
-
-# --- Flow Bridge Import ---
-from core.quant.flow_bridge import get_btc_flow_snapshot
+from core.quant.feature_engineering import generate_features
 
 log = logging.getLogger(__name__)
 
 
-class CryptoQuantEngine:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_DIR = os.path.join(BASE_DIR, "ml_models")
+def cap(x, limit=3.0):
+    """Bounds a value to prevent outliers from hijacking the score."""
+    return max(-limit, min(limit, x))
 
-    # Paths to your trained models
-    PATHS = {
-        "xgb_long": os.path.join(MODEL_DIR, "xgb_long.json"),
-        "xgb_short": os.path.join(MODEL_DIR, "xgb_short.json"),
-        "lgb_long": os.path.join(MODEL_DIR, "lgb_long.txt"),
-        "lgb_short": os.path.join(MODEL_DIR, "lgb_short.txt"),
-        "cat_long": os.path.join(MODEL_DIR, "cat_long.cbm"),
-        "cat_short": os.path.join(MODEL_DIR, "cat_short.cbm"),
-        "flow_model": os.path.join(MODEL_DIR, "flow_model.json"),
-    }
+
+class CryptoQuantEngine:
+    """
+    REELIOO QUANT PHYSICS ENGINE (v5.3 – Price Fix)
+
+    - Bounded Factors & Regime Awareness (Production Safety)
+    - WATCH State: Yellow Color, Bias = "WATCH"
+    - UI Fix: 'entry' always returns CURRENT PRICE (so header isn't $--)
+    - Targets (SL/TP) remain 0.0 unless Confirmed.
+    """
 
     def __init__(self):
-        self.models = {}
+        self.SIGMOID_K = 0.45
+        self.CONFIRMATION_THRESH = 70
+        log.info("🚀 QuantPhysicsEngine v5.3 (Price Fix) Initialized")
 
-    def _load_models(self):
-        if self.models: return self.models
+    def _sigmoid(self, x):
+        return 100 / (1 + np.exp(-self.SIGMOID_K * x))
+
+    def analyze(self, df: pd.DataFrame, trade_style: str = "DAY") -> SimpleNamespace:
         try:
-            # --- 1. XGBOOST ---
-            self.models['xgb_long'] = xgb.Booster(model_file=self.PATHS['xgb_long'])
-            self.models['xgb_long'].set_param({"predictor": "cpu_predictor", "nthread": 1})
-
-            self.models['xgb_short'] = xgb.Booster(model_file=self.PATHS['xgb_short'])
-            self.models['xgb_short'].set_param({"predictor": "cpu_predictor", "nthread": 1})
-
-            # Load Flow Model (Silent fail allowed)
-            if os.path.exists(self.PATHS['flow_model']):
-                self.models['flow_model'] = xgb.Booster(model_file=self.PATHS['flow_model'])
-                self.models['flow_model'].set_param({"predictor": "cpu_predictor", "nthread": 1})
-
-            # --- 2. LIGHTGBM ---
-            self.models['lgb_long'] = lgb.Booster(model_file=self.PATHS['lgb_long'])
-            self.models['lgb_short'] = lgb.Booster(model_file=self.PATHS['lgb_short'])
-
-            # --- 3. CATBOOST ---
-            self.models['cat_long'] = CatBoostClassifier()
-            self.models['cat_long'].load_model(self.PATHS['cat_long'])
-
-            self.models['cat_short'] = CatBoostClassifier()
-            self.models['cat_short'].load_model(self.PATHS['cat_short'])
-
+            df = generate_features(df)
+            last = df.iloc[-1]
         except Exception as e:
-            log.error(f"Model Loading Error: {e}")
-            pass
-        return self.models
+            return self._neutral_result(0, f"Data Error: {e}")
 
-    def analyze(self, df: pd.DataFrame, trade_style: str = "DAY"):
-        df = generate_features(df)
-        last = df.iloc[-1]
+        price = float(last["close"])
 
-        # Prepare row for ML
-        row_df = pd.DataFrame([last])[FEATURES].astype(float)
+        # ------------------------------------------------------------------
+        # 1. REGIME DETECTION
+        # ------------------------------------------------------------------
+        er = float(last.get("efficiency_ratio", 0.5))
+        regime_label = "TRENDING" if er > 0.4 else "CHOPPY"
 
-        models = self._load_models()
-        if not models:
-            return self._neutral_result(last['close'], "System Booting")
+        # ------------------------------------------------------------------
+        # 2. ALPHA FACTORS (PHYSICS)
+        # ------------------------------------------------------------------
+        # Trend
+        ema_diff = cap(last.get("ema_diff", 0) * 100)
+        rsi_z = cap((last.get("rsi_14", 50) - 50) / 15)
+        trend_alpha = (ema_diff * 1.5 + rsi_z) * (1.0 if regime_label == "TRENDING" else 0.5)
+        trend_alpha = cap(trend_alpha)
 
-        # 1. GET RAW PRICE PROBABILITIES
-        pL, pS = 0.0, 0.0
-        try:
-            dmat = xgb.DMatrix(row_df)
+        # Whale
+        whale_z = cap(float(last.get("whale_z", 0)))
 
-            pL = (float(models['xgb_long'].predict(dmat)[0]) +
-                  float(models['lgb_long'].predict(row_df)[0]) +
-                  float(models['cat_long'].predict_proba(row_df)[0][1])) / 3 * 100
+        # Reversion
+        vwap_z = cap(last.get("vwap_dist", 0) * 100)
+        reversion_alpha = -vwap_z * (2.0 if regime_label == "CHOPPY" else 1.2)
+        reversion_alpha = cap(reversion_alpha)
 
-            pS = (float(models['xgb_short'].predict(dmat)[0]) +
-                  float(models['lgb_short'].predict(row_df)[0]) +
-                  float(models['cat_short'].predict_proba(row_df)[0][1])) / 3 * 100
-        except Exception as e:
-            log.error(f"Prediction Error: {e}")
-            return self._neutral_result(last['close'], "Model Error")
+        # Events
+        event_alpha = 0.0
+        if int(last.get("liq_sweep", 0)) == 1:
+            event_alpha += 2.0
+        elif int(last.get("liq_sweep", 0)) == -1:
+            event_alpha -= 2.0
 
-        # ---------------------------------------------------------
-        # 🟢 FLOW INTELLIGENCE LAYER
-        # ---------------------------------------------------------
-        flow_score = 0.5  # Default Neutral
-        flow_veto = False
-        flow_narrative = ""
+        if int(last.get("cvd_divergence", 0)) == 1:
+            event_alpha += 1.5
+        elif int(last.get("cvd_divergence", 0)) == -1:
+            event_alpha -= 1.5
+        event_alpha = cap(event_alpha)
 
-        if trade_style != "SCALP" and 'flow_model' in models:
-            try:
-                flow_data = get_btc_flow_snapshot()
-                if flow_data is not None:
-                    dmat_flow = xgb.DMatrix(flow_data, feature_names=["liq_pressure", "funding_z"])
-                    flow_score = float(models['flow_model'].predict(dmat_flow)[0])
-            except Exception as ex:
-                log.warning(f"Flow Inference Failed: {ex}")
+        # ------------------------------------------------------------------
+        # 3. PROBABILITY
+        # ------------------------------------------------------------------
+        raw_alpha = trend_alpha + whale_z + reversion_alpha + event_alpha
+        final_probability = self._sigmoid(raw_alpha)
 
-        # ---------------------------------------------------------
-        # 🔴 LOGIC: CALIBRATION & VETO (PURIST MODE)
-        # ---------------------------------------------------------
+        # Stability Dampener (Fakeout Filter)
+        vol_slope = float(last.get("volatility_slope", 0))
+        if vol_slope > 0.25 and abs(whale_z) < 1.0:
+            final_probability = 50 + (final_probability - 50) * 0.75
 
-        # A) CALIBRATION: Boost REMOVED to prevent hallucination.
-        # We only keep the PENALTY (Veto) to save us from bad trades.
-        if pL > pS:
-            # if flow_score > 0.70: pL += 5.0  <-- DELETED (No Artificial Boost)
-            if flow_score < 0.30: pL -= 10.0   # Veto Kept
+        # ------------------------------------------------------------------
+        # 4. INITIAL BIAS & SCORE
+        # ------------------------------------------------------------------
+        if final_probability > 55:
+            bias = "LONG"
+            score = final_probability
+        elif final_probability < 45:
+            bias = "SHORT"
+            score = 100 - final_probability
         else:
-            # if flow_score < 0.30: pS += 5.0  <-- DELETED (No Artificial Boost)
-            if flow_score > 0.70: pS -= 10.0   # Veto Kept
-
-        # B) SELECT BIAS
-        bias = "HOLD"
-        score = max(pL, pS)
-
-        # Context Variables
-        rsi = last['rsi_14']
-        vwap_dist = last['vwap_dist']
-        liq_sweep = last.get('liq_sweep', 0)
-        vol_slope = last.get('volatility_slope', 0)
-        ema_20 = last['ema_20']
-        ema_50 = last['ema_50']
-        price = last['close']
-
-        # TREND DEFINITIONS
-        is_uptrend = (price > ema_20) and (ema_20 > ema_50)
-        is_weakness = (price < ema_20)
-
-        # --- THRESHOLDS (TIGHTENED) ---
-        # Increased to 75% to filter out "maybe" trades
-        LONG_THRESH = 75.0
-        SHORT_THRESH = 75.0
-
-        if trade_style == "SCALP":
-            # Scalps are faster, so we allow slightly lower conviction
-            LONG_THRESH -= 5.0
-            SHORT_THRESH -= 5.0
-
-        if pL > LONG_THRESH:
-            if rsi < 75 and vwap_dist < 0.04:
-                if is_uptrend or vol_slope > 0.1 or liq_sweep == 1:
-                    bias = "LONG"
-                    score = pL
-                    if liq_sweep == 1: score += 5
-
-        elif pS > SHORT_THRESH:
-            if rsi > 25 and vwap_dist > -0.04:
-                if is_weakness or vol_slope > 0.2:
-                    bias = "SHORT"
-                    score = pS
-                    if liq_sweep == -1: score += 5
-
-        # Safety Valves
-        if bias == "LONG" and not is_uptrend and trade_style != "SCALP":
-            if liq_sweep != 1: bias = "HOLD"
-
-        if bias == "SHORT" and not is_weakness:
             bias = "HOLD"
+            score = 50
 
-        # C) FLOW VETO
-        if trade_style != "SCALP" and bias != "HOLD":
-            if bias == "LONG" and flow_score < 0.25:
-                bias = "HOLD"
-                flow_veto = True
-                flow_narrative = "Global BTC liquidations contradict Long setup."
-            elif bias == "SHORT" and flow_score > 0.75:
-                bias = "HOLD"
-                flow_veto = True
-                flow_narrative = "Global BTC liquidations contradict Short setup."
+        # Score Compression
+        score = 50 + (score - 50) * 0.85
 
-        # 3. TRADE MANAGEMENT
-        atr = float(last.get('atr_14', price * 0.01))
+        # ------------------------------------------------------------------
+        # 5. VISUAL STATE & LOGIC
+        # ------------------------------------------------------------------
+        thresh = self.CONFIRMATION_THRESH - (5 if trade_style == "SCALP" else 0)
 
-        if trade_style == "SCALP":
-            stop_mult, tgt_mult, duration = 1.0, 1.5, "15m - 2h"
-        elif trade_style == "SWING":
-            stop_mult, tgt_mult, duration = 2.5, 4.0, "1 - 3 Days"
-        else:  # DAY
-            stop_mult, tgt_mult, duration = 1.5, 1.5, "4h - 24h"
+        regime_color = "gray"
+        display_bias = bias
 
-        calc_dir = "LONG" if (bias == "LONG" or (bias == "HOLD" and pL >= pS)) else "SHORT"
+        # FIX: Entry is ALWAYS price (so header shows price)
+        entry = price
 
-        if calc_dir == "LONG":
-            stop = price - (atr * stop_mult)
-            t1 = price + (atr * tgt_mult)
+        # Trade Levels default to 0.0 (Hidden)
+        stop, t1, t2, t3 = 0.0, 0.0, 0.0, 0.0
+        expected_duration = "--"
+
+        # A. CONFIRMED TRADE (GREEN/RED)
+        if score >= thresh:
+            regime_color = "green" if bias == "LONG" else "red"
+            display_bias = bias  # Keep LONG/SHORT
+
+            # Calculate Targets ONLY if Confirmed
+            atr = float(last.get("atr_14", price * 0.01))
+            stop_mult, tgt_mult = (1.0, 1.5) if trade_style == "SCALP" else (1.5, 3.0)
+            direction = 1 if bias == "LONG" else -1
+
+            stop = price - direction * atr * stop_mult
+            t1 = price + direction * atr * tgt_mult
+            t2 = t1 + (abs(t1 - price) * 0.5) * direction
+            t3 = t1 + abs(t1 - price) * direction
+
+            expected_duration = "4h - 24h"
+
+        # B. WATCHING STATE (YELLOW)
+        elif score >= 60:
+            regime_color = "yellow"
+            display_bias = "WATCH"
+            # Targets remain 0.0, but entry is visible
+
+        # C. SLEEPING STATE (GRAY)
         else:
-            stop = price + (atr * stop_mult)
-            t1 = price - (atr * tgt_mult)
+            regime_color = "gray"
+            display_bias = "HOLD"
+            # Targets remain 0.0, but entry is visible
 
-        # 4. EXPLAINABILITY
+        # ------------------------------------------------------------------
+        # 6. EXPLAINABILITY
+        # ------------------------------------------------------------------
         drivers = []
-        if vol_slope > 0.1: drivers.append({"feature": "Energy", "desc": "VOLATILITY SPIKE", "importance": 95})
-        if abs(vwap_dist) < 0.01: drivers.append({"feature": "Value", "desc": "FAIR VALUE ENTRY", "importance": 85})
-        if liq_sweep != 0: drivers.append({"feature": "Trap", "desc": "STOP HUNT", "importance": 90})
+        if abs(whale_z) > 1.2:
+            drivers.append({"feature": "Volume", "desc": "Whale Activity", "importance": 90})
+        if abs(event_alpha) > 1.0:
+            drivers.append({"feature": "Event", "desc": "Liquidity Trap", "importance": 85})
+        if regime_label == "TRENDING" and abs(trend_alpha) > 1.0:
+            drivers.append({"feature": "Trend", "desc": "Market Structure", "importance": 80})
 
-        if abs(flow_score - 0.5) > 0.3:
-            lbl = "BULLISH FLOW" if flow_score > 0.5 else "BEARISH FLOW"
-            drivers.append({"feature": "On-Chain", "desc": lbl, "importance": 88})
+        narrative = self._build_narrative(display_bias, score, regime_label)
 
-        if not drivers: drivers.append({"feature": "Trend", "desc": "AI MOMENTUM", "importance": 80})
-
-        dist = abs(t1 - price)
-        narrative = self._generate_narrative(bias, drivers, rsi, is_uptrend, liq_sweep, flow_veto, flow_narrative)
+        # Risk Reward Calc
+        rr_ratio = 0.0
+        if stop != 0:
+            risk = abs(entry - stop)
+            reward = abs(t1 - entry)
+            if risk > 0:
+                rr_ratio = round(reward / risk, 2)
 
         return SimpleNamespace(
-            bias=bias,
-            score=int(min(99, round(score))),
-            entry=price,
+            bias=display_bias,
+            score=int(score),
+            entry=entry,  # FIX: Always returns current price
             stop=round(stop, 4),
             target1=round(t1, 4),
-            target2=round(t1 + (dist * 0.5), 4),
-            target3=round(t1 + dist, 4),
-            rr_ratio=round(tgt_mult / stop_mult, 2),
-            expected_duration=duration,
-            regime="LIQUIDITY RUN" if liq_sweep != 0 else "TREND",
-            regime_color="green" if bias == "LONG" else "red" if bias == "SHORT" else "gray",
-            whale_zscore=round(float(last.get('whale_z', 0)), 2),
-            whale_label="Whale Active" if abs(last.get('whale_z', 0)) > 2.0 else "Normal",
+            target2=round(t2, 4),
+            target3=round(t3, 4),
+            rr_ratio=rr_ratio,
+            expected_duration=expected_duration,
+            regime=regime_label,
+            regime_color=regime_color,
+            whale_zscore=round(whale_z, 2),
+            whale_label="High" if abs(whale_z) > 1.5 else "Normal",
             top_features=drivers,
             narrative=narrative,
-            flow_score=round(flow_score, 2)
+            flow_score=0.5
         )
 
-    def _generate_narrative(self, bias, drivers, rsi, is_uptrend, liq_sweep, flow_veto, flow_narrative):
-        if flow_veto:
-            return f"Trade Vetoed: {flow_narrative}"
-
+    def _build_narrative(self, bias, score, regime):
         if bias == "HOLD":
-            return "Market noise. Waiting for clear structure."
+            return f"Neutral market ({regime.lower()}). Waiting for volume."
+        if bias == "WATCH":
+            return f"Momentum building ({score}%). Waiting for trigger."
 
-        main_driver = drivers[0]['desc'] if drivers else "MOMENTUM"
+        strength = "Strong" if score > 80 else "Moderate"
+        return f"{strength} Signal detected in {regime.lower()} conditions."
 
-        if liq_sweep != 0: return "Whales swept liquidity stops. Reversal imminent."
-        if "VOLATILITY" in main_driver: return "Volatility expansion detected. Fast move expected."
-        if "FAIR VALUE" in main_driver: return "Price reclaimed VWAP baseline. Institutional entry zone."
-        if "FLOW" in main_driver: return "Smart money flows are aggressively supporting this direction."
-
-        return "Trend alignment confirmed with strong volume."
-
-    def _neutral_result(self, price, reason="Neutral"):
+    def _neutral_result(self, price, reason):
+        # FIX: entry=price here too
         return SimpleNamespace(
-            bias="HOLD", score=50, entry=price, stop=price, target1=price, target2=price,
-            target3=price, rr_ratio=0, expected_duration="--", regime=reason,
+            bias="HOLD", score=50, entry=price, stop=0.0, target1=0.0, target2=0.0,
+            target3=0.0, rr_ratio=0, expected_duration="--", regime="WAIT",
             regime_color="gray", whale_zscore=0, whale_label="Normal", top_features=[],
-            narrative="System initializing data streams...", flow_score=0.5
+            narrative=reason, flow_score=0.5
         )

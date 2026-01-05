@@ -3,7 +3,7 @@
 {% block content %}
 <div class="relative font-sans text-slate-300 overflow-x-hidden bg-[#020202]">
 
-    <section class="relative pt-32 pb-20 px-6 text-center max-w-7xl mx-auto z-10">
+    <section class="relative pt-32 pb-20 px-4 sm:px-6 text-center max-w-7xl mx-auto z-10">
 
         <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] -z-10"></div>
         <div class="fixed inset-0 pointer-events-none opacity-10"
@@ -16,41 +16,40 @@
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            Regime Detection: Active
+            Physics Engine v5.4: Online
         </div>
 
-        <h1 class="text-5xl md:text-7xl font-black text-white mb-6 leading-[1.1] tracking-tight animate-fade-in-up delay-100">
-            The Crypto Trend <br>
+        <h1 class="text-4xl sm:text-5xl md:text-7xl font-black text-white mb-6 leading-[1.1] tracking-tight animate-fade-in-up delay-100">
+            Don't Predict. <br>
             <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
-                Intelligence Engine
+                Measure the Force.
             </span>
         </h1>
 
-        <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed animate-fade-in-up delay-200">
-            Stop guessing. Start forecasting. <br>
-            We analyze <strong>Volatility Regimes</strong> and <strong>Institutional Flow</strong> to alert you only when a high-momentum move is real.
+        <p class="max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-slate-400 mb-10 leading-relaxed animate-fade-in-up delay-200">
+            Markets follow laws of physics. We track <strong>Volatility Mass</strong>, <strong>Volume Velocity</strong>, and <strong>Liquidity Friction</strong> to identify the exact moment a trend becomes inevitable.
         </p>
 
         <div class="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in-up delay-300 relative z-30 mb-16" x-data="{ loading: false }">
             {% if user.is_authenticated %}
-                <a href="{% url 'terminal' %}" class="px-8 py-4 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                <a href="{% url 'terminal' %}" class="px-8 py-4 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.2)] text-sm sm:text-base">
                     LAUNCH TERMINAL
                 </a>
             {% else %}
-                <a href="{% url 'signup' %}" @click="loading = true" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-[0_0_30px_rgba(37,99,235,0.3)] flex items-center justify-center gap-2">
-                    <span x-show="!loading">START TRACKING REGIMES</span>
-                    <span x-show="loading" class="flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> SETUP...</span>
+                <a href="{% url 'signup' %}" @click="loading = true" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition shadow-[0_0_30px_rgba(37,99,235,0.3)] flex items-center justify-center gap-2 text-sm sm:text-base">
+                    <span x-show="!loading">START 21-DAY TRIAL</span>
+                    <span x-show="loading" class="flex items-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> INITIALIZING...</span>
                 </a>
-                <a href="#logic" class="px-8 py-4 bg-[#111] border border-white/10 text-slate-300 hover:text-white font-bold rounded-xl hover:bg-white/5 transition">
-                    HOW IT WORKS
+                <a href="#logic" class="px-8 py-4 bg-[#111] border border-white/10 text-slate-300 hover:text-white font-bold rounded-xl hover:bg-white/5 transition text-sm sm:text-base">
+                    THE LOGIC
                 </a>
             {% endif %}
         </div>
 
-        <div class="relative max-w-5xl mx-auto perspective-1000 animate-fade-in-up delay-300 group">
+        <div class="relative max-w-5xl mx-auto md:perspective-1000 animate-fade-in-up delay-300 group px-2 sm:px-0">
             <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition duration-700"></div>
 
-            <div class="relative bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden shadow-2xl transform rotate-x-2 transition hover:rotate-0 duration-700 ease-out">
+            <div class="relative bg-[#020202] border border-white/10 rounded-xl overflow-hidden shadow-2xl md:transform md:rotate-x-2 transition hover:rotate-0 duration-700 ease-out text-left">
 
                 <div class="bg-[#050505] border-b border-white/5 px-4 py-3 flex items-center gap-4">
                     <div class="flex gap-2">
@@ -63,75 +62,80 @@
                     </div>
                 </div>
 
-                <div class="p-6 md:p-10 grid md:grid-cols-12 gap-8 bg-[#020202]">
-                    <div class="md:col-span-8 space-y-8">
-                        <div class="flex justify-between items-start">
+                <div class="p-4 sm:p-6 md:p-10 grid gap-6">
+
+                    <div class="border rounded-2xl p-6 md:p-10 relative overflow-hidden flex flex-col justify-center bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                        <div class="absolute inset-0 blur-3xl opacity-100 bg-emerald-500/10"></div>
+
+                        <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-0">
                             <div>
-                                <div class="flex items-center gap-3 mb-2">
-                                    <h2 class="text-5xl font-black text-white">BTC/USDT</h2>
-                                    <span class="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded uppercase">Trend Active</span>
+                                <div class="flex items-center gap-3 mb-2 flex-wrap">
+                                     <span class="text-[10px] bg-white/5 border border-white/10 text-slate-400 px-2 py-1 rounded tracking-widest uppercase font-bold">SIGNAL</span>
+                                     <h2 class="text-sm font-bold text-slate-500 tracking-widest uppercase">BTCUSDT</h2>
+                                     <span class="text-sm font-bold text-white tracking-widest">$98,420.00</span>
+                                     <span class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all text-emerald-400 border-emerald-500/20 bg-emerald-500/10">TRENDING</span>
                                 </div>
-                                <div class="flex items-center gap-4 text-xs font-mono text-slate-500">
-                                    <span>VOLATILITY: <b class="text-white">EXPANSION</b></span>
-                                    <span>REGIME: <b class="text-white">High Momentum</b></span>
+
+                                <div class="flex items-baseline gap-4">
+                                    <h1 class="text-5xl md:text-8xl font-black tracking-tighter leading-none text-emerald-400">LONG</h1>
+                                </div>
+
+                                <p class="mt-1 text-[10px] text-slate-400 font-mono uppercase tracking-wider">Valid for ~4h - 24h</p>
+
+                                <div class="flex items-center gap-3 mt-4">
+                                     <button class="flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 border border-white/10 px-4 py-2 rounded">
+                                        <i data-lucide="bookmark" class="w-3 h-3"></i> SAVE
+                                    </button>
+                                    <button class="flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-transparent border border-white/10 px-4 py-2 rounded">
+                                        <i data-lucide="history" class="w-3 h-3"></i> BACKTEST
+                                    </button>
                                 </div>
                             </div>
-                            <div class="relative">
-                                <svg class="w-20 h-20 -rotate-90">
-                                    <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#1e293b" fill="transparent"/>
-                                    <circle cx="40" cy="40" r="36" stroke-width="6" stroke="#10b981" fill="transparent" stroke-dasharray="226" stroke-dashoffset="40" class="drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]"/>
-                                </svg>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span class="text-xl font-bold text-white">84%</span>
-                                </div>
+
+                            <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0">
+                                 <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Signal Strength</span>
+                                 <div class="flex items-center md:justify-end gap-3">
+                                     <span class="text-5xl md:text-7xl font-bold text-white tracking-tighter">84%</span>
+                                 </div>
+                                 <div class="mt-2 text-right hidden md:block">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">MARKET SCANNING...</span>
+                                 </div>
                             </div>
                         </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="p-6 bg-emerald-900/10 border border-emerald-500/30 rounded-xl flex flex-col items-center justify-center relative overflow-hidden">
-                                <div class="absolute inset-0 bg-emerald-500/5 blur-xl"></div>
-                                <span class="text-[10px] uppercase text-emerald-300 font-bold mb-1 relative z-10">Bias</span>
-                                <span class="text-3xl font-black text-emerald-400 relative z-10">LONG</span>
+                    </div>
+                    <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h4 class="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                                <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i> Logic Vectors
+                            </h4>
+                            <span class="text-[9px] text-slate-500 font-mono">ML EXPLAINABILITY</span>
+                        </div>
+                        <div class="space-y-5">
+                            <div class="mb-4">
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                        <i data-lucide="activity" class="w-3 h-3 text-slate-400"></i> VOLATILITY EXPANSION
+                                    </span>
+                                    <span class="text-[10px] font-mono text-slate-400">95.0</span>
+                                </div>
+                                <div class="w-full bg-[#111] h-1.5 rounded-full overflow-hidden">
+                                    <div class="h-full bg-slate-500 rounded-full w-[95%]"></div>
+                                </div>
                             </div>
-                            <div class="p-6 bg-[#111] border border-white/10 rounded-xl flex flex-col justify-center">
-                                <span class="text-[10px] uppercase text-slate-500 font-bold mb-1">Execution</span>
-                                <div class="flex items-center gap-2">
-                                    <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    <span class="text-sm font-bold text-white">ENTRY ZONE VALID</span>
+                            <div class="mb-4">
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                        <i data-lucide="activity" class="w-3 h-3 text-slate-400"></i> INSTITUTIONAL FLOW
+                                    </span>
+                                    <span class="text-[10px] font-mono text-slate-400">88.0</span>
+                                </div>
+                                <div class="w-full bg-[#111] h-1.5 rounded-full overflow-hidden">
+                                    <div class="h-full bg-slate-500 rounded-full w-[88%]"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div class="md:col-span-4 space-y-4">
-                        <div class="bg-[#0a0a0a] border border-white/10 p-5 rounded-xl">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase mb-4 tracking-widest">Logic Vectors</h4>
-                            <div class="space-y-3">
-                                <div>
-                                    <div class="flex justify-between text-[10px] mb-1">
-                                        <span class="text-cyan-400 font-bold">VOLATILITY EXPANSION</span>
-                                        <span class="text-slate-400">92/100</span>
-                                    </div>
-                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-cyan-400 h-1 rounded-full w-[92%]"></div></div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between text-[10px] mb-1">
-                                        <span class="text-blue-400 font-bold">ORDER FLOW</span>
-                                        <span class="text-slate-400">85/100</span>
-                                    </div>
-                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-blue-400 h-1 rounded-full w-[85%]"></div></div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between text-[10px] mb-1">
-                                        <span class="text-purple-400 font-bold">TREND ALIGNMENT</span>
-                                        <span class="text-slate-400">78/100</span>
-                                    </div>
-                                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="bg-purple-400 h-1 rounded-full w-[78%]"></div></div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                </div>
             </div>
         </div>
     </section>
@@ -141,45 +145,45 @@
 
             <div class="order-2 md:order-1">
                 <span class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 block">The Philosophy</span>
-                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">Trade when the market wants to move.</h2>
-                <div class="space-y-6 text-slate-400 leading-relaxed">
+                <h2 class="text-3xl md:text-4xl font-black text-white mb-6">AI guesses. Physics knows.</h2>
+                <div class="space-y-6 text-slate-400 leading-relaxed text-sm sm:text-base">
                     <p>
-                        Most "signal" tools fail because they try to predict every candle. That's mathematically impossible.
+                        Most trading tools fail because they try to predict the future using "Black Box" AI. But markets change, and AI hallucinates.
                     </p>
                     <p>
-                        Reelioo is different. We ignore <strong>80% of the chop</strong>. Our engine only wakes up when the "Regime Model" detects a high probability of <strong>Volatility Expansion</strong>.
+                        Reelioo uses <strong>Deterministic Physics</strong>. We don't guess what will happen next. We measure the <strong>imbalance of forces</strong> happening <em>right now</em>.
                     </p>
                     <div class="pl-4 border-l-2 border-emerald-500">
-                        <p class="text-white italic font-medium">"Silence is a feature. We protect your capital during the noise so you have it ready for the trend."</p>
+                        <p class="text-white italic font-medium">"If Buyers > Sellers AND Volatility > Resistance, Price MUST go up. That is not a prediction. It is mechanics."</p>
                     </div>
                 </div>
             </div>
 
             <div class="order-1 md:order-2 relative">
                 <div class="absolute inset-0 bg-blue-600/10 blur-[60px] rounded-full"></div>
-                <div class="relative bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 shadow-2xl">
-                    <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">The Reelioo Difference</h3>
+                <div class="relative bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl">
+                    <h3 class="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">The Quant Advantage</h3>
                     <div class="space-y-4">
                         <div class="grid grid-cols-2 text-xs uppercase font-bold text-slate-500 tracking-widest mb-2">
-                            <span>Typical App</span>
-                            <span class="text-emerald-500 text-right">Reelioo</span>
+                            <span>Retail Tools</span>
+                            <span class="text-emerald-500 text-right">Reelioo Engine</span>
                         </div>
 
                         <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
-                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> 30 Signals / Day</span>
-                            <span class="text-sm text-white font-bold text-right">2-3 High Quality</span>
+                            <span class="text-xs sm:text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Lagging Indicators</span>
+                            <span class="text-xs sm:text-sm text-white font-bold text-right">Real-time Forces</span>
                         </div>
                         <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
-                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> RSI / MACD Toys</span>
-                            <span class="text-sm text-white font-bold text-right">Regime AI Models</span>
+                            <span class="text-xs sm:text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Probabilistic Guesses</span>
+                            <span class="text-xs sm:text-sm text-white font-bold text-right">Deterministic Logic</span>
                         </div>
                         <div class="grid grid-cols-2 items-center py-3 border-b border-white/5">
-                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Ignored Chop</span>
-                            <span class="text-sm text-white font-bold text-right">Filtered Chop</span>
+                            <span class="text-xs sm:text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Trades Chop</span>
+                            <span class="text-xs sm:text-sm text-white font-bold text-right">Filters Chop</span>
                         </div>
                         <div class="grid grid-cols-2 items-center py-3">
-                            <span class="text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> "Guessing"</span>
-                            <span class="text-sm text-white font-bold text-right">Forecasting</span>
+                            <span class="text-xs sm:text-sm text-slate-400 flex items-center gap-2"><span class="text-red-500">✖</span> Black Box</span>
+                            <span class="text-xs sm:text-sm text-white font-bold text-right">White Box (Logic)</span>
                         </div>
                     </div>
                 </div>
@@ -190,41 +194,41 @@
 
     <section id="logic" class="py-32 px-6 max-w-7xl mx-auto">
         <div class="text-center mb-20">
-            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">The 3-Model Architecture.</h2>
-            <p class="text-slate-400 max-w-2xl mx-auto">We don't rely on one metric. A signal is only generated when three distinct intelligence layers align.</p>
+            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">The 3 Forces of Price.</h2>
+            <p class="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">We don't use 100 indicators. We measure the three fundamental forces that drive 99% of all market moves.</p>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-blue-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-6 border border-blue-500/20 group-hover:scale-110 transition">
-                    <span class="text-2xl">🌐</span>
+                    <span class="text-2xl">🛑</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">1. Regime Model</h3>
-                <p class="text-xs font-mono text-blue-400 mb-3">TIMEFRAME: 4H</p>
+                <h3 class="text-xl font-bold text-white mb-3">1. The Regime (Friction)</h3>
+                <p class="text-xs font-mono text-blue-400 mb-3">STATE DETECTION</p>
                 <p class="text-sm text-slate-400 leading-relaxed">
-                    Detects the global market state. Is it Trending? Chopping? Or transitioning? If the Regime is "Low Volatility," the system stays silent.
+                    Is the market efficient or chaotic? If volatility entropy is high (Chop), we assume high friction and <strong>block all signals</strong> to preserve capital.
                 </p>
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-purple-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 border border-purple-500/20 group-hover:scale-110 transition">
-                    <span class="text-2xl">🧭</span>
+                    <span class="text-2xl">🌊</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">2. Direction Model</h3>
-                <p class="text-xs font-mono text-purple-400 mb-3">TIMEFRAME: 1H</p>
+                <h3 class="text-xl font-bold text-white mb-3">2. The Whale (Mass)</h3>
+                <p class="text-xs font-mono text-purple-400 mb-3">VOLUME ANOMALY</p>
                 <p class="text-sm text-slate-400 leading-relaxed">
-                    Once a trend is confirmed, this layer calculates the probability of Bullish vs Bearish pressure using Order Flow and Momentum Physics.
+                    Price requires mass to move. We track institutional volume anomalies (Z-Scores). If whales aren't participating, the move is fake.
                 </p>
             </div>
 
             <div class="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl hover:border-emerald-500/50 transition duration-300 group">
                 <div class="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-6 border border-emerald-500/20 group-hover:scale-110 transition">
-                    <span class="text-2xl">⚡</span>
+                    <span class="text-2xl">🪤</span>
                 </div>
-                <h3 class="text-xl font-bold text-white mb-3">3. Breakout Model</h3>
-                <p class="text-xs font-mono text-emerald-400 mb-3">TIMEFRAME: 15M</p>
+                <h3 class="text-xl font-bold text-white mb-3">3. The Trap (Trigger)</h3>
+                <p class="text-xs font-mono text-emerald-400 mb-3">LIQUIDITY SWEEPS</p>
                 <p class="text-sm text-slate-400 leading-relaxed">
-                    The final check. Is there enough immediate volume to sustain the move? This prevents buying "fakeouts" and times the perfect entry.
+                    The final catalyst. We look for "Stop Hunts"—moments where retail traders are trapped, providing the fuel for the real reversal.
                 </p>
             </div>
         </div>
@@ -236,8 +240,8 @@
             <div class="relative bg-[#050505] rounded-2xl p-1 overflow-hidden">
                 <div class="bg-[#0a0a0a] rounded-xl p-8 border border-white/5 relative z-10 h-full flex flex-col text-center">
 
-                    <h3 class="text-xl font-bold text-white mb-2">Reelioo Black</h3>
-                    <p class="text-xs text-slate-500 mb-6">Institutional Intelligence for Retail</p>
+                    <h3 class="text-xl font-bold text-white mb-2">Reelioo Quant</h3>
+                    <p class="text-xs text-slate-500 mb-6">Institutional Grade. Retail Access.</p>
 
                     <div class="flex items-baseline justify-center gap-1 mb-8">
                         <span class="text-5xl font-black text-white tracking-tight">$19</span>
@@ -245,9 +249,9 @@
                     </div>
 
                     <div class="space-y-4 mb-8 text-left pl-4">
-                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Full Regime Detection</div>
-                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Volatility & Breakout Signals</div>
-                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Confidence Scoring</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Physics-Based Engine (No AI)</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Regime & Chop Filtering</div>
+                        <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Whale Volume Tracking</div>
                         <div class="flex items-center gap-3 text-sm text-slate-300"><span class="text-emerald-400">✔</span> Unlimited Scans</div>
                     </div>
 
