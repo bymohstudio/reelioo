@@ -12,45 +12,56 @@ class MarketService:
     BASE_SPOT = "https://api.binance.com/api/v3"
     BASE_FUT = "https://fapi.binance.com/fapi/v1"
 
-    # -------------------------
-    #  1. EXCHANGE INFO (Cached)
-    # -------------------------
+    # =========================================================
+    # 1. EXCHANGE INFO (SYMBOL DISCOVERY)
+    # =========================================================
     @staticmethod
     def _load_exchange_info():
-        cache_key = "exchange_info_v2_csv"
+        cache_key = "exchange_info_v9"
         cached = cache.get(cache_key)
-        if cached: return cached
+        if cached:
+            log.info("🧠 [EXCHANGE] Loaded symbols from cache")
+            return cached
 
         results = []
-        global_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
+        csv_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
 
-        # 1. Try Loading from local CSV
-        if os.path.exists(global_path):
+        # --- CSV FIRST (FAST + SAFE)
+        if os.path.exists(csv_path):
             try:
-                df_csv = pd.read_csv(global_path)
-                results = df_csv.to_dict("records")
+                df = pd.read_csv(csv_path)
+                results = df.to_dict("records")
+                log.info(f"✅ [EXCHANGE] Loaded {len(results)} symbols from CSV")
             except Exception as e:
-                log.error(f"Error reading Global CSV: {e}")
+                log.error(f"❌ [EXCHANGE] CSV read failed: {e}")
 
-        # 2. Fallback to live API (Futures First)
+        # --- BINANCE FUTURES FALLBACK
         if not results:
             try:
-                headers = {"User-Agent": "Mozilla/5.0"}
-                fapi = requests.get(f"{MarketService.BASE_FUT}/exchangeInfo", headers=headers, timeout=5).json()
-                if "symbols" in fapi:
-                    for s in fapi["symbols"]:
-                        if s["status"] == "TRADING" and s["quoteAsset"] == "USDT":
-                            results.append({"symbol": s["symbol"], "name": s["baseAsset"], "type": "PERP"})
+                r = requests.get(
+                    f"{MarketService.BASE_FUT}/exchangeInfo",
+                    timeout=5
+                )
+                data = r.json()
+                for s in data.get("symbols", []):
+                    if s["status"] == "TRADING" and s["quoteAsset"] == "USDT":
+                        results.append({
+                            "symbol": s["symbol"],
+                            "name": s["baseAsset"],
+                            "type": "PERP"
+                        })
+                log.info(f"🌐 [EXCHANGE] Loaded {len(results)} symbols from Binance")
             except Exception as e:
-                log.error(f"Binance API Fallback Failed: {e}")
+                log.error(f"❌ [EXCHANGE] Binance fallback failed: {e}")
 
-        # 3. Static Safety Net
+        # --- ABSOLUTE SAFETY NET
         if not results:
             results = [
-                {"symbol": "BTCUSDT", "name": "BTC", "type": "GLOBAL"},
-                {"symbol": "ETHUSDT", "name": "ETH", "type": "GLOBAL"},
-                {"symbol": "SOLUSDT", "name": "SOL", "type": "GLOBAL"}
+                {"symbol": "BTCUSDT", "name": "BTC", "type": "PERP"},
+                {"symbol": "ETHUSDT", "name": "ETH", "type": "PERP"},
+                {"symbol": "SOLUSDT", "name": "SOL", "type": "PERP"},
             ]
+            log.warning("⚠️ [EXCHANGE] Using static fallback symbols")
 
         cache.set(cache_key, results, timeout=3600)
         return results
@@ -58,84 +69,139 @@ class MarketService:
     @staticmethod
     def search_assets(query: str):
         query = (query or "").upper().strip()
-        if not query: return []
-        all_symbols = MarketService._load_exchange_info()
-        matches = [s for s in all_symbols if query in s["symbol"] or query in s["name"]]
-        return matches[:10]
+        if not query:
+            return []
+        symbols = MarketService._load_exchange_info()
+        return [s for s in symbols if query in s["symbol"] or query in s["name"]][:10]
 
-    # -------------------------
-    #  2. HISTORICAL DATA (PHYSICS READY)
-    # -------------------------
+    # =========================================================
+    # 2. HISTORICAL DATA (PHYSICS-GRADE)
+    # =========================================================
     @staticmethod
     def get_historical_data(symbol_input, market_type="PERP", trade_style="INTRADAY"):
-        # 1. Sanitize Symbol
+        # -------------------------------------------------
+        # 0. SYMBOL NORMALIZATION
+        # -------------------------------------------------
         if isinstance(symbol_input, dict):
             symbol = symbol_input.get("symbol")
         else:
-            raw = str(symbol_input).upper().strip().replace("/", "").replace("-", "")
-            symbol = f"{raw}USDT" if "USDT" not in raw else raw
+            raw = str(symbol_input).upper().replace("/", "").replace("-", "")
+            symbol = raw if raw.endswith("USDT") else f"{raw}USDT"
 
-        # 2. Interval Map (Optimized for Physics)
-        # Using 15m for Intraday to allow Kinetic Energy calculation
+        log.info(f"📊 [DATA] Requesting physics data for {symbol}")
+
+        # -------------------------------------------------
+        # 1. PHYSICS-SAFE INTERVALS (DO NOT CHANGE)
+        # -------------------------------------------------
         interval_map = {
             "SCALP": "5m",
             "INTRADAY": "15m",
-            "SWING": "4h",
-            "POSITION": "1d"
+            "SWING": "1h",
+            "POSITION": "4h",
         }
         interval = interval_map.get(trade_style, "15m")
 
-        # 3. Check Cache
-        cache_key = f"kline_v85:{symbol}:{interval}:{market_type}"
-        df = cache.get(cache_key)
+        # -------------------------------------------------
+        # 2. CACHE (GUARDED)
+        # -------------------------------------------------
+        cache_key = f"kline_phys_v9:{symbol}:{interval}:{market_type}"
+        MIN_ROWS = 2000
 
-        if df is None or df.empty:
-            # 4. Fetch from Binance (Multi-Page for depth)
-            base_url = MarketService.BASE_FUT if market_type in ["PERP", "FUTURES"] else MarketService.BASE_SPOT
-            limit = 1000
+        df = cache.get(cache_key)
+        if df is not None and isinstance(df, pd.DataFrame) and len(df) >= MIN_ROWS:
+            log.info(f"🧠 [CACHE] HIT {symbol} ({len(df)} candles)")
+        else:
+            if df is not None:
+                log.warning(
+                    f"♻️ [CACHE] INVALID {symbol} "
+                    f"(rows={0 if df is None else len(df)})"
+                )
+            df = None
+
+        # -------------------------------------------------
+        # 3. MULTI-PAGE FETCH (MANDATORY FOR PHYSICS)
+        # -------------------------------------------------
+        if df is None:
             klines = []
+            base_url = (
+                MarketService.BASE_FUT
+                if market_type in ["PERP", "FUTURES"]
+                else MarketService.BASE_SPOT
+            )
+
+            limit = 1500
+            start_ts = None
+            max_rows = 5000
 
             try:
-                # Fetch recent data
-                params = {"symbol": symbol, "interval": interval, "limit": limit}
-                resp = requests.get(f"{base_url}/klines", params=params, timeout=5)
+                while len(klines) < max_rows:
+                    params = {
+                        "symbol": symbol,
+                        "interval": interval,
+                        "limit": limit
+                    }
+                    if start_ts:
+                        params["endTime"] = start_ts
 
-                if resp.status_code == 200:
-                    batch = resp.json()
-                    if isinstance(batch, list):
-                        klines = batch
+                    r = requests.get(
+                        f"{base_url}/klines",
+                        params=params,
+                        timeout=10
+                    )
 
-                if not klines: return pd.DataFrame()
+                    if r.status_code != 200:
+                        log.error(f"❌ [BINANCE] Kline error {r.status_code}")
+                        break
 
-                # 5. Build DataFrame with PHYSICS COLUMNS
-                # 0:OpenTime, 1:Open, 2:High, 3:Low, 4:Close, 5:Vol, 6:CloseTime, 7:QuoteVol, 8:Trades, 9:TakerBase
-                df = pd.DataFrame(klines, columns=[
-                    "open_time", "open", "high", "low", "close", "volume",
-                    "close_time", "quote_volume", "trades", "taker_base",
-                    "taker_quote", "ignore"
-                ])
+                    batch = r.json()
+                    if not isinstance(batch, list) or not batch:
+                        break
+
+                    klines = batch + klines
+                    start_ts = batch[0][0] - 1
+
+                    if len(batch) < limit:
+                        break
+
+                if not klines:
+                    log.error(f"❌ [DATA] No candles received for {symbol}")
+                    return pd.DataFrame()
+
+                df = pd.DataFrame(
+                    klines,
+                    columns=[
+                        "open_time", "open", "high", "low", "close", "volume",
+                        "close_time", "quote_volume", "trades",
+                        "taker_base", "taker_quote", "ignore"
+                    ]
+                )
 
                 df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
                 df.set_index("timestamp", inplace=True)
 
-                # Convert to float
-                cols = ["open", "high", "low", "close", "volume",
-                        "quote_volume", "trades", "taker_base"]
+                cols = [
+                    "open", "high", "low", "close",
+                    "volume", "quote_volume", "trades", "taker_base"
+                ]
                 df = df[cols].astype(float)
 
-                # Cache ONLY if sufficient depth
-                if len(df) >= 50:
-                    cache.set(cache_key, df, timeout=60)  # 1 Minute Cache for Freshness
+                log.info(f"✅ [DATA] Fetched {len(df)} candles for {symbol}")
+
+                if len(df) >= MIN_ROWS:
+                    cache.set(cache_key, df, timeout=300)
+                    log.info(f"💾 [CACHE] Stored physics candles for {symbol}")
+                else:
+                    log.warning(
+                        f"⚠️ [DATA] Insufficient depth ({len(df)}) — NOT cached"
+                    )
 
             except Exception as e:
-                log.error(f"Physics Data Fetch Error: {e}")
+                log.exception(f"🔥 [DATA] Fetch failed for {symbol}: {e}")
                 return pd.DataFrame()
 
-        # ----------------------------
-        # 4. LIVE PRICE INJECTION
-        # ----------------------------
-        # Even if cached, fetch the REAL-TIME price to fix the "$ --" header bug
-        # This ensures the engine always has the exact current price.
+        # -------------------------------------------------
+        # 4. LIVE PRICE (EXECUTION / DISPLAY ONLY)
+        # -------------------------------------------------
         try:
             r = requests.get(
                 f"{MarketService.BASE_FUT}/ticker/price",
@@ -144,18 +210,15 @@ class MarketService:
             )
             if r.status_code == 200:
                 live_price = float(r.json().get("price"))
-
-                # Inject into DataFrame (copy to avoid cache mutation issues)
                 df = df.copy()
-                df["live_close"] = df["close"]  # Clone column
-
-                # Update last row with live price
-                df.iloc[-1, df.columns.get_loc("close")] = live_price
+                df["live_close"] = df["close"]
                 df.iloc[-1, df.columns.get_loc("live_close")] = live_price
-
-                # Recalculate last candle Volume/Trades roughly if needed,
-                # but Price is the most critical for the UI.
-        except Exception:
-            pass  # Fallback to kline close if live fetch fails
+                log.info(f"💰 [PRICE] Live price injected {symbol}: {live_price}")
+            else:
+                df["live_close"] = df["close"]
+                log.warning(f"⚠️ [PRICE] Live price API failed for {symbol}")
+        except Exception as e:
+            df["live_close"] = df["close"]
+            log.warning(f"⚠️ [PRICE] Exception fetching price for {symbol}: {e}")
 
         return df

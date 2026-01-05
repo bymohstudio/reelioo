@@ -45,7 +45,7 @@ class CryptoQuantEngine:
             if df.empty: return self._neutral_result(0.0, "No Data")
 
             # --- CRITICAL: CAPTURE MARKET PRICE IMMEDIATELY ---
-            if "live_close" in df.columns:
+            if "live_close" in df.columns and not pd.isna(df.iloc[-1]["live_close"]):
                 price = float(df.iloc[-1]["live_close"])
             else:
                 price = float(df.iloc[-1]["close"])

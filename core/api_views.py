@@ -168,8 +168,7 @@ class FindAlphaView(APIView):
         vip_assets = [
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
             "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT",
-            "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT",
-            "RNDRUSDT", "FETUSDT", "LTCUSDT"
+            "SUIUSDT", "NEARUSDT", "APTUSDT", "INJUSDT", "FETUSDT", "LTCUSDT"
         ]
 
         leaderboard = []
