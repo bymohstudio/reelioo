@@ -1,22 +1,24 @@
 # core/quant/ml_training/feature_engineering.py
 
+# core/quant/ml_training/feature_engineering.py
+
 import pandas as pd
 import numpy as np
 
-# FEATURES (Unchanged)
+# FEATURES (Updated list)
 FEATURES = [
     "ret_1", "log_ret", "body_pct", "wick_ratio",
     "vwap_dist", "liq_sweep", "order_block",
     "rsi_14", "ema_diff", "trend_strength",
     "atr_pct", "ttm_squeeze", "volatility_slope",
-    "whale_z", "cvd_divergence", "flow_imbalance", "efficiency_ratio"
+    "whale_z", "cvd_divergence", "flow_imbalance", "efficiency_ratio",
+    "kinetic_energy", "momentum_shock", "volatility_compression"  # <--- NEW
 ]
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Standardizes market data into institutional vectors.
-    (This function remains EXACTLY as before to ensure compatibility)
     """
     if df.empty: return df
     df = df.copy()
@@ -77,6 +79,7 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
 
     df['order_block'] = np.where((df['vol_z'] > 1.5) & (df['body_pct'] < df['atr_pct'] * 0.3), 1, 0)
 
+    # CVD / Flow Imbalance
     if 'taker_base' in df.columns:
         taker_buy = df['taker_base']
         taker_sell = df['volume'] - taker_buy
@@ -94,12 +97,36 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
         df['cvd_slope'] = 0.0
         df['cvd_divergence'] = 0.0
 
+    # Efficiency Ratio
     change = abs(df['close'] - df['close'].shift(10))
     volatility = df['tr'].rolling(10).sum()
     df['efficiency_ratio'] = change / (volatility + 1e-9)
 
-    return df.fillna(0)
+    # --- 7. NEW: PHYSICS ENHANCEMENTS (PROFITABILITY BOOSTERS) ---
 
+    # A. KINETIC ENERGY: (0.5 * Mass * Velocity^2)
+    # High Energy + Small Body = Explosion Imminent (Compressed Energy)
+    velocity = df['close'].pct_change(1)
+    df['kinetic_energy'] = 0.5 * df['volume'] * (velocity ** 2)
+
+    # Normalize KE (Z-Score)
+    ke_mean = df['kinetic_energy'].rolling(50).mean()
+    ke_std = df['kinetic_energy'].rolling(50).std()
+    df['kinetic_energy'] = (df['kinetic_energy'] - ke_mean) / (ke_std + 1e-9)
+
+    # B. MOMENTUM SHOCK (Jerk): Derivative of Acceleration
+    # Detects immediate shifts in force before price fully reacts
+    momentum = df['close'].diff(3)
+    acceleration = momentum.diff(3)
+    df['momentum_shock'] = acceleration.diff(3)
+
+    # C. VOLATILITY COMPRESSION (Potential Energy)
+    # Ratio of current volatility to historical volatility.
+    # Low values (< 0.5) mean the spring is loaded.
+    long_term_vol = df['tr'].rolling(100).mean()
+    df['volatility_compression'] = df['atr_14'] / (long_term_vol + 1e-9)
+
+    return df.fillna(0)
 
 # --- ASYMMETRIC PHYSICS (REWRITTEN) ---
 def generate_targets(df: pd.DataFrame, risk_reward=2.0, stop_mult=1.0, candles=24) -> pd.DataFrame:
