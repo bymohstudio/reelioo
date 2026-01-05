@@ -136,7 +136,16 @@ class CryptoQuantEngine:
         # =========================
         # PHASE 4 — FINAL BIAS
         # =========================
+        # -------------------------
+        # FINAL SCORE (DISPLAY SCORE)
+        # -------------------------
         score = int(adjusted_score)
+        score = 50 + (score - 50) * 0.95
+        score = int(round(score))
+
+        # -------------------------
+        # FINAL BIAS (DERIVED FROM DISPLAY SCORE)
+        # -------------------------
         bias = "HOLD"
 
         if score >= 70:
@@ -150,9 +159,8 @@ class CryptoQuantEngine:
             bias = "WATCH"
             score = 100 - score
         else:
+            bias = "HOLD"
             score = 50
-
-        score = 50 + (score - 50) * 0.95
 
         # =========================
         # BTC-FIRST GLOBAL GATING
