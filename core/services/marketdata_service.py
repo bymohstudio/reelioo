@@ -1,10 +1,8 @@
 import os
-
 import requests
 import pandas as pd
 import logging
 from django.core.cache import cache
-
 from reelioo import settings
 
 log = logging.getLogger(__name__)
@@ -19,47 +17,34 @@ class MarketService:
     # -------------------------
     @staticmethod
     def _load_exchange_info():
-        # CHANGE KEY TO FORCE REFRESH
         cache_key = "exchange_info_v2_csv"
         cached = cache.get(cache_key)
         if cached: return cached
 
         results = []
-        # Construct path
         global_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
-
-        # DEBUG PRINT: Check where the server is actually looking
-        print(f"📂 Looking for CSV at: {global_path}")
 
         # 1. Try Loading from local CSV
         if os.path.exists(global_path):
             try:
                 df_csv = pd.read_csv(global_path)
                 results = df_csv.to_dict("records")
-                print(f"✅ Loaded {len(results)} symbols from CSV")
             except Exception as e:
                 log.error(f"Error reading Global CSV: {e}")
-        else:
-            print("❌ CSV File not found at path.")
 
-        # 2. Fallback to live API if results are still empty
+        # 2. Fallback to live API (Futures First)
         if not results:
             try:
                 headers = {"User-Agent": "Mozilla/5.0"}
-                spot = requests.get(f"{MarketService.BASE_SPOT}/exchangeInfo", headers=headers, timeout=5).json()
-
-                if "symbols" in spot:
-                    for s in spot["symbols"]:
+                fapi = requests.get(f"{MarketService.BASE_FUT}/exchangeInfo", headers=headers, timeout=5).json()
+                if "symbols" in fapi:
+                    for s in fapi["symbols"]:
                         if s["status"] == "TRADING" and s["quoteAsset"] == "USDT":
-                            results.append({
-                                "symbol": s["symbol"],
-                                "name": s["baseAsset"],
-                                "type": "GLOBAL"
-                            })
+                            results.append({"symbol": s["symbol"], "name": s["baseAsset"], "type": "PERP"})
             except Exception as e:
                 log.error(f"Binance API Fallback Failed: {e}")
 
-        # 3. Final Static Safety Net
+        # 3. Static Safety Net
         if not results:
             results = [
                 {"symbol": "BTCUSDT", "name": "BTC", "type": "GLOBAL"},
@@ -67,7 +52,6 @@ class MarketService:
                 {"symbol": "SOLUSDT", "name": "SOL", "type": "GLOBAL"}
             ]
 
-        # Cache the list for 1 hour to reduce disk/network overhead
         cache.set(cache_key, results, timeout=3600)
         return results
 
@@ -80,79 +64,98 @@ class MarketService:
         return matches[:10]
 
     # -------------------------
-    #  3. HISTORICAL DATA (FIXED)
+    #  2. HISTORICAL DATA (PHYSICS READY)
     # -------------------------
     @staticmethod
-    def get_historical_data(symbol_input, market_type="SPOT", trade_style="SWING"):
+    def get_historical_data(symbol_input, market_type="PERP", trade_style="INTRADAY"):
+        # 1. Sanitize Symbol
         if isinstance(symbol_input, dict):
             symbol = symbol_input.get("symbol")
         else:
             raw = str(symbol_input).upper().strip().replace("/", "").replace("-", "")
             symbol = f"{raw}USDT" if "USDT" not in raw else raw
 
+        # 2. Interval Map (Optimized for Physics)
+        # Using 15m for Intraday to allow Kinetic Energy calculation
         interval_map = {
-            "SCALP": "15m",
-            "INTRADAY": "1h",
+            "SCALP": "5m",
+            "INTRADAY": "15m",
             "SWING": "4h",
             "POSITION": "1d"
         }
-        interval = interval_map.get(trade_style, "1h")
+        interval = interval_map.get(trade_style, "15m")
 
-        # ---- PATCH: fetch MULTIPLE pages (just like training loader) ----
-        max_rows_needed = 5000
-        klines = []
-        base_url = MarketService.BASE_FUT if market_type in ["PERP", "FUTURES"] else MarketService.BASE_SPOT
-        limit = 1500  # Binance hard limit
-        start_ts = None
+        # 3. Check Cache
+        cache_key = f"kline_v85:{symbol}:{interval}:{market_type}"
+        df = cache.get(cache_key)
 
-        print(f"🔄 Fetching multi-page data for {symbol} [{interval}]...")
+        if df is None or df.empty:
+            # 4. Fetch from Binance (Multi-Page for depth)
+            base_url = MarketService.BASE_FUT if market_type in ["PERP", "FUTURES"] else MarketService.BASE_SPOT
+            limit = 1000
+            klines = []
 
-        try:
-            while len(klines) < max_rows_needed:
+            try:
+                # Fetch recent data
                 params = {"symbol": symbol, "interval": interval, "limit": limit}
-                if start_ts:
-                    params["endTime"] = start_ts
+                resp = requests.get(f"{base_url}/klines", params=params, timeout=5)
 
-                resp = requests.get(f"{base_url}/klines", params=params, timeout=10)
-                if resp.status_code != 200:
-                    print(f"❌ Binance Error {resp.status_code}")
-                    break
+                if resp.status_code == 200:
+                    batch = resp.json()
+                    if isinstance(batch, list):
+                        klines = batch
 
-                batch = resp.json()
-                if not isinstance(batch, list) or len(batch) == 0:
-                    break
+                if not klines: return pd.DataFrame()
 
-                klines = batch + klines  # prepend newest → oldest
-                start_ts = batch[0][0] - 1
+                # 5. Build DataFrame with PHYSICS COLUMNS
+                # 0:OpenTime, 1:Open, 2:High, 3:Low, 4:Close, 5:Vol, 6:CloseTime, 7:QuoteVol, 8:Trades, 9:TakerBase
+                df = pd.DataFrame(klines, columns=[
+                    "open_time", "open", "high", "low", "close", "volume",
+                    "close_time", "quote_volume", "trades", "taker_base",
+                    "taker_quote", "ignore"
+                ])
 
-                # Safety
-                if len(batch) < limit:
-                    break
+                df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
+                df.set_index("timestamp", inplace=True)
 
-            if len(klines) == 0:
+                # Convert to float
+                cols = ["open", "high", "low", "close", "volume",
+                        "quote_volume", "trades", "taker_base"]
+                df = df[cols].astype(float)
+
+                # Cache ONLY if sufficient depth
+                if len(df) >= 50:
+                    cache.set(cache_key, df, timeout=60)  # 1 Minute Cache for Freshness
+
+            except Exception as e:
+                log.error(f"Physics Data Fetch Error: {e}")
                 return pd.DataFrame()
 
-            print(f"✅ Multi-page Success: {len(klines)} candles")
+        # ----------------------------
+        # 4. LIVE PRICE INJECTION
+        # ----------------------------
+        # Even if cached, fetch the REAL-TIME price to fix the "$ --" header bug
+        # This ensures the engine always has the exact current price.
+        try:
+            r = requests.get(
+                f"{MarketService.BASE_FUT}/ticker/price",
+                params={"symbol": symbol},
+                timeout=3
+            )
+            if r.status_code == 200:
+                live_price = float(r.json().get("price"))
 
-            df = pd.DataFrame(klines, columns=[
-                "open_time", "open", "high", "low", "close", "volume",
-                "close_time", "q_vol", "trades", "taker_base",
-                "taker_quote", "ignore"
-            ])
+                # Inject into DataFrame (copy to avoid cache mutation issues)
+                df = df.copy()
+                df["live_close"] = df["close"]  # Clone column
 
-            cols = ["open", "high", "low", "close", "volume", "taker_base"]
-            df[cols] = df[cols].astype(float)
-            df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
-            df.set_index("timestamp", inplace=True)
+                # Update last row with live price
+                df.iloc[-1, df.columns.get_loc("close")] = live_price
+                df.iloc[-1, df.columns.get_loc("live_close")] = live_price
 
-            final_df = df[cols]
+                # Recalculate last candle Volume/Trades roughly if needed,
+                # but Price is the most critical for the UI.
+        except Exception:
+            pass  # Fallback to kline close if live fetch fails
 
-            # OPTIONAL caching
-            cache.set(f"kline_v26:{symbol}:{interval}:{market_type}",
-                      final_df, timeout=300)
-
-            return final_df
-
-        except Exception as e:
-            log.error(f"Data Fetch Error: {e}")
-            return pd.DataFrame()
+        return df

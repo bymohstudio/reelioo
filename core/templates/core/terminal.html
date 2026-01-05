@@ -44,40 +44,32 @@
 
             // --- Init ---
             async init() {
-                // 1. Fetch Live Ticker Prices
                 this.initTicker();
-
-                // 2. Load Symbols for Search
                 try {
                     const res = await fetch('/api/symbols/');
                     const s = await res.json();
                     this.allSymbols = Array.isArray(s) ? s : ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
                 } catch(e) { this.allSymbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]; }
 
-                // 3. Initial Logs
                 setTimeout(() => this.log(">> INITIALIZING SNIPER CORE...", "text-blue-500"), 500);
                 setTimeout(() => this.log(">> SYSTEM ONLINE.", "text-emerald-500 font-bold"), 1000);
 
-                // 4. Auto Scan URL Param
                 const params = new URLSearchParams(window.location.search);
                 if(params.get('ticker')) {
                     this.symbol = params.get('ticker');
                     setTimeout(() => this.scan(), 1500);
                 }
 
-                // 5. Maintenance Loop
                 setInterval(() => {
                     if(this.showDashboard) this.log("Optimizing Execution Latency Vectors...", "text-slate-600");
                 }, 5000);
             },
 
-            // --- Ticker Logic ---
             async initTicker() {
                 try {
                     const pairs = '["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AVAXUSDT"]';
                     const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${pairs}`);
                     if(!res.ok) throw new Error();
-
                     const raw = await res.json();
                     this.tickerData = raw.map(item => ({
                         sym: item.symbol.replace('USDT', ''),
@@ -86,16 +78,10 @@
                         isUp: parseFloat(item.priceChangePercent) >= 0
                     }));
                 } catch(e) {
-                    this.tickerData = [
-                        { sym: "BTC", price: "98,420.00", change: "+1.20", isUp: true },
-                        { sym: "ETH", price: "2,950.00", change: "+0.80", isUp: true },
-                        { sym: "SOL", price: "145.20", change: "-2.10", isUp: false },
-                        { sym: "BNB", price: "612.50", change: "+0.50", isUp: true }
-                    ];
+                    this.tickerData = [{ sym: "BTC", price: "0.00", change: "0.00", isUp: true }];
                 }
             },
 
-            // --- Actions ---
             handleInput() {
                 if(this.symbol.length < 1) { this.suggestions = []; return; }
                 const upper = this.symbol.toUpperCase();
@@ -115,9 +101,11 @@
                 this.symbol = raw;
                 this.suggestions = [];
 
+                // 1. Reset UI
                 this.showDashboard = false;
                 this.isLoading = true;
 
+                // 2. Start Animation Loop
                 const logs = ["ESTABLISHING SECURE HANDSHAKE...", "PARSING L2 ORDER BOOK...", "CALCULATING IV SURFACE...", "DETECTING WHALE FLOW..."];
                 let logIdx = 0;
                 const logContainer = document.getElementById('loading-text');
@@ -132,34 +120,45 @@
                 }, 400);
 
                 try {
+                    // 3. Fetch Data
                     const res = await fetch("/api/analyze/", {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie('csrftoken') },
                         body: JSON.stringify({ symbol: raw, market_type: "PERP", trade_style: this.mode })
                     });
 
+                    // 4. Handle Access Rights
+                    if (res.status === 403) {
+                        clearInterval(logInt);
+                        this.isLoading = false;
+                        Swal.fire({
+                            title: 'INSTITUTIONAL ACCESS EXPIRED',
+                            text: 'Your 21-day trial has ended. Please upgrade to continue accessing the terminal.',
+                            icon: 'warning',
+                            background: '#0a0a0a',
+                            color: '#fff',
+                            confirmButtonText: 'UPGRADE NOW',
+                            confirmButtonColor: '#2563eb'
+                        }).then(() => window.location.href = "/pricing/");
+                        return;
+                    }
+
                     if(!res.ok) throw new Error("Connection Failed");
+
+                    // 5. CRITICAL FIX: Save the Backend Data!
                     this.data = await res.json();
 
+                    // 6. Finish Animation & Show Result
                     clearInterval(logInt);
                     this.isLoading = false;
                     this.showDashboard = true;
                     this.log(`SCAN COMPLETE: ${raw}`, "text-emerald-500");
-
                     this.$nextTick(() => { if(window.lucide) lucide.createIcons(); });
 
                 } catch(e) {
                     clearInterval(logInt);
                     this.isLoading = false;
-                    Swal.fire({
-                        title: 'SYSTEM ERROR',
-                        text: e.message || 'Network timeout.',
-                        icon: 'error',
-                        background: '#0a0a0a',
-                        color: '#fff',
-                        confirmButtonColor: '#dc2626',
-                        confirmButtonText: 'ACKNOWLEDGE'
-                    });
+                    Swal.fire({ title: 'SYSTEM ERROR', text: e.message || 'Network timeout.', icon: 'error', background: '#0a0a0a', color: '#fff' });
                 }
             },
 
@@ -178,8 +177,23 @@
 
                 try {
                     const res = await fetch("/api/find_best_opportunity/");
-                    const result = await res.json();
+                    if (res.status === 403) {
+                        clearInterval(interval);
+                        this.isScanningAlpha = false;
+                        document.getElementById('scan-overlay').classList.add('hidden');
+                        Swal.fire({
+                            title: 'INSTITUTIONAL ACCESS EXPIRED',
+                            text: 'Your 21-day trial has ended. Upgrade to unlock the Alpha Scanner.',
+                            icon: 'warning',
+                            background: '#0a0a0a',
+                            color: '#fff',
+                            confirmButtonText: 'UPGRADE NOW',
+                            confirmButtonColor: '#2563eb'
+                        }).then(() => window.location.href = "/pricing/");
+                        return;
+                    }
 
+                    const result = await res.json();
                     clearInterval(interval);
                     this.isScanningAlpha = false;
                     document.getElementById('scan-overlay').classList.add('hidden');
@@ -196,11 +210,8 @@
                         };
                     } else {
                         this.alphaResult = {
-                            found: false,
-                            symbol: 'NO EDGE',
-                            bias: 'CAPITAL PRESERVATION',
-                            explanation: 'MARKET CONDITIONS CHOPPY / LOW VOLUME',
-                            entry: '--', stop: '--', target: '--'
+                            found: false, symbol: 'NO EDGE', bias: 'CAPITAL PRESERVATION',
+                            explanation: 'MARKET CONDITIONS CHOPPY / LOW VOLUME', entry: '--', stop: '--', target: '--'
                         };
                     }
                     this.showAlpha = true;
@@ -228,28 +239,24 @@
                     Swal.fire({toast:true, position:'top-end', icon:'error', title:'NO SIGNAL', text:'Cannot save neutral signal.', background:'#0a0a0a', color:'#fff', showConfirmButton:false, timer:2000});
                     return;
                 }
-
                 const originalHTML = btn.innerHTML;
                 btn.innerHTML = `<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> SAVING...`;
                 if(window.lucide) lucide.createIcons();
 
                 try {
                     const payload = {
-                        symbol: this.data.symbol,
-                        bias: this.data.signal.bias,
+                        symbol: this.data.symbol, bias: this.data.signal.bias,
                         entry: parseFloat(String(this.data.signal.entry).replace(/,/g,'')) || 0,
                         stop: parseFloat(String(this.data.signal.stop).replace(/,/g,'')) || 0,
                         target: parseFloat(String(this.data.signal.target2).replace(/,/g,'')) || 0,
                         confidence: parseFloat(String(this.data.signal.probability).replace('%','')) || 0,
                         leverage: "Low"
                     };
-
                     const res = await fetch("/api/journal/add/", {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie('csrftoken') },
                         body: JSON.stringify(payload)
                     });
-
                     if(res.ok) {
                         btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> SAVED`;
                         btn.className = "flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500 px-4 py-2 rounded transition shadow-[0_0_20px_rgba(16,185,129,0.5)] ring-1 ring-emerald-500/50";
@@ -259,7 +266,7 @@
                             btn.className = "flex items-center gap-2 text-[10px] font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded transition";
                             if(window.lucide) lucide.createIcons();
                         }, 2000);
-                    } else { throw new Error(); }
+                    } else throw new Error();
                 } catch(e) {
                     btn.innerHTML = `<i data-lucide="x" class="w-3 h-3"></i> ERROR`;
                     btn.classList.add('text-red-400');
@@ -275,7 +282,6 @@
                 this.showBacktest = true;
                 this.btLoading = true;
                 this.btResult = null;
-
                 try {
                     const res = await fetch("/api/backtest/", {
                         method: "POST",
@@ -292,25 +298,19 @@
                 const time = new Date().toLocaleTimeString('en-US', {hour12:false});
                 this.logs.push({time, msg, color});
                 if(this.logs.length > 50) this.logs.shift();
-                this.$nextTick(() => {
-                    const el = document.getElementById('scanner-log');
-                    if(el) el.scrollTop = el.scrollHeight;
-                });
+                this.$nextTick(() => { const el = document.getElementById('scanner-log'); if(el) el.scrollTop = el.scrollHeight; });
             },
-
             formatPrice(p) {
                 if(!p || p === '--' || p === '---') return '--';
                 const n = parseFloat(p);
                 if(isNaN(n)) return '--';
                 return n < 1 ? n.toFixed(5) : n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             },
-
             calcSize() {
                 const entry = parseFloat(String(this.data.signal.entry).replace(/,/g, ''));
                 if(!entry || isNaN(entry)) return '--';
                 return ((this.calc.cap * (this.calc.risk / 100)) / entry).toFixed(4) + " units";
             },
-
             getSignalBoxClass() {
                 const b = this.data.signal.bias;
                 if(b === 'LONG') return "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]";
@@ -318,7 +318,6 @@
                 if(b === 'WATCH') return "bg-yellow-900/10 border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]";
                 return "bg-[#0a0a0a] border-white/10";
             },
-
             getDirectionClass() {
                 const b = this.data.signal.bias;
                 if(b === 'LONG') return "text-emerald-400";
@@ -326,7 +325,6 @@
                 if(b === 'WATCH') return "text-yellow-500";
                 return "text-slate-600 opacity-80";
             },
-
             get displayEntry() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.entry); },
             get displayStop() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.stop); },
             get displayTarget() { return (this.data.signal.bias === 'NEUTRAL' || this.data.signal.bias === 'HOLD') ? '---' : this.formatPrice(this.data.signal.target2); }
@@ -334,12 +332,12 @@
     })
 </script>
 
-<div x-data="terminal()" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full min-h-screen flex flex-col font-mono text-slate-300 overflow-x-hidden">
+<div x-data="terminal()" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full min-h-screen flex flex-col overflow-x-hidden">
 
     {% if not is_premium %}
     <div class="bg-blue-900/20 border-b border-blue-500/20 text-center py-2 relative z-50 backdrop-blur-md">
-        <p class="text-[10px] text-blue-300 font-bold uppercase tracking-widest">
-            Trial Status: <span class="text-white">{{ days_left|default:"21" }} Days Remaining</span>.
+        <p class="text-xs sm:text-sm text-blue-300 font-bold uppercase tracking-widest">
+            Trial Status: <span class="text-white font-mono">{{ days_left }} Days Remaining</span>.
             <a href="{% url 'pricing' %}" class="ml-2 underline hover:text-white decoration-blue-500/50">Upgrade to Monthly Plan</a>
         </p>
     </div>
@@ -356,11 +354,9 @@
                      <template x-for="t in tickerData">
                          <div class="flex items-center gap-2 mx-8">
                              <span class="text-white font-bold" x-text="t.sym"></span>
-                             <span class="text-slate-400" x-text="'$'+t.price"></span>
-                             <span class="text-[9px] flex items-center gap-1"
-                                   :class="t.isUp ? 'text-emerald-500' : 'text-red-500'">
-                                 <span x-text="t.isUp ? '▲' : '▼'"></span>
-                                 <span x-text="(t.isUp ? '+' : '') + t.change + '%'"></span>
+                             <span class="text-slate-400 font-mono" x-text="'$'+t.price"></span>
+                             <span class="text-[9px] flex items-center gap-1 font-mono" :class="t.isUp ? 'text-emerald-500' : 'text-red-500'">
+                                 <span x-text="t.isUp ? '▲' : '▼'"></span><span x-text="(t.isUp ? '+' : '') + t.change + '%'"></span>
                              </span>
                          </div>
                      </template>
@@ -375,14 +371,11 @@
     <div class="flex flex-col items-center justify-center mb-12 px-2">
         <div class="w-full max-w-3xl relative group z-20">
             <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-
             <div class="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[#0a0a0a] rounded-lg border border-white/10 p-2 shadow-2xl gap-2 sm:gap-0">
-
                 <div class="relative flex items-center flex-grow bg-transparent pr-2 border-b sm:border-b-0 sm:border-r border-white/10 pb-2 sm:pb-0">
                     <span class="pl-3 pr-3 text-emerald-500 font-bold text-xl md:text-2xl">></span>
                     <input x-model="symbol" @input="handleInput" @keydown.enter="scan" type="text" placeholder="ENTER ASSET..."
                            class="w-full bg-transparent border-none text-white text-lg md:text-2xl font-black placeholder-slate-800 focus:ring-0 focus:outline-none uppercase tracking-widest h-12 p-0" autocomplete="off">
-
                     <div x-show="suggestions.length > 0" @click.outside="suggestions = []" class="absolute top-full left-0 w-full bg-[#0a0a0a] border border-white/10 mt-1 rounded-lg z-[60] shadow-2xl max-h-60 overflow-y-auto custom-scrollbar pointer-events-auto" x-cloak>
                         <template x-for="s in suggestions">
                             <div @click="selectSuggestion(s)" class="px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 flex justify-between items-center transition-colors">
@@ -391,7 +384,6 @@
                         </template>
                     </div>
                 </div>
-
                 <div class="flex items-center justify-between sm:justify-end gap-2 pl-0 sm:pl-3 pt-2 sm:pt-0">
                     <div class="w-full sm:w-auto">
                         <select x-model="mode" class="w-full sm:w-auto bg-[#111] text-[10px] text-slate-300 border border-white/10 rounded px-3 py-3 font-bold uppercase focus:ring-0 cursor-pointer hover:bg-white/5 transition">
@@ -399,21 +391,17 @@
                             <option value="SCALP">⚡ Scalp (Risk)</option>
                         </select>
                     </div>
-
                     <button @click="scan" class="flex-grow sm:flex-grow-0 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap flex items-center justify-center gap-2">
                         <span>SCAN</span> <i data-lucide="radar" class="w-3 h-3"></i>
                     </button>
-
                     <button @click="findAlpha" class="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-6 rounded text-xs tracking-[0.15em] transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] items-center gap-2 animate-pulse border border-emerald-400/30 whitespace-nowrap">
                         <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> ALPHA
                     </button>
                 </div>
             </div>
-
             <button @click="findAlpha" class="sm:hidden w-full mt-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded text-xs tracking-[0.15em] shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 border border-emerald-400/30 relative z-30 pointer-events-auto">
                  <i data-lucide="crosshair" class="w-4 h-4 text-emerald-200"></i> SCAN FOR ALPHA EDGE
             </button>
-
             <div class="mt-3 text-center sm:text-left px-1">
                  <p class="text-[9px] text-emerald-500/70 font-mono tracking-wider flex items-center justify-center sm:justify-start gap-1.5 animate-pulse">
                     <i data-lucide="zap" class="w-3 h-3"></i>
@@ -429,7 +417,6 @@
             <span class="text-[9px] text-slate-500 uppercase tracking-[0.2em] font-bold">Market Radar</span>
             <div class="h-px bg-white/10 w-16"></div>
         </div>
-
         <div class="grid grid-cols-3 gap-2 sm:gap-6">
             <div @click="selectSuggestion('BTCUSDT')" class="bg-[#0a0a0a] border border-orange-500/20 rounded-xl p-2 sm:p-6 min-h-[90px] sm:min-h-[140px] cursor-pointer transition-all hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(249,115,22,0.1)] group relative overflow-hidden flex flex-col items-center justify-center">
                 <div class="absolute inset-0 bg-orange-500/5 group-hover:bg-orange-500/10 transition"></div>
@@ -471,7 +458,7 @@
         </div>
     </div>
 
-    <div x-show="showDashboard" x-transition.opacity.duration.700ms class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full" x-cloak>
+    <div x-show="showDashboard" x-transition:enter="transition ease-out duration-700" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full" x-cloak>
 
         <div class="col-span-1 lg:col-span-12">
             <div class="border rounded-2xl p-6 md:p-10 relative overflow-hidden transition-all duration-500 min-h-[200px] flex flex-col justify-center"
@@ -490,7 +477,7 @@
                         <div class="flex items-center gap-3 mb-2 flex-wrap">
                              <span class="text-[10px] bg-white/5 border border-white/10 text-slate-400 px-2 py-1 rounded tracking-widest uppercase font-bold">SIGNAL</span>
                              <h2 class="text-sm font-bold text-slate-500 tracking-widest uppercase" x-text="data.symbol"></h2>
-                             <span class="text-sm font-bold text-white tracking-widest" x-text="'$'+formatPrice(data.price)"></span>
+                             <span class="text-sm font-bold text-white tracking-widest font-mono" x-text="'$'+formatPrice(data.price)"></span>
 
                              <span class="text-[10px] px-2 py-0.5 border rounded uppercase tracking-wide font-bold transition-all"
                                    :class="{
@@ -529,10 +516,11 @@
                             </button>
                         </div>
                     </div>
-                    <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0">
-                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-1">Signal Strength</span>
+
+                    <div class="text-left md:text-right w-full md:w-auto border-t md:border-t-0 border-white/10 pt-4 md:pt-0 flex flex-col justify-center">
+                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold block mb-0 sm:mb-1">Signal Strength</span>
                          <div class="flex items-center md:justify-end gap-3">
-                             <span class="text-5xl md:text-7xl font-bold text-white tracking-tighter" x-text="data.signal.probability + '%'"></span>
+                             <span class="text-6xl md:text-8xl font-black text-white tracking-tighter font-mono leading-none transition-all duration-300" x-text="data.signal.probability + '%'"></span>
                          </div>
                          <div class="mt-2 text-right hidden md:block">
                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">MARKET SCANNING...</span>
@@ -569,7 +557,6 @@
                     <h4 class="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
                         <i data-lucide="cpu" class="w-4 h-4 text-blue-500"></i> Logic Vectors
                     </h4>
-                    <span class="text-[9px] text-slate-500 font-mono">ML EXPLAINABILITY</span>
                 </div>
                 <div class="space-y-5">
                     <template x-for="item in data.explainability.slice(0,3)">
@@ -585,7 +572,7 @@
                             </div>
                         </div>
                     </template>
-                    <div x-show="data.explainability.length === 0 || data.signal.probability < 60" class="text-[10px] text-slate-600 italic text-center py-4">Vectors appear only when execution-grade edge exists.</div>
+                    <div x-show="!data.explainability.length" class="text-[10px] text-slate-600 italic text-center py-4">Vectors appear only when execution-grade edge exists.</div>
                 </div>
             </div>
 
@@ -594,9 +581,9 @@
                     <i data-lucide="calculator" class="w-3 h-3"></i> Position Sizing
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div><label class="block text-[9px] text-slate-600 mb-1">CAPITAL ($)</label><input x-model="calc.cap" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
-                    <div><label class="block text-[9px] text-slate-600 mb-1">RISK (%)</label><input x-model="calc.risk" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full"></div>
-                    <div><label class="block text-[9px] text-slate-600 mb-1">SIZE</label><div class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-emerald-400 font-bold flex items-center h-[34px]" x-text="calcSize()"></div></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">CAPITAL ($)</label><input x-model="calc.cap" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full font-mono"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">RISK (%)</label><input x-model="calc.risk" type="number" class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-white w-full font-mono"></div>
+                    <div><label class="block text-[9px] text-slate-600 mb-1">SIZE</label><div class="bg-black border border-white/10 rounded px-3 py-2 text-xs text-emerald-400 font-bold flex items-center h-[34px] font-mono" x-text="calcSize()"></div></div>
                 </div>
             </div>
         </div>
@@ -669,7 +656,7 @@
                     :class="alphaResult.found ? 'text-emerald-500' : 'text-blue-500'"
                     x-text="alphaResult.found ? 'Highest Probability Setup' : 'Risk Management Protocol'"></h2>
 
-                <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tighter mb-1 text-glow" x-text="alphaResult.symbol.replace('USDT','')"></h1>
+                <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tighter mb-1 text-glow font-mono" x-text="alphaResult.symbol.replace('USDT','')"></h1>
                 <p class="text-xl sm:text-2xl font-bold tracking-widest mb-6 sm:mb-8"
                    :class="{'text-emerald-400 text-glow': alphaResult.bias === 'LONG', 'text-red-500 text-glow': alphaResult.bias === 'SHORT', 'text-slate-400': !alphaResult.found}"
                    x-text="alphaResult.bias"></p>
@@ -704,8 +691,8 @@
         </div>
     </div>
 
-    <div x-show="showBacktest" class="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center px-4 py-12" x-cloak x-transition>
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[85%] sm:w-full sm:max-w-md relative shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden m-auto" @click.outside="showBacktest = false">
+    <div x-show="showBacktest" class="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center px-4" x-cloak x-transition>
+        <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl w-[85%] sm:w-full sm:max-w-md relative shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden my-auto" @click.outside="showBacktest = false">
             <div class="p-3 sm:p-4 border-b border-white/5 bg-white/5 flex justify-between items-center flex-shrink-0">
                 <div>
                     <h3 class="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
@@ -726,15 +713,15 @@
                     <div class="grid grid-cols-3 gap-px bg-white/5 border-b border-white/5">
                         <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
                             <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Win Rate</span>
-                            <span class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tighter" x-text="btResult?.win_rate + '%'"></span>
+                            <span class="text-xl sm:text-2xl font-black text-emerald-400 tracking-tighter font-mono" x-text="btResult?.win_rate + '%'"></span>
                         </div>
                         <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
                             <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Profit Factor</span>
-                            <span class="text-xl sm:text-2xl font-black text-blue-400 tracking-tighter" x-text="btResult?.profit_factor"></span>
+                            <span class="text-xl sm:text-2xl font-black text-blue-400 tracking-tighter font-mono" x-text="btResult?.profit_factor"></span>
                         </div>
                         <div class="bg-[#0a0a0a] p-4 text-center group hover:bg-white/5 transition">
                             <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Trades</span>
-                            <span class="text-xl sm:text-2xl font-black text-white tracking-tighter" x-text="btResult?.total_trades"></span>
+                            <span class="text-xl sm:text-2xl font-black text-white tracking-tighter font-mono" x-text="btResult?.total_trades"></span>
                         </div>
                     </div>
                     <div class="p-4 bg-[#050505] space-y-1">

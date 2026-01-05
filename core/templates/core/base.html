@@ -6,47 +6,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-    <title>{% block title %}Reelioo | Institutional Crypto Quant Terminal & Whale Tracker{% endblock %}</title>
-    <meta name="description" content="Stop trading on noise. Reelioo is the institutional-grade crypto scanner that decodes Whale Order Flow, Dark Pool Liquidity, and Volatility Regimes using AI. Start your 21-day free trial.">
+    <title>{% block title %}Reelioo | Institutional Crypto Quant Terminal{% endblock %}</title>
     <link rel="canonical" href="https://reelioo.app/">
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <meta name="keywords" content="crypto quant terminal, bitcoin order flow, whale alert scanner, binance volatility analysis, ai trading signals, crypto screener, dark pool tracker, reelioo, institutional trading tools">
-    <meta name="theme-color" content="#020202">
-
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Reelioo Intelligence">
-    <meta property="og:url" content="https://reelioo.app/">
-    <meta property="og:title" content="Reelioo | Decode Smart Money Order Flow">
-    <meta property="og:description" content="Institutional-grade crypto scanner that decodes Whale Order Flow, Dark Pool Liquidity, and Volatility Regimes using AI.">
-    <meta property="og:image" content="{% static 'images/og-image.jpg' %}">
-
-    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
-    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
 
     <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #020202; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* GLOBAL FONT RESET */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020202;
+        }
+
+        /* Utility class for Data/Terminal elements */
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         .cursor-blink { animation: blink 1s step-end infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         [x-cloak] { display: none !important; }
 
-        /* SweetAlert Dark Override */
+        /* SweetAlert Dark Theme */
         div.swal2-popup { background: #0a0a0a !important; border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; }
         div.swal2-title { color: #fff; }
     </style>
 </head>
 
-<body class="text-slate-400 font-mono antialiased min-h-screen flex flex-col selection:bg-blue-500/30 selection:text-white"
+<body class="text-base text-slate-400 antialiased min-h-screen flex flex-col selection:bg-blue-500/30 selection:text-white"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       x-data="{ mobileMenuOpen: false }">
 
@@ -61,28 +57,28 @@
 
             <div class="hidden md:flex items-center gap-6">
                 {% if user.is_authenticated %}
-                <a href="{% url 'terminal' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-[10px] font-bold tracking-widest"><i data-lucide="layout-grid" class="w-3 h-3"></i> Terminal</a>
-                <a href="{% url 'journal' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-[10px] font-bold tracking-widest"><i data-lucide="book" class="w-3 h-3"></i> Journal</a>
-                <a href="{% url 'settings' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-[10px] font-bold tracking-widest"><i data-lucide="settings" class="w-3 h-3"></i> Settings</a>
+                <a href="{% url 'terminal' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-xs font-bold tracking-widest"><i data-lucide="layout-grid" class="w-4 h-4"></i> Terminal</a>
+                <a href="{% url 'journal' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-xs font-bold tracking-widest"><i data-lucide="book" class="w-4 h-4"></i> Journal</a>
+                <a href="{% url 'settings' %}" class="nav-link flex items-center gap-2 hover:text-white transition uppercase text-xs font-bold tracking-widest"><i data-lucide="settings" class="w-4 h-4"></i> Settings</a>
 
                 {% if not user.profile.is_premium %}
-                <a href="{% url 'pricing' %}" class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition">Upgrade</a>
+                <a href="{% url 'pricing' %}" class="text-xs font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-4 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition">Upgrade</a>
                 {% endif %}
 
-                <a href="https://discord.gg/csVPpg6mFD" target="_blank" class="text-[10px] font-bold text-[#5865F2] hover:text-[#4752C4] uppercase tracking-widest transition flex items-center gap-2 group">
-                    <svg class="w-3 h-3 fill-current" viewBox="0 0 127.14 96.36"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+                <a href="https://discord.gg/csVPpg6mFD" target="_blank" class="text-xs font-bold text-[#5865F2] hover:text-[#4752C4] uppercase tracking-widest transition flex items-center gap-2 group">
+                    <svg class="w-4 h-4 fill-current" viewBox="0 0 127.14 96.36"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
                     Alerts
                 </a>
 
                 <form action="{% url 'logout' %}" method="post" class="inline">
                     {% csrf_token %}
-                    <button type="submit" class="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-widest transition flex items-center gap-2">
-                        <i data-lucide="log-out" class="w-3 h-3"></i>Logout
+                    <button type="submit" class="text-xs font-bold text-red-500 hover:text-red-400 uppercase tracking-widest transition flex items-center gap-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>Logout
                     </button>
                 </form>
                 {% else %}
-                <a href="{% url 'login' %}" class="text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log In</a>
-                <a href="{% url 'signup' %}" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5">Start Trial</a>
+                <a href="{% url 'login' %}" class="text-xs font-bold text-slate-300 hover:text-white uppercase tracking-widest transition">Log In</a>
+                <a href="{% url 'signup' %}" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-6 py-2.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5 uppercase tracking-wide">Start Trial</a>
                 {% endif %}
             </div>
 
@@ -96,15 +92,9 @@
     <div x-show="mobileMenuOpen" x-transition.opacity class="md:hidden bg-[#0a0a0a] border-b border-white/5 absolute w-full left-0 top-full shadow-2xl z-40" x-cloak>
         <div class="px-6 py-8 flex flex-col gap-4">
             {% if user.is_authenticated %}
-                <a href="{% url 'terminal' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition">
-                    <i data-lucide="layout-grid" class="w-4 h-4"></i> Terminal
-                </a>
-                <a href="{% url 'journal' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition">
-                    <i data-lucide="book" class="w-4 h-4"></i> Journal
-                </a>
-                <a href="{% url 'settings' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition">
-                    <i data-lucide="settings" class="w-4 h-4"></i> Settings
-                </a>
+                <a href="{% url 'terminal' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition"><i data-lucide="layout-grid" class="w-4 h-4"></i> Terminal</a>
+                <a href="{% url 'journal' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition"><i data-lucide="book" class="w-4 h-4"></i> Journal</a>
+                <a href="{% url 'settings' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-slate-400 uppercase hover:text-white transition"><i data-lucide="settings" class="w-4 h-4"></i> Settings</a>
 
                 <a href="https://discord.gg/csVPpg6mFD" target="_blank" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-[#5865F2] uppercase hover:text-[#4752C4] transition">
                     <svg class="w-4 h-4 fill-current" viewBox="0 0 127.14 96.36"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.89,105.89,0,0,0,126.6,80.22c2.36-24.44-5.42-48.18-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
@@ -112,16 +102,12 @@
                 </a>
 
                 {% if not user.profile.is_premium %}
-                <a href="{% url 'pricing' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-emerald-400 uppercase transition">
-                    <i data-lucide="zap" class="w-4 h-4"></i> Upgrade Plan
-                </a>
+                <a href="{% url 'pricing' %}" class="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-emerald-400 uppercase transition"><i data-lucide="zap" class="w-4 h-4"></i> Upgrade Plan</a>
                 {% endif %}
 
                 <form action="{% url 'logout' %}" method="post" class="w-full">
                     {% csrf_token %}
-                    <button class="flex w-full items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-red-500 uppercase hover:text-red-400 transition">
-                        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
-                    </button>
+                    <button class="flex w-full items-center gap-3 p-3 rounded-lg hover:bg-white/5 text-sm font-bold text-red-500 uppercase hover:text-red-400 transition"><i data-lucide="log-out" class="w-4 h-4"></i> Logout</button>
                 </form>
             {% else %}
                 <a href="{% url 'login' %}" class="block text-center p-3 text-sm font-bold text-slate-300 uppercase hover:text-white hover:bg-white/5 rounded-lg transition">Log In</a>
@@ -133,17 +119,14 @@
 
 <main class="flex-grow w-full relative">
     {% if messages %}
-    <div class="max-w-2xl mx-auto pt-6 px-4 absolute top-0 left-0 right-0 z-40 pointer-events-none"
-         x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
+    <div class="max-w-2xl mx-auto pt-6 px-4 absolute top-0 left-0 right-0 z-40 pointer-events-none" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
         {% for message in messages %}
-        <div class="pointer-events-auto p-3 mb-3 text-xs font-bold text-center rounded border shadow-xl backdrop-blur-md animate-fade-in
-                        {% if message.tags == 'success' %}bg-emerald-900/40 border-emerald-500/30 text-emerald-400{% else %}bg-red-900/40 border-red-500/30 text-red-400{% endif %}">
+        <div class="pointer-events-auto p-3 mb-3 text-xs font-bold text-center rounded border shadow-xl backdrop-blur-md animate-fade-in {% if message.tags == 'success' %}bg-emerald-900/40 border-emerald-500/30 text-emerald-400{% else %}bg-red-900/40 border-red-500/30 text-red-400{% endif %}">
             {{ message }}
         </div>
         {% endfor %}
     </div>
     {% endif %}
-
     {% block content %}{% endblock %}
 </main>
 
@@ -158,7 +141,7 @@
                 <h4 class="text-[10px] font-bold text-white uppercase tracking-widest mb-4">Product</h4>
                 <ul class="space-y-2 text-[11px] text-slate-500">
                     <li><a href="{% url 'terminal' %}" class="hover:text-blue-400 transition">Terminal</a></li>
-                    <li><a href="{% url 'plans' %}" class="hover:text-blue-400 transition">Pricing</a></li>
+                    <li><a href="{% url 'pricing' %}" class="hover:text-blue-400 transition">Pricing</a></li>
                     <li><a href="{% url 'about' %}" class="hover:text-blue-400 transition">About</a></li>
                 </ul>
             </div>
@@ -178,14 +161,10 @@
                 </a>
             </div>
         </div>
-
         <div class="border-t border-white/5 pt-8 text-[10px] text-slate-600 text-center flex flex-col gap-2">
             <p>&copy; 2025 REELIOO.</p>
             <p class="text-[9px] text-slate-300/90 max-w-xl mx-auto px-4 leading-relaxed font-medium">
-                <strong>⚠️ RISK DISCLOSURE:</strong> Reelioo is a data analytics tool, not a financial advisor.
-                Content is for educational purposes only. Trading involves high risk;
-                <strong class="text-orange-400">you are solely responsible for your trades and losses.</strong>
-                We do not accept liability for any financial decisions.
+                <strong>⚠️ RISK DISCLOSURE:</strong> Reelioo is a data analytics tool, not a financial advisor. Content is for educational purposes only.
             </p>
         </div>
     </div>

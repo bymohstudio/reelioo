@@ -17,210 +17,212 @@ def cap(x, limit=3.0):
 
 class CryptoQuantEngine:
     """
-    REELIOO QUANT PHYSICS ENGINE (v5.4 – Kinetic Integration)
+    REELIOO QUANT PHYSICS ENGINE (v8.6 – Retail Polished)
 
-    - Integrated New Physics Vectors:
-      1. Kinetic Energy (Mass * Velocity): Validates move strength.
-      2. Momentum Shock (Jerk): Detects instant acceleration.
-      3. Volatility Compression (Spring): Identifies explosive breakouts.
+    - Renamed "Kill Switch" -> "Risk Protocol"
+    - Ensures Market Price is always visible
+    - Full Institutional Gatekeeping layers active
     """
 
     def __init__(self):
         self.SIGMOID_K = 0.45
         self.CONFIRMATION_THRESH = 70
-        log.info("🚀 QuantPhysicsEngine v5.4 (Kinetic) Initialized")
+
+        # --- INSTITUTIONAL CONFIG ---
+        self.MIN_VOLUME_RATIO = 0.6  # Liquidity check
+        self.MAX_ATR_PCT = 0.04  # Volatility guard
+
+        log.info("🚀 QuantPhysicsEngine v8.6 (Retail Polished) Initialized")
 
     def _sigmoid(self, x):
         return 100 / (1 + np.exp(-self.SIGMOID_K * x))
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY") -> SimpleNamespace:
+        price = 0.0
         try:
+            # 1. ENRICH DATA
             df = generate_features(df)
+            if df.empty: return self._neutral_result(0.0, "No Data")
+
+            # --- CRITICAL: CAPTURE MARKET PRICE IMMEDIATELY ---
+            if "live_close" in df.columns:
+                price = float(df.iloc[-1]["live_close"])
+            else:
+                price = float(df.iloc[-1]["close"])
+
+            # 2. PHYSICS CALCULATIONS
+            mass = df.get('quote_volume', df['volume'])
+            velocity = df['close'].diff()
+            trades = df.get('trades', 1)
+
+            df['force'] = mass * velocity
+            df['friction_coeff'] = trades / (mass + 1)
+
             last = df.iloc[-1]
         except Exception as e:
-            return self._neutral_result(0, f"Data Error: {e}")
+            return self._neutral_result(price, f"Data Error: {e}")
 
-        price = float(last["close"])
+        # ==================================================================
+        # PHASE 1: CORE PHYSICS (The Alpha)
+        # ==================================================================
 
-        # ------------------------------------------------------------------
-        # 1. REGIME DETECTION
-        # ------------------------------------------------------------------
-        er = float(last.get("efficiency_ratio", 0.5))
-        regime_label = "TRENDING" if er > 0.4 else "CHOPPY"
+        # Stagnation Check (Friction)
+        avg_friction = df['friction_coeff'].rolling(20).mean().iloc[-1]
+        current_friction = df['friction_coeff'].iloc[-1]
+        # High Friction + Low Motion = Trap
+        is_stagnant = (current_friction > (avg_friction * 1.5) and abs(last.get('ret_1', 0)) < 0.001)
 
-        # ------------------------------------------------------------------
-        # 2. STANDARD VECTORS (Layer 1)
-        # ------------------------------------------------------------------
-        # Trend
-        ema_diff = cap(last.get("ema_diff", 0) * 100)
-        rsi_z = cap((last.get("rsi_14", 50) - 50) / 15)
-        trend_alpha = (ema_diff * 1.5 + rsi_z) * (1.0 if regime_label == "TRENDING" else 0.5)
-        trend_alpha = cap(trend_alpha)
-
-        # Whale (Volume Z-Score)
+        # Vector Scoring
+        trend_alpha = cap(last.get("ema_diff", 0) * 100) * 1.5
         whale_z = cap(float(last.get("whale_z", 0)))
+        reversion_alpha = -cap(last.get("vwap_dist", 0) * 100) * 1.2
 
-        # Reversion
-        vwap_z = cap(last.get("vwap_dist", 0) * 100)
-        reversion_alpha = -vwap_z * (2.0 if regime_label == "CHOPPY" else 1.2)
-        reversion_alpha = cap(reversion_alpha)
-
-        # Events (Liquidity Sweeps)
-        event_alpha = 0.0
-        if int(last.get("liq_sweep", 0)) == 1:
-            event_alpha += 2.0
-        elif int(last.get("liq_sweep", 0)) == -1:
-            event_alpha -= 2.0
-
-        # CVD Divergence
-        if int(last.get("cvd_divergence", 0)) == 1:
-            event_alpha += 1.5
-        elif int(last.get("cvd_divergence", 0)) == -1:
-            event_alpha -= 1.5
-        event_alpha = cap(event_alpha)
-
-        # ------------------------------------------------------------------
-        # 3. PHYSICS VECTORS (Layer 2 - The Profit Multipliers)
-        # ------------------------------------------------------------------
-        # Extract new features
+        # Physics Vectors
         kinetic = cap(float(last.get("kinetic_energy", 0)))
-        shock = cap(float(last.get("momentum_shock", 0)) * 5)  # Scale shock up as values are small
+        shock = cap(float(last.get("momentum_shock", 0)) * 5)
         compression = float(last.get("volatility_compression", 1.0))
 
-        physics_alpha = 0.0
+        physics_alpha = (kinetic * 0.8) + shock
+        is_spring_loaded = (compression < 0.6 and abs(whale_z) > 0.8)
+        if is_spring_loaded:
+            physics_alpha += (3.0 * np.sign(trend_alpha + shock))
 
-        # A. KINETIC ENERGY (Validation)
-        # If Kinetic Energy is high (>1.5), the move has "Mass". Hard to fake.
-        # We allow Kinetic Energy to boost the existing trend direction.
-        if abs(kinetic) > 1.2:
-            physics_alpha += kinetic * 0.8
+        # ==================================================================
+        # PHASE 2: INSTITUTIONAL GATEKEEPERS (The Protection)
+        # ==================================================================
 
-        # B. MOMENTUM SHOCK (Leading Indicator)
-        # Detects immediate acceleration/jerk. Great for early entries.
-        physics_alpha += shock
-
-        # C. COMPRESSION (The Spring Setup - MOST PROFITABLE)
-        # If Volatility is compressed (<0.6) AND Whales are active (>0.8)...
-        # This is a "Spring Loaded" setup. Massive boost to probability.
-        is_spring_loaded = False
-        if compression < 0.6 and abs(whale_z) > 0.8:
-            is_spring_loaded = True
-            # Determine direction based on existing flow
-            direction = 1.0 if (trend_alpha + shock) > 0 else -1.0
-            physics_alpha += (3.0 * direction)  # Huge Alpha Boost
-
-        physics_alpha = cap(physics_alpha)
-
-        # ------------------------------------------------------------------
-        # 4. TOTAL PROBABILITY
-        # ------------------------------------------------------------------
-        raw_alpha = trend_alpha + whale_z + reversion_alpha + event_alpha + physics_alpha
+        # Raw Probability
+        raw_alpha = trend_alpha + whale_z + reversion_alpha + physics_alpha
         final_probability = self._sigmoid(raw_alpha)
 
-        # Stability Dampener (Fakeout Filter)
-        # If volatility is expanding rapidly but there is NO Kinetic Mass (Low Volume),
-        # it's a fakeout (Pump & Dump). Reduce probability.
-        vol_slope = float(last.get("volatility_slope", 0))
-        if vol_slope > 0.25 and abs(kinetic) < 0.5:
-            # Drag score back to 50
-            final_probability = 50 + (final_probability - 50) * 0.6
+        # 1. Session Awareness
+        session_mod = 0
+        try:
+            hour = last.name.hour
+            if 0 <= hour < 8:
+                session_mod = -5  # Asia Discount
+            elif 13 <= hour < 16:
+                session_mod = +5  # NY/London Premium
+        except:
+            pass
 
-        # ------------------------------------------------------------------
-        # 5. INITIAL BIAS & SCORE
-        # ------------------------------------------------------------------
-        if final_probability > 55:
+        adjusted_score = final_probability + session_mod
+
+        # 2. Execution Gates
+        execution_gate = True
+        gate_reason = ""
+
+        # Liquidity Check
+        avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+        if last['volume'] < (avg_vol * self.MIN_VOLUME_RATIO):
+            execution_gate = False
+            gate_reason = "Low Liquidity"
+
+        # Volatility Shock Check
+        if float(last.get("atr_pct", 0)) > self.MAX_ATR_PCT:
+            execution_gate = False
+            gate_reason = "Max Volatility Exceeded"
+
+        # 3. Kill Switch -> Risk Protocol
+        kill_switch = False
+        if abs(shock) > 2.8:
+            kill_switch = True
+            gate_reason = "Extreme Volatility"
+
+        # ==================================================================
+        # PHASE 3: FINAL DECISION
+        # ==================================================================
+
+        # Force Neutrality if Gates Fail
+        if is_stagnant or not execution_gate or kill_switch:
+            adjusted_score = 50
+
+        # Determine Bias
+        score = int(adjusted_score)
+        bias = "HOLD"
+
+        if score >= 70:
             bias = "LONG"
-            score = final_probability
-        elif final_probability < 45:
+        elif score <= 30:
             bias = "SHORT"
-            score = 100 - final_probability
+            score = 100 - score
+        elif 60 <= score < 70:
+            bias = "WATCH"
+        elif 30 < score <= 40:
+            bias = "WATCH"
+            score = 100 - score
         else:
             bias = "HOLD"
             score = 50
 
-        # Score Compression (Make 90+ harder to get)
-        score = 50 + (score - 50) * 0.90
+        # Score Smoothing (UI Stability)
+        score = 50 + (score - 50) * 0.95
 
-        # ------------------------------------------------------------------
-        # 6. VISUAL STATE & LOGIC
-        # ------------------------------------------------------------------
-        thresh = self.CONFIRMATION_THRESH - (5 if trade_style == "SCALP" else 0)
+        # ==================================================================
+        # PHASE 4: OUTPUT CONSTRUCTION
+        # ==================================================================
 
-        regime_color = "gray"
-        display_bias = bias
+        # Lifecycle State
+        lifecycle = "WAITING"
+        if bias == "WATCH": lifecycle = "EMERGING"
+        if bias in ["LONG", "SHORT"]: lifecycle = "CONFIRMED"
+        if kill_switch: lifecycle = "SHIELDED"
 
-        # UI Fix: Entry always shows price
-        entry = price
-        stop, t1, t2, t3 = 0.0, 0.0, 0.0, 0.0
+        # Trade Levels (Hidden unless Confirmed)
+        entry = 0.0
+        stop = 0.0
+        t1 = 0.0
+        t2 = 0.0
+        t3 = 0.0
         expected_duration = "--"
-
-        # A. CONFIRMED TRADE
-        if score >= thresh:
-            regime_color = "green" if bias == "LONG" else "red"
-            display_bias = bias
-
-            atr = float(last.get("atr_14", price * 0.01))
-            stop_mult, tgt_mult = (1.0, 1.5) if trade_style == "SCALP" else (1.5, 3.0)
-
-            # If "Spring Loaded", extend targets because expansion will be large
-            if is_spring_loaded:
-                tgt_mult += 1.5
-                expected_duration = "Rapid Expansion"
-            else:
-                expected_duration = "4h - 24h"
-
-            direction = 1 if bias == "LONG" else -1
-            stop = price - direction * atr * stop_mult
-            t1 = price + direction * atr * tgt_mult
-            t2 = t1 + (abs(t1 - price) * 0.5) * direction
-            t3 = t1 + abs(t1 - price) * direction
-
-        # B. WATCHING STATE
-        elif score >= 60:
-            regime_color = "yellow"
-            display_bias = "WATCH"
-
-        # C. HOLD STATE
-        else:
-            regime_color = "gray"
-            display_bias = "HOLD"
-
-        # ------------------------------------------------------------------
-        # 7. EXPLAINABILITY (Updated for Physics)
-        # ------------------------------------------------------------------
-        drivers = []
-
-        # Priority 1: Physics Drivers
-        if is_spring_loaded:
-            drivers.append({"feature": "Physics", "desc": "Spring Loaded (Compression)", "importance": 98})
-        elif abs(kinetic) > 1.5:
-            drivers.append({"feature": "Physics", "desc": "High Kinetic Energy", "importance": 92})
-        elif abs(shock) > 1.5:
-            drivers.append({"feature": "Physics", "desc": "Momentum Shock", "importance": 88})
-
-        # Priority 2: Standard Drivers
-        if abs(whale_z) > 1.2:
-            drivers.append({"feature": "Volume", "desc": "Whale Activity", "importance": 85})
-        if abs(event_alpha) > 1.0:
-            drivers.append({"feature": "Event", "desc": "Liquidity Trap", "importance": 80})
-
-        # Fallback
-        if not drivers and regime_label == "TRENDING":
-            drivers.append({"feature": "Trend", "desc": "Market Structure", "importance": 75})
-
-        narrative = self._build_narrative(display_bias, score, regime_label, is_spring_loaded)
-
-        # Risk Reward
         rr_ratio = 0.0
-        if stop != 0:
+
+        if bias in ["LONG", "SHORT"]:
+            entry = price
+            atr = float(last.get("atr_14", price * 0.01))
+            direction = 1 if bias == "LONG" else -1
+
+            # Physics Extension
+            extension = 1.0 + (abs(physics_alpha) * 0.2)
+
+            stop = price - (direction * atr * 1.5)
+            t1 = price + (direction * atr * 2.0 * extension)
+            t2 = price + (direction * atr * 3.5 * extension)
+            t3 = price + (direction * atr * 5.0 * extension)
+
             risk = abs(entry - stop)
-            reward = abs(t1 - entry)
             if risk > 0:
-                rr_ratio = round(reward / risk, 2)
+                rr_ratio = round(abs(t1 - entry) / risk, 2)
+            expected_duration = "4h"
+
+        # Explainability (RETAIL FRIENDLY TERMS)
+        drivers = []
+        if score >= 60 or is_stagnant or kill_switch:
+            if kill_switch:
+                # RENAME: Kill Switch -> Risk Protocol
+                drivers.append({"desc": f"RISK PROTOCOL: {gate_reason}", "importance": 100})
+            elif is_stagnant:
+                drivers.append({"desc": "Retail Trap (Choppy)", "importance": 99})
+            else:
+                # Retail Friendly Mappings
+                if int(last.get("liq_sweep", 0)) != 0: drivers.append({"desc": "Stop Hunt", "importance": 95})
+                if is_spring_loaded:
+                    drivers.append({"desc": "Squeeze Setup", "importance": 98})
+                elif abs(kinetic) > 1.5:
+                    drivers.append({"desc": "Momentum", "importance": 92})
+
+                if abs(whale_z) > 1.2: drivers.append({"desc": "Smart Money", "importance": 85})
+                if abs(trend_alpha) > 1.2: drivers.append({"desc": "Trend", "importance": 75})
+
+        # Limit to top 3
+        drivers = sorted(drivers, key=lambda x: x.get('importance', 0), reverse=True)[:3]
+
+        narrative = self._build_narrative(bias, score, is_stagnant, is_spring_loaded, kill_switch, gate_reason)
 
         return SimpleNamespace(
-            bias=display_bias,
+            bias=bias,
             score=int(score),
+            price=price,
             entry=entry,
             stop=round(stop, 4),
             target1=round(t1, 4),
@@ -228,30 +230,37 @@ class CryptoQuantEngine:
             target3=round(t3, 4),
             rr_ratio=rr_ratio,
             expected_duration=expected_duration,
-            regime=regime_label,
-            regime_color=regime_color,
+            regime="IMPULSE" if abs(physics_alpha) > 1.5 else "FLOW",
+            regime_color="green" if bias == "LONG" else "red" if bias == "SHORT" else "yellow" if bias == "WATCH" else "gray",
             whale_zscore=round(whale_z, 2),
             whale_label="High" if abs(whale_z) > 1.5 else "Normal",
-            top_features=drivers[:3],  # Top 3 only
+            top_features=drivers,
             narrative=narrative,
+            lifecycle=lifecycle,
             flow_score=0.5
         )
 
-    def _build_narrative(self, bias, score, regime, is_spring=False):
+    def _build_narrative(self, bias, score, is_stagnant, is_spring, kill_switch, gate_reason):
+        if kill_switch:
+            return f"🛡️ RISK PROTOCOL ACTIVE: {gate_reason}. Capital Preserved."
+        if gate_reason:
+            return f"⚠️ Gate Closed: {gate_reason}."
+        if is_stagnant:
+            return "⚠️ Retail Trap Detected. Market is chopping."
         if bias == "HOLD":
-            return f"Neutral market ({regime.lower()}). Waiting for energy."
+            return "System Idle. No Edge."
         if bias == "WATCH":
-            return f"Kinetic energy building ({score}%). Waiting for trigger."
-
+            return f"Momentum building ({score}%)."
         if is_spring:
-            return "⚠️ SPRING LOADED: Volatility compression detected. Explosive move imminent."
+            return "⚡ SQUEEZE DETECTED: Explosive move imminent."
 
-        strength = "Strong" if score > 80 else "Moderate"
-        return f"{strength} Signal confirmed by physics engine."
+        return f"Confirmed institutional force detected."
 
     def _neutral_result(self, price, reason):
         return SimpleNamespace(
-            bias="HOLD", score=50, entry=price, stop=0.0, target1=0.0, target2=0.0,
+            bias="HOLD", score=50,
+            price=price, entry=0.0,
+            stop=0.0, target1=0.0, target2=0.0,
             target3=0.0, rr_ratio=0, expected_duration="--", regime="WAIT",
             regime_color="gray", whale_zscore=0, whale_label="Normal", top_features=[],
             narrative=reason, flow_score=0.5

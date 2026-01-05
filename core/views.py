@@ -99,12 +99,25 @@ def logout_view(request):
 # --- TERMINAL ---
 @login_required(login_url='login')
 def terminal_view(request):
-    profile = request.user.profile
-    if not profile.is_access_granted():
-        messages.warning(request, "Trial Expired. Please Upgrade to Access Terminal.")
-        return redirect('pricing')
-    context = {'days_left': profile.get_days_left(), 'is_premium': profile.is_premium,
-               'username': request.user.username}
+    # Calculate Trial Days
+    user = request.user
+    joined_date = user.date_joined
+    trial_end = joined_date + timedelta(days=21)
+    now = timezone.now()
+
+    remaining = (trial_end - now).days
+    days_left = max(0, remaining)
+
+    profile = user.profile
+
+    # Optional: You can block access here if you want strict enforcement
+    # But since API blocks data, visual access is fine.
+
+    context = {
+        'days_left': days_left,
+        'is_premium': profile.is_premium,
+        'username': request.user.username
+    }
     return render(request, 'core/terminal.html', context)
 
 
@@ -113,9 +126,13 @@ def terminal_view(request):
 def pricing_view(request):
     profile = request.user.profile
     if profile.subscription_status == 'cancellation_pending':
-        if profile.is_access_granted():
-            messages.info(request, "You have an active plan. Wait for it to expire before resubscribing.")
-            return redirect('settings')
+        # Safely check access
+        try:
+            if profile.is_access_granted():
+                messages.info(request, "You have an active plan. Wait for it to expire before resubscribing.")
+                return redirect('settings')
+        except:
+            pass
 
     key_id = os.getenv("RAZORPAY_KEY_ID")
     key_secret = os.getenv("RAZORPAY_KEY_SECRET")
@@ -134,8 +151,17 @@ def pricing_view(request):
     except Exception as e:
         print(f"Razorpay Init Error: {e}")
 
-    context = {"key_id": key_id, "sub_id": sub_id, "user_email": request.user.email,
-               "is_trial_expired": profile.is_trial_expired() and not profile.is_premium}
+    # Check expiration for UI
+    joined_date = request.user.date_joined
+    trial_end = joined_date + timedelta(days=21)
+    is_expired = (timezone.now() > trial_end) and not profile.is_premium
+
+    context = {
+        "key_id": key_id,
+        "sub_id": sub_id,
+        "user_email": request.user.email,
+        "is_trial_expired": is_expired
+    }
     return render(request, 'core/pricing.html', context)
 
 
@@ -203,7 +229,7 @@ def settings_view(request):
     from .forms import UserUpdateForm
     user = request.user
     profile = user.profile
-    profile.is_access_granted()
+
     if request.method == 'POST':
         form = UserUpdateForm(request.POST, instance=user)
         if form.is_valid():
@@ -221,13 +247,19 @@ def settings_view(request):
     return render(request, 'core/auth/settings.html', {'form': form})
 
 
-# --- JOURNAL ---
+# --- JOURNAL (READ-ONLY FOR EXPIRED) ---
 @login_required
 def journal_view(request):
     profile = request.user.profile
-    if not profile.is_access_granted():
-        messages.warning(request, "Access Expired. Upgrade to View Journal.")
-        return redirect('pricing')
+
+    # --- LOGIC UPDATE: ALLOW HISTORY, BUT SHOW WARNING ---
+    joined_date = request.user.date_joined
+    trial_end = joined_date + timedelta(days=21)
+    is_expired = (not profile.is_premium) and (timezone.now() > trial_end)
+
+    if is_expired:
+        messages.info(request, "Trial Expired. Journal is in History-Only Mode. No new signals will be added.")
+    # -----------------------------------------------------
 
     from .models import JournalEntry
     entries_list = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
@@ -389,7 +421,7 @@ def sitemap_view(request):
     return HttpResponse(content, content_type="application/xml")
 
 
-# --- CRON JOB TRIGGER ---
+# --- CRON JOB TRIGGER (AUTO-SIGNALS) ---
 def cron_scan_trigger(request, secret_key):
     from .models import JournalEntry, UserProfile
     from django.contrib.auth.models import User
@@ -411,10 +443,21 @@ def cron_scan_trigger(request, secret_key):
     engine = CryptoQuantEngine()
 
     now = timezone.now()
+
+    # --- CRITICAL FIX: EXCLUDE EXPIRED TRIAL USERS ---
+    # Only send signals to:
+    # 1. Superusers
+    # 2. Premium Users (Subscription Active)
+    # 3. Trial Users (Joined < 21 Days Ago)
+
+    trial_start_cutoff = now - timedelta(days=21)
+
     active_users = User.objects.filter(
         Q(is_superuser=True) |
-        Q(profile__subscription_end_date__gt=now)
+        Q(profile__is_premium=True, profile__subscription_end_date__gt=now) |
+        Q(profile__is_premium=False, date_joined__gt=trial_start_cutoff)
     ).distinct()
+    # -------------------------------------------------
 
     for symbol in watchlist:
         try:

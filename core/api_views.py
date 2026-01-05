@@ -5,8 +5,10 @@ import os
 import traceback
 import logging
 import concurrent.futures
+from datetime import timedelta
 
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
@@ -26,6 +28,19 @@ class AnalyzeCryptoView(APIView):
 
     def post(self, request):
         try:
+            # --- SECURITY FIX ---
+            user = request.user
+            is_premium = user.profile.is_premium if hasattr(user, 'profile') else False
+            joined_date = user.date_joined
+            trial_end = joined_date + timedelta(days=21)
+
+            if not is_premium and timezone.now() > trial_end:
+                return Response({
+                    "error": "Trial Expired. Institutional Access Revoked.",
+                    "redirect": "/pricing/"
+                }, status=403)
+            # --------------------
+
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper().replace("-", "")
             if not symbol.endswith("USDT") and not symbol.endswith("BTC"):
@@ -42,13 +57,6 @@ class AnalyzeCryptoView(APIView):
             engine = CryptoQuantEngine()
             res = engine.analyze(df, trade_style)
 
-            # ---------------------------------------------------------------
-            # ❌ DELETED SAFETY VALVE BLOCK
-            # The Engine (v5.4) now handles volatility logic internally.
-            # It will correctly return "WATCH" (Yellow) or "HOLD" (Gray)
-            # without this external override blocking it.
-            # ---------------------------------------------------------------
-
             news_data = []
             try:
                 news_data = NewsService.get_smart_insights(symbol)
@@ -57,19 +65,19 @@ class AnalyzeCryptoView(APIView):
 
             return Response({
                 "symbol": symbol,
-                "price": res.entry,
+                "price": res.price,  # <--- FIXED: MAPS TO MARKET PRICE
                 "signal": {
                     "bias": res.bias,
                     "probability": res.score,
                     "style": trade_style,
-                    "entry": res.entry,
+                    "entry": res.entry, # <--- FIXED: MAPS TO TRADE ENTRY
                     "stop": res.stop,
                     "target1": res.target1,
                     "target2": res.target2,
                     "target3": res.target3,
                     "rr": res.rr_ratio,
                     "duration": res.expected_duration,
-                    "narrative": getattr(res, 'narrative', "Analyzing...") # PASS NARRATIVE TO FRONTEND
+                    "narrative": res.narrative
                 },
                 "regime": {"phase": res.regime, "color": res.regime_color},
                 "whales": {"zscore": res.whale_zscore, "label": res.whale_label},
@@ -88,6 +96,13 @@ class BacktestCryptoView(APIView):
 
     def post(self, request):
         try:
+            user = request.user
+            is_premium = user.profile.is_premium if hasattr(user, 'profile') else False
+            trial_end = user.date_joined + timedelta(days=21)
+
+            if not is_premium and timezone.now() > trial_end:
+                return Response({"error": "Trial Expired"}, status=403)
+
             body = request.data
             symbol = body.get("symbol", "BTCUSDT").upper()
             if not symbol.endswith("USDT"): symbol += "USDT"
@@ -115,6 +130,7 @@ class SearchCryptoView(APIView):
 
 class GlobalSymbolsView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
         symbols = []
@@ -124,7 +140,8 @@ class GlobalSymbolsView(APIView):
                     reader = csv.DictReader(f)
                     for row in reader:
                         if 'symbol' in row: symbols.append(row['symbol'])
-            except Exception as e: pass
+            except Exception as e:
+                pass
         if not symbols: symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
         return Response(symbols)
 
@@ -133,16 +150,26 @@ class FindAlphaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # 1. Check Cache (5 Minutes)
+        user = request.user
+        is_premium = user.profile.is_premium if hasattr(user, 'profile') else False
+        joined_date = user.date_joined
+        trial_end = joined_date + timedelta(days=21)
+
+        if not is_premium and timezone.now() > trial_end:
+            return Response({
+                "status": "error",
+                "message": "Trial Expired. Upgrade to access Alpha Scanner.",
+                "redirect": "/pricing/"
+            }, status=403)
+
         cached_result = cache.get("alpha_opportunity_v1")
         if cached_result: return Response(cached_result)
 
-        # 2. Define Scan List
         vip_assets = [
             "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT",
             "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT",
             "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT",
-            "PEPEUSDT", "RNDRUSDT", "FETUSDT", "LTCUSDT"
+            "RNDRUSDT", "FETUSDT", "LTCUSDT"
         ]
 
         leaderboard = []
@@ -150,16 +177,10 @@ class FindAlphaView(APIView):
 
         def analyze_symbol(symbol):
             try:
-                # Fetch Data
                 df = MarketService.get_historical_data(symbol, market_type="PERP", trade_style="INTRADAY")
                 if df.empty: return None
-
-                # Analyze
                 res = engine.analyze(df, trade_style="INTRADAY")
 
-                # --- STRICT SNIPER FILTER ---
-                # 1. Must be LONG or SHORT (No WATCH, No HOLD)
-                # 2. Score must be >= 70 (Confirmed Strength)
                 if res.bias in ["LONG", "SHORT"] and res.score >= 70:
                     return {
                         "symbol": symbol,
@@ -176,15 +197,12 @@ class FindAlphaView(APIView):
                 return None
             return None
 
-        # 3. Parallel Execution (Fast Scan)
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = list(executor.map(analyze_symbol, vip_assets))
 
         leaderboard = [r for r in results if r is not None]
 
-        # 4. Final Decision
         if not leaderboard:
-            # EMPTY RESULT -> Triggers "Capital Preserved" Modal on Frontend
             result = {
                 "status": "empty",
                 "trade": {
@@ -195,10 +213,8 @@ class FindAlphaView(APIView):
                 }
             }
         else:
-            # Success -> Show Best Trade
             leaderboard.sort(key=lambda x: x['score'], reverse=True)
             result = {"status": "success", "trade": leaderboard[0]}
 
-        # Cache Result
         cache.set("alpha_opportunity_v1", result, 300)
         return Response(result)
