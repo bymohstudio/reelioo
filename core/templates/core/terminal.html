@@ -109,7 +109,7 @@
                 const logs = ["ESTABLISHING SECURE HANDSHAKE...", "PARSING L2 ORDER BOOK...", "CALCULATING IV SURFACE...", "DETECTING WHALE FLOW..."];
                 let logIdx = 0;
                 const logContainer = document.getElementById('loading-text');
-                if(logContainer) logContainer.innerHTML = '<p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING NEURAL BRIDGE...</p>';
+                if(logContainer) logContainer.innerHTML = '<p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING QUANT CORE...</p>';
 
                 const logInt = setInterval(() => {
                     if(logIdx < logs.length && logContainer) {
@@ -453,7 +453,7 @@
                 <span class="animate-pulse text-green-500">STATUS: PROCESSING</span>
             </div>
             <div id="loading-text" class="space-y-1.5 h-32 overflow-y-auto custom-scrollbar relative z-10 p-2 bg-[#050505] rounded border border-white/5">
-                <p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING NEURAL BRIDGE...</p>
+                <p class="text-emerald-500 font-bold animate-pulse">>> INITIALIZING QUANT CORE...</p>
             </div>
         </div>
     </div>
@@ -632,7 +632,7 @@
             <i data-lucide="crosshair" class="absolute inset-0 m-auto w-10 h-10 text-emerald-400"></i>
         </div>
         <h2 class="text-2xl font-black text-white tracking-widest mb-2" x-text="alphaScanText">INITIALIZING...</h2>
-        <p class="text-xs text-emerald-500 font-mono">NEURAL NETWORK ACTIVE</p>
+        <p class="text-xs text-emerald-500 font-mono">QUANT CORE ACTIVE...</p>
         <div class="mt-8 text-[10px] font-mono text-slate-500 text-center space-y-1 opacity-50">
             <p>fetching::deep_pool::perp_agg_trade</p>
             <p>calc::volatility_vectors::skew</p>
