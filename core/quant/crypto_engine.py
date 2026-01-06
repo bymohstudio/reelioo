@@ -15,25 +15,28 @@ def cap(x, limit=3.0):
 
 class CryptoQuantEngine:
     """
-    REELIOO QUANT PHYSICS ENGINE (v9.3 – Retail Gloss)
+    REELIOO QUANT PHYSICS ENGINE (v9.4 – Sniper Lane Model)
 
-    - Vocabulary: "Impulse" -> "SURGE", "Flow" -> "TREND"
-    - Tuning: Thresholds raised (65/80) to reduce signal spam.
-    - Safety: Friction Penalties + Risk Protocol active.
+    The "Code 3" Hybrid:
+    - Structure: Lane Model (Attack/Engage) for rich UI feedback.
+    - Safety: Strict "Code 1" Gates (0.6 Vol / 0.04 ATR) to prevent loss.
+    - Logic: Hard Gating. If conditions are bad, Lane = STAND DOWN.
+    - Fix: Full API compatibility (target3, regime, lifecycle).
     """
 
     def __init__(self):
         self.SIGMOID_K = 0.45
 
-        # --- TUNING: REDUCED NOISE ---
-        self.ATTACK_THRESH = 80  # 🟢 High Confidence (Was 75)
-        self.ENGAGE_THRESH = 65  # 🟡 Moderate Confidence (Was 60)
+        # --- THRESHOLDS (TUNED FOR PRECISION) ---
+        self.ATTACK_THRESH = 75  # 🟢 Sniper Entry (Full Size)
+        self.ENGAGE_THRESH = 65  # 🟡 Confirmation Entry (Reduced Size)
         self.PREPARE_THRESH = 50  # 🟠 Watch Mode
 
-        self.MIN_VOLUME_RATIO = 0.4
-        self.MAX_ATR_PCT = 0.06
+        # --- STRICT SAFETY GATES (FROM CODE 1) ---
+        self.MIN_VOLUME_RATIO = 0.6  # High standard for liquidity
+        self.MAX_ATR_PCT = 0.04  # Strict chop/wick filter
 
-        log.info("🚀 QuantPhysicsEngine v9.3 (Retail Gloss) Online")
+        log.info("🚀 QuantPhysicsEngine v9.4 (Sniper Lane) Online")
 
     def _sigmoid(self, x):
         return 100 / (1 + np.exp(-self.SIGMOID_K * x))
@@ -75,52 +78,72 @@ class CryptoQuantEngine:
 
         raw_score = self._sigmoid(trend_alpha + whale_z + reversion_alpha + physics_alpha)
 
-        # --- AXIS 2: EXECUTION QUALITY (Penalties) ---
+        # --- AXIS 2: HARD GATING (The Sniper Logic) ---
+        # We calculate the condition, but we do NOT apply a soft penalty.
+        # If the gate fails, we force the lane to "STAND DOWN".
+
+        gate_status = "OPEN"
+        gate_reason = ""
+
+        # 1. Friction Gate
         avg_friction = df['friction_coeff'].rolling(20).mean().iloc[-1]
-        friction_ratio = df['friction_coeff'].iloc[-1] / (avg_friction + 1e-9)
+        if last['friction_coeff'] > avg_friction * 1.8:
+            gate_status = "CLOSED"
+            gate_reason = "High Friction"
 
-        execution_penalty = 1.0
-
-        # Friction & Liquidity Penalties
-        if friction_ratio > 1.5: execution_penalty *= 0.85
+        # 2. Liquidity Gate (Strict 0.6 Ratio)
         avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-        if last['volume'] < (avg_vol * self.MIN_VOLUME_RATIO): execution_penalty *= 0.85
+        if last['volume'] < (avg_vol * self.MIN_VOLUME_RATIO):
+            gate_status = "CLOSED"
+            gate_reason = "Low Liquidity"
 
-        # Risk Protocol (Softened Kill Switch)
-        if abs(shock) > 2.8: execution_penalty *= 0.6
+        # 3. Volatility Gate (Strict 4%)
+        if float(last.get("atr_pct", 0)) > self.MAX_ATR_PCT:
+            gate_status = "CLOSED"
+            gate_reason = "Max Volatility Exceeded"
 
-        final_confidence = 50 + (raw_score - 50) * execution_penalty
+        # 4. Risk Protocol (Hard Kill)
+        kill_switch = False
+        if abs(shock) > 2.8:
+            kill_switch = True
+            gate_status = "CLOSED"
+            gate_reason = "Black Swan Event"
 
-        # --- DECISION LOGIC (Lanes) ---
+        # --- DECISION LOGIC (Lanes with Hard Gates) ---
         lane = "⚫ STAND DOWN"
         bias = "HOLD"
-        display_score = int(final_confidence)
 
-        if display_score >= self.ATTACK_THRESH:
-            lane = "🟢 ATTACK"
-            bias = "LONG"
-        elif display_score <= (100 - self.ATTACK_THRESH):
-            lane = "🟢 ATTACK"
-            bias = "SHORT"
-            display_score = 100 - display_score
-        elif display_score >= self.ENGAGE_THRESH:
-            lane = "🟡 ENGAGE"
-            bias = "LONG"
-        elif display_score <= (100 - self.ENGAGE_THRESH):
-            lane = "🟡 ENGAGE"
-            bias = "SHORT"
-            display_score = 100 - display_score
-        elif display_score >= self.PREPARE_THRESH:
-            lane = "🟠 PREPARE"
-            bias = "WATCH"
-        elif display_score <= (100 - self.PREPARE_THRESH):
-            lane = "🟠 PREPARE"
-            bias = "WATCH"
-            display_score = 100 - display_score
-        else:
-            lane = "⚫ STAND DOWN"
-            bias = "HOLD"
+        # If gates are closed, we force score to 50 regardless of alpha
+        if gate_status == "CLOSED":
             display_score = 50
+        else:
+            display_score = int(50 + (raw_score - 50) * 0.95)  # Slight smoothing
+
+            if display_score >= self.ATTACK_THRESH:
+                lane = "🟢 ATTACK"
+                bias = "LONG"
+            elif display_score <= (100 - self.ATTACK_THRESH):
+                lane = "🟢 ATTACK"
+                bias = "SHORT"
+                display_score = 100 - display_score
+            elif display_score >= self.ENGAGE_THRESH:
+                lane = "🟡 ENGAGE"
+                bias = "LONG"
+            elif display_score <= (100 - self.ENGAGE_THRESH):
+                lane = "🟡 ENGAGE"
+                bias = "SHORT"
+                display_score = 100 - display_score
+            elif display_score >= self.PREPARE_THRESH:
+                lane = "🟠 PREPARE"
+                bias = "WATCH"
+            elif display_score <= (100 - self.PREPARE_THRESH):
+                lane = "🟠 PREPARE"
+                bias = "WATCH"
+                display_score = 100 - display_score
+            else:
+                lane = "⚫ STAND DOWN"
+                bias = "HOLD"
+                display_score = 50
 
         # --- OUTPUT CONSTRUCTION ---
         entry = stop = t1 = t2 = t3 = 0.0
@@ -129,7 +152,7 @@ class CryptoQuantEngine:
             atr = float(last.get("atr_14", price * 0.01))
             direction = 1 if bias == "LONG" else -1
 
-            # Lane-based sizing
+            # Precision Sizing
             mult = 2.0 if lane == "🟢 ATTACK" else 1.5
 
             stop = price - direction * (atr * 1.5)
@@ -137,19 +160,16 @@ class CryptoQuantEngine:
             t2 = price + direction * (atr * mult * 2.0)
             t3 = price + direction * (atr * mult * 3.5)
 
-        # Retail Friendly Logic Vectors
         drivers = []
-        if display_score >= 60:  # Only show vectors if there's interest
+        if display_score >= 55:
             if is_spring_loaded: drivers.append({"desc": "Squeeze Setup", "importance": 95})
-            if abs(kinetic) > 1.2: drivers.append({"desc": "Surge Momentum", "importance": 85})  # RETAIL TERM
-            if friction_ratio < 1.0: drivers.append({"desc": "Clear Path", "importance": 80})  # RETAIL TERM
-            if execution_penalty < 1.0: drivers.append({"desc": "Trend Resistance", "importance": 70})  # RETAIL TERM
+            if abs(kinetic) > 1.2: drivers.append({"desc": "Surge Momentum", "importance": 85})
+            if gate_status == "OPEN": drivers.append({"desc": "Clean Traffic", "importance": 80})
+            if gate_status == "CLOSED": drivers.append({"desc": f"Gate: {gate_reason}", "importance": 100})
 
-        narrative = self._build_narrative(lane, display_score, is_spring_loaded, execution_penalty)
+        narrative = self._build_narrative(lane, display_score, is_spring_loaded, kill_switch, gate_reason)
 
-        # RETAIL FRIENDLY REGIME LABELS
-        # Impulse -> SURGE
-        # Flow    -> TREND
+        # Retail Friendly Regime Logic
         regime_label = "SURGE" if abs(physics_alpha) > 1.5 else "TREND"
 
         return SimpleNamespace(
@@ -161,11 +181,11 @@ class CryptoQuantEngine:
             stop=round(stop, 4),
             target1=round(t1, 4),
             target2=round(t2, 4),
-            target3=round(t3, 4),
+            target3=round(t3, 4),  # FIXED
             rr_ratio=2.0 if entry > 0 else 0.0,
             expected_duration="4h",
 
-            regime=regime_label,  # Fixed
+            regime=regime_label,  # FIXED
             regime_color="green" if lane == "🟢 ATTACK" else "yellow" if lane == "🟡 ENGAGE" else "gray",
 
             whale_zscore=round(whale_z, 2),
@@ -177,10 +197,11 @@ class CryptoQuantEngine:
             flow_score=0.5
         )
 
-    def _build_narrative(self, lane, score, is_spring, penalty):
-        if penalty < 0.7: return "⚠️ High Choppiness. Confidence Reduced."
+    def _build_narrative(self, lane, score, is_spring, kill_switch, gate_reason):
+        if kill_switch: return "🛡️ RISK PROTOCOL: Black Swan protection active."
+        if gate_reason: return f"⚠️ {gate_reason}. Trade blocked for safety."
         if lane == "🟢 ATTACK": return "Institutional Force Confirmed. Clear Path."
-        if lane == "🟡 ENGAGE": return f"Force present ({score}%). Moderate resistance."
+        if lane == "🟡 ENGAGE": return f"Force present ({score}%). Valid Entry."
         if lane == "🟠 PREPARE": return "Energy building. Awaiting trigger."
         if is_spring: return "⚡ SQUEEZE DETECTED: Volatility Compression."
         return "Market idle. Monitoring for force vectors."
@@ -188,9 +209,9 @@ class CryptoQuantEngine:
     def _neutral_result(self, price, reason):
         return SimpleNamespace(
             bias="HOLD", lane="⚫ STAND DOWN", score=50, price=price, entry=0.0,
-            stop=0.0, target1=0.0, target2=0.0, target3=0.0,
+            stop=0.0, target1=0.0, target2=0.0, target3=0.0,  # FIXED
             rr_ratio=0, expected_duration="--",
-            regime="SCANNING", regime_color="gray",  # RETAIL TERM
+            regime="SCANNING", regime_color="gray",
             whale_zscore=0, whale_label="Normal",
             top_features=[], narrative=reason,
             lifecycle="WAITING", flow_score=0.5
