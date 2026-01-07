@@ -15,62 +15,34 @@ def cap(x, limit=3.0):
 
 class CryptoQuantEngine:
     """
-    REELIOO QUANT PHYSICS ENGINE (v11.2 – Trend Guard Fix)
+    REELIOO QUANT PHYSICS ENGINE (v15.0 – UNIFIED FIELD)
 
-    - BASE: Regime-Aware Physics (Macro/Beta/Impulse profiles).
-    - FIX 1: "Reversal Guard" - Kills trade if trend stability drops during a dip.
-             (Prevents buying "Slow Bleed" reversals).
-    - FIX 2: Wider Stops (2.5 ATR) to survive modern volatility/wicks.
+    The "Holy Grail" Synthesis:
+    1. PHYSICS (v14): Detects the "Snap" (Jerk) of institutional entry.
+    2. CONTEXT (v5.4): Detects the "Spring" (Compression) and "Regime" (ER).
+    3. SAFETY (v5.4): Restores the 'Vol Slope' fakeout filter.
+
+    GOAL: PF > 6.0. High Accuracy. No Chasing Wicks.
     """
 
     def __init__(self):
         self.SIGMOID_K = 0.5
-        log.info("🚀 QuantPhysicsEngine v11.2 (Trend Guard Fix) Online")
 
-    def _get_asset_profile(self, symbol: str):
-        s = symbol.upper()
+        # --- THRESHOLDS ---
+        self.ATTACK_THRESH = 75  # 🟢 High Conviction
+        self.ENGAGE_THRESH = 65  # 🟡 Standard Entry
 
-        # 1. MACRO LEADERS (BTC, ETH) - Strict, Needs Stability
-        if any(x in s for x in ['BTC', 'ETH', 'BNB']):
-            return {
-                'type': 'MACRO',
-                'stability_window': 6,
-                'min_stability': 0.7,
-                'vol_gate': 0.04,
-                'penalty_mult': 12.0,
-                'strong_thresh': 78
-            }
+        # --- GATES (The "Rentec" Standards) ---
+        self.MIN_VOLUME_RATIO = 0.6  # Strict Liquidity
+        self.MAX_ATR_PCT = 0.05  # Volatility Guard
 
-        # 2. IMPULSE / MEME (PEPE, WIF) - Fast, High Volatility Allowed
-        elif any(x in s for x in ['PEPE', 'WIF', 'DOGE', 'SHIB', 'BONK', 'FLOKI']):
-            return {
-                'type': 'IMPULSE',
-                'stability_window': 3,
-                'min_stability': 0.5,
-                'vol_gate': 0.08,
-                'penalty_mult': 6.0,
-                'strong_thresh': 72
-            }
-
-        # 3. BETA (SOL, AVAX) - Standard Trenders
-        else:
-            return {
-                'type': 'BETA',
-                'stability_window': 5,
-                'min_stability': 0.6,
-                'vol_gate': 0.06,
-                'penalty_mult': 10.0,
-                'strong_thresh': 75
-            }
+        log.info("🚀 QuantPhysicsEngine v15.0 (Unified Field) Online")
 
     def _sigmoid(self, x):
         return 100 / (1 + np.exp(-self.SIGMOID_K * x))
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY") -> SimpleNamespace:
         price = 0.0
-        symbol_name = str(df.get("symbol", "UNKNOWN"))
-        profile = self._get_asset_profile(symbol_name)
-
         try:
             # 1. Data Enrichment
             df = generate_features(df)
@@ -81,135 +53,137 @@ class CryptoQuantEngine:
             else:
                 price = float(df.iloc[-1]["close"])
 
+            last = df.iloc[-1]
+
+            # 2. PHYSICS CALCULATIONS
             mass = df.get('quote_volume', df['volume'])
             velocity = df['close'].diff()
-            df['force'] = mass * velocity
-            df['friction_coeff'] = df.get('trades', 1) / (mass + 1)
+            acceleration = velocity.diff()
+            jerk = acceleration.diff()  # The "Snap"
 
-            # Dynamic Lookback Window
-            window_size = profile['stability_window']
-            recent_window = df.iloc[-window_size:]
-            last = df.iloc[-1]
+            # 3. REGIME CALCULATIONS (Restored from v5.4)
+            # Efficiency Ratio (ER): 1.0 = Straight Line, 0.0 = Random Noise
+            er = float(last.get("efficiency_ratio", 0.5))
+            regime = "TRENDING" if er > 0.4 else "CHOPPY"
+
+            # Compression (The Spring): Low values = High Potential Energy
+            compression = float(last.get("volatility_compression", 1.0))
+            is_compressed = compression < 0.6
 
         except Exception as e:
             return self._neutral_result(price, f"Data Error: {e}")
 
         # ==========================================
-        # PHASE 1: PHYSICS & STABILITY
+        # PHASE 1: VECTOR ANALYSIS
         # ==========================================
 
-        # Trend Vector
-        current_trend = cap(last.get("ema_diff", 0) * 100) * 2.0
+        # A. TREND VECTOR (Regime-Adjusted)
+        # If Choppy, we dampen the trend signal to avoid whipsaws.
+        raw_trend = cap(last.get("ema_diff", 0) * 100) * 2.0
+        trend_weight = 1.0 if regime == "TRENDING" else 0.5
+        trend_alpha = raw_trend * trend_weight
 
-        # Stability Check
-        trend_sign = np.sign(current_trend)
-        agreement_count = sum(np.sign(row) == trend_sign for row in recent_window["ema_diff"])
-        stability_ratio = agreement_count / window_size
+        # B. WHALE VECTOR (Smart Money)
+        whale_z = cap(float(last.get("whale_z", 0)))
 
-        trend_alpha = current_trend * stability_ratio
+        # C. KINETIC VECTOR (The v14 Upgrade)
+        # We use Jerk (Snap) for timing, but we verify it with Kinetic Energy (Mass).
+        jerk_val = float(jerk.iloc[-1]) if not pd.isna(jerk.iloc[-1]) else 0.0
+        kinetic_energy = float(last.get("kinetic_energy", 0))
 
-        # Confirmation Vectors
-        whale_z = cap(float(last.get("whale_z", 0))) * 1.0
-        kinetic = cap(float(last.get("kinetic_energy", 0))) * 1.5
+        physics_alpha = 0.0
 
-        # Pullback / Mismatch Logic
-        mismatch_penalty = 0
-        is_pullback = False
+        # Logic: We only care about the "Snap" if there is "Mass" behind it.
+        if abs(kinetic_energy) > 1.0:
+            physics_alpha += cap(jerk_val * 10.0)  # The Snap
+            physics_alpha += kinetic_energy * 0.5  # The Sustained Force
 
-        if np.sign(trend_alpha) != np.sign(kinetic) and abs(trend_alpha) > 0.5:
-            is_pullback = True
-            atr = float(last.get("atr_14", 1.0))
-            current_move_pct = abs(velocity.iloc[-1]) / price
-            volatility_ratio = current_move_pct / (atr / price + 0.0001)
-
-            # Penalize volatility during pullbacks
-            mismatch_penalty = profile['penalty_mult'] * max(1.0, min(3.0, volatility_ratio))
-
-        raw_alpha = trend_alpha + whale_z + kinetic
-        raw_score = self._sigmoid(raw_alpha)
+        # D. THE SPRING (The v5.4 Profit Multiplier)
+        # If market is compressed AND whales are active -> EXPLOSIVE SETUP
+        is_spring_loaded = False
+        if is_compressed and abs(whale_z) > 0.8:
+            is_spring_loaded = True
+            # Boost the score massively in the direction of the breakdown/breakout
+            # We use the Snap (Jerk) to determine direction of the break
+            breakout_dir = np.sign(jerk_val + trend_alpha)
+            physics_alpha += (4.0 * breakout_dir)  # Massive Alpha Boost
 
         # ==========================================
-        # PHASE 2: GATES (The v11.2 Fixes)
+        # PHASE 2: THE FAKEOUT FILTER (Restored)
         # ==========================================
+        # If Volatility is expanding (Slope > 0.25) but Kinetic Energy is low,
+        # it is a "Scam Wick" (Price moving without Mass).
+        vol_slope = float(last.get("volatility_slope", 0))
+        fakeout_penalty = 0
+
+        if vol_slope > 0.25 and abs(kinetic_energy) < 0.8:
+            fakeout_penalty = 30  # Heavy penalty to kill the trade
+
+        # ==========================================
+        # PHASE 3: SCORING & GATES
+        # ==========================================
+
+        total_alpha = trend_alpha + whale_z + physics_alpha
+        raw_score = self._sigmoid(total_alpha)
+
+        # Apply Fakeout Penalty
+        final_score = int(raw_score - fakeout_penalty)
+        final_score = max(0, min(100, final_score))
+
+        # GATES (The "Bouncers")
         gate_status = "OPEN"
         gate_reason = ""
 
-        # 1. Temporal Stability Gate (TIGHTENED FOR PULLBACKS)
-        # Fix: If we are in a "Dip", we demand HIGHER stability (0.9+)
-        # This prevents buying a dip that is actually a trend reversal.
-        required_stability = profile['min_stability']
-        if is_pullback:
-            required_stability = min(0.9, required_stability + 0.2)
-
-        if stability_ratio < required_stability:
+        # 1. Liquidity Gate
+        avg_vol = df['volume'].rolling(20).mean().iloc[-1]
+        if last['volume'] < (avg_vol * self.MIN_VOLUME_RATIO):
             gate_status = "CLOSED"
-            gate_reason = "Trend Degrading"
+            gate_reason = "Low Liquidity"
 
-        # 2. Friction Gate
-        avg_friction = df['friction_coeff'].rolling(20).mean().iloc[-1]
-        if pd.isna(avg_friction): avg_friction = 0
-
-        friction_limit = 2.2 if profile['type'] == 'IMPULSE' else 1.8
-        if last['friction_coeff'] > (avg_friction * friction_limit) and avg_friction > 0:
+        # 2. Volatility Gate (Unless Compressed)
+        # We allow high vol ONLY if it came from a "Spring" (Breakout)
+        atr_pct = float(last.get("atr_pct", 0))
+        if atr_pct > self.MAX_ATR_PCT and not is_spring_loaded:
             gate_status = "CLOSED"
-            gate_reason = "High Friction"
-
-        # 3. Volatility Gate
-        if float(last.get("atr_pct", 0)) > profile['vol_gate']:
-            gate_status = "CLOSED"
-            gate_reason = "Max Volatility"
-
-        # 4. Risk Protocol
-        shock = cap(float(last.get("momentum_shock", 0)) * 5)
-        kill_switch = False
-        if abs(shock) > 2.8:
-            kill_switch = True
-            gate_status = "CLOSED"
-            gate_reason = "Black Swan"
+            gate_reason = "Volatility Limit"
 
         # ==========================================
-        # PHASE 3: RETAIL LANE LOGIC
+        # PHASE 4: DECISION LANES
         # ==========================================
         lane = "⚫ HOLD"
         bias = "HOLD"
 
         if gate_status == "CLOSED":
-            display_score = 50
+            final_score = 50
         else:
-            base_score = int(50 + (raw_score - 50) * 0.95)
-            display_score = int(base_score - mismatch_penalty)
-            display_score = max(0, min(100, display_score))
-
-            # Dynamic Classification based on Score
-            if display_score >= profile['strong_thresh']:
+            if final_score >= self.ATTACK_THRESH:
                 lane = "🟢 STRONG BUY"
                 bias = "LONG"
-            elif display_score <= (100 - profile['strong_thresh']):
+            elif final_score <= (100 - self.ATTACK_THRESH):
                 lane = "🟢 STRONG SELL"
                 bias = "SHORT"
-                display_score = 100 - display_score
-            elif display_score >= 65:
+                final_score = 100 - final_score
+            elif final_score >= self.ENGAGE_THRESH:
                 lane = "🟡 BUY"
                 bias = "LONG"
-            elif display_score <= 35:
+            elif final_score <= (100 - self.ENGAGE_THRESH):
                 lane = "🟡 SELL"
                 bias = "SHORT"
-                display_score = 100 - display_score
-            elif display_score >= 50:
+                final_score = 100 - final_score
+            elif final_score >= 55:  # Watching Zone
                 lane = "🟠 WATCH"
                 bias = "WATCH"
+            elif final_score <= 45:
+                lane = "🟠 WATCH"
+                bias = "WATCH"
+                final_score = 100 - final_score
             else:
-                lane = "🟠 WATCH"
-                bias = "WATCH"
-                display_score = 100 - display_score
-
-            if display_score < 50:
                 lane = "⚫ HOLD"
                 bias = "HOLD"
-                display_score = 50
+                final_score = 50
 
         # ==========================================
-        # PHASE 4: OUTPUT (Wider Stops Fix)
+        # PHASE 5: EXECUTION
         # ==========================================
         entry = stop = t1 = t2 = t3 = 0.0
         if bias in ["LONG", "SHORT"]:
@@ -217,34 +191,28 @@ class CryptoQuantEngine:
             atr = float(last.get("atr_14", price * 0.01))
             direction = 1 if bias == "LONG" else -1
 
-            extension_mult = 1.5 if profile['type'] == 'IMPULSE' else 1.0
-            if not is_pullback:
-                extension_mult += (abs(kinetic) * 0.3)
+            # Target Extension: If Spring Loaded, aim higher.
+            extension = 1.5 if is_spring_loaded else 1.0
 
-            # FIX: WIDER STOPS (2.5 ATR) to survive wicks
-            stop = price - direction * (atr * 2.5)
+            stop = price - direction * (atr * 1.5)
+            t1 = price + direction * (atr * 2.0 * extension)
+            t2 = price + direction * (atr * 4.0 * extension)
+            t3 = price + direction * (atr * 6.0 * extension)
 
-            t1 = price + direction * (atr * 3.0 * extension_mult)
-            t2 = price + direction * (atr * 5.0 * extension_mult)
-            t3 = price + direction * (atr * 8.0 * extension_mult)
-
+        # Explainability
         drivers = []
-        if display_score >= 55:
-            drivers.append({"desc": f"Asset Class: {profile['type']}", "importance": 100})
-            if stability_ratio >= profile['min_stability']: drivers.append({"desc": "Trend Stable", "importance": 90})
-            if is_pullback:
-                drivers.append({"desc": "Healthy Pullback", "importance": 85})
-            elif abs(kinetic) > 1.0:
-                drivers.append({"desc": "Volume Surge", "importance": 90})
+        if final_score >= 60:
+            if is_spring_loaded: drivers.append({"desc": "Spring Loaded (Squeeze)", "importance": 100})
+            if abs(jerk_val) > 0.1: drivers.append({"desc": "Kinetic Snap", "importance": 90})
+            if abs(whale_z) > 1.2: drivers.append({"desc": "Whale Flow", "importance": 85})
             if gate_status == "CLOSED": drivers.append({"desc": f"Blocked: {gate_reason}", "importance": 100})
 
-        narrative = self._build_narrative(lane, display_score, gate_reason, is_pullback, profile['type'])
+        narrative = self._build_narrative(lane, final_score, gate_reason, is_spring_loaded, regime)
 
-        # Retail Friendly Regime
-        regime_label = "TRENDING" if abs(kinetic) > 1.2 else "RANGING"
+        regime_label = "SURGE" if abs(physics_alpha) > 1.5 else "FLOW"
 
         return SimpleNamespace(
-            bias=bias, lane=lane, score=display_score, price=price,
+            bias=bias, lane=lane, score=final_score, price=price,
             entry=entry, stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
             rr_ratio=2.0 if entry > 0 else 0.0, expected_duration="4h",
             regime=regime_label,
@@ -257,13 +225,13 @@ class CryptoQuantEngine:
             flow_score=0.5
         )
 
-    def _build_narrative(self, lane, score, gate_reason, is_pullback, asset_type):
-        if gate_reason: return f"⚠️ {gate_reason}. Trade blocked for safety."
-        if is_pullback and "BUY" in lane: return f"Dip Entry on {asset_type} structure."
-        if "STRONG" in lane: return f"High Conviction {asset_type} Setup. Full Alignment."
-        if "BUY" in lane or "SELL" in lane: return f"Trend Confirmed ({score}%). Standard Entry."
-        if "WATCH" in lane: return "Setup developing. Waiting for momentum."
-        return "No Edge. Capital Preserved."
+    def _build_narrative(self, lane, score, gate_reason, is_spring, regime):
+        if gate_reason: return f"⛔ {gate_reason}. Capital Preserved."
+        if is_spring: return "⚡ SPRING LOADED: Volatility Compression -> Explosive Move."
+        if "STRONG" in lane: return "High Conviction Kinetic Setup. Full Alignment."
+        if "BUY" in lane or "SELL" in lane: return f"Trend Confirmed ({regime.lower()}). Standard Entry."
+        if "WATCH" in lane: return "Energy building. Awaiting trigger."
+        return "Market idle. Scanning for edge."
 
     def _neutral_result(self, price, reason):
         return SimpleNamespace(
