@@ -15,15 +15,17 @@ def cap(x, limit=3.0):
 
 class CryptoQuantEngine:
     """
-    REELIOO QUANT PHYSICS ENGINE (v11.1 – Retail Standard)
+    REELIOO QUANT PHYSICS ENGINE (v11.2 – Trend Guard Fix)
 
-    - TERMINOLOGY UPDATE: "Attack/Engage" replaced with "Buy/Sell/Watch/Hold".
-    - LOGIC: Regime-Aware Physics (Macro/Beta/Impulse profiles).
+    - BASE: Regime-Aware Physics (Macro/Beta/Impulse profiles).
+    - FIX 1: "Reversal Guard" - Kills trade if trend stability drops during a dip.
+             (Prevents buying "Slow Bleed" reversals).
+    - FIX 2: Wider Stops (2.5 ATR) to survive modern volatility/wicks.
     """
 
     def __init__(self):
         self.SIGMOID_K = 0.5
-        log.info("🚀 QuantPhysicsEngine v11.1 (Retail Standard) Online")
+        log.info("🚀 QuantPhysicsEngine v11.2 (Trend Guard Fix) Online")
 
     def _get_asset_profile(self, symbol: str):
         s = symbol.upper()
@@ -36,7 +38,7 @@ class CryptoQuantEngine:
                 'min_stability': 0.7,
                 'vol_gate': 0.04,
                 'penalty_mult': 12.0,
-                'strong_thresh': 78  # Threshold for "STRONG BUY/SELL"
+                'strong_thresh': 78
             }
 
         # 2. IMPULSE / MEME (PEPE, WIF) - Fast, High Volatility Allowed
@@ -120,23 +122,30 @@ class CryptoQuantEngine:
             current_move_pct = abs(velocity.iloc[-1]) / price
             volatility_ratio = current_move_pct / (atr / price + 0.0001)
 
+            # Penalize volatility during pullbacks
             mismatch_penalty = profile['penalty_mult'] * max(1.0, min(3.0, volatility_ratio))
 
         raw_alpha = trend_alpha + whale_z + kinetic
         raw_score = self._sigmoid(raw_alpha)
 
         # ==========================================
-        # PHASE 2: GATES
+        # PHASE 2: GATES (The v11.2 Fixes)
         # ==========================================
         gate_status = "OPEN"
         gate_reason = ""
 
-        # Temporal Stability Gate
-        if stability_ratio < profile['min_stability']:
-            gate_status = "CLOSED"
-            gate_reason = "Trend Unstable"
+        # 1. Temporal Stability Gate (TIGHTENED FOR PULLBACKS)
+        # Fix: If we are in a "Dip", we demand HIGHER stability (0.9+)
+        # This prevents buying a dip that is actually a trend reversal.
+        required_stability = profile['min_stability']
+        if is_pullback:
+            required_stability = min(0.9, required_stability + 0.2)
 
-        # Friction Gate
+        if stability_ratio < required_stability:
+            gate_status = "CLOSED"
+            gate_reason = "Trend Degrading"
+
+        # 2. Friction Gate
         avg_friction = df['friction_coeff'].rolling(20).mean().iloc[-1]
         if pd.isna(avg_friction): avg_friction = 0
 
@@ -145,12 +154,12 @@ class CryptoQuantEngine:
             gate_status = "CLOSED"
             gate_reason = "High Friction"
 
-        # Volatility Gate
+        # 3. Volatility Gate
         if float(last.get("atr_pct", 0)) > profile['vol_gate']:
             gate_status = "CLOSED"
             gate_reason = "Max Volatility"
 
-        # Risk Protocol
+        # 4. Risk Protocol
         shock = cap(float(last.get("momentum_shock", 0)) * 5)
         kill_switch = False
         if abs(shock) > 2.8:
@@ -200,7 +209,7 @@ class CryptoQuantEngine:
                 display_score = 50
 
         # ==========================================
-        # PHASE 4: OUTPUT
+        # PHASE 4: OUTPUT (Wider Stops Fix)
         # ==========================================
         entry = stop = t1 = t2 = t3 = 0.0
         if bias in ["LONG", "SHORT"]:
@@ -212,10 +221,12 @@ class CryptoQuantEngine:
             if not is_pullback:
                 extension_mult += (abs(kinetic) * 0.3)
 
-            stop = price - direction * (atr * 1.5)
-            t1 = price + direction * (atr * 2.0 * extension_mult)
-            t2 = price + direction * (atr * 3.5 * extension_mult)
-            t3 = price + direction * (atr * 5.0 * extension_mult)
+            # FIX: WIDER STOPS (2.5 ATR) to survive wicks
+            stop = price - direction * (atr * 2.5)
+
+            t1 = price + direction * (atr * 3.0 * extension_mult)
+            t2 = price + direction * (atr * 5.0 * extension_mult)
+            t3 = price + direction * (atr * 8.0 * extension_mult)
 
         drivers = []
         if display_score >= 55:
