@@ -3,6 +3,7 @@ import json
 import logging
 import requests
 import concurrent.futures
+import razorpay  # REQUIRED for payments
 from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
@@ -81,7 +82,7 @@ def hx_analyze(request):
         return HttpResponse('<div class="text-center text-red-500 font-bold p-10">TRIAL EXPIRED</div>')
 
     symbol = request.POST.get("symbol", "").upper().strip()
-    if not symbol: return HttpResponse("")  # Safety check
+    if not symbol: return HttpResponse("")
 
     if not symbol.endswith("USDT"): symbol += "USDT"
     mode = request.POST.get("mode", "INTRADAY")
@@ -171,7 +172,6 @@ def hx_journal_add(request):
 def refresh_journal_entry(request, entry_id):
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
     msg_type, title, message = "info", "Market Data", "Synced."
-
     if entry.status == 'PENDING':
         try:
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
@@ -202,7 +202,6 @@ def refresh_journal_entry(request, entry_id):
                     message = f"Current: ${price}"
         except:
             msg_type, title = "error", "Sync Failed"
-
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
     response['HX-Trigger'] = json.dumps({'showJournalToast': {'type': msg_type, 'title': title, 'message': message}})
     return response
@@ -257,6 +256,7 @@ def cron_scan_trigger(request, secret_key):
 
 @login_required
 def global_symbols_view(request):
+    """API for search bar"""
     csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
     symbols = []
     if os.path.exists(csv_path):
@@ -277,15 +277,17 @@ def search_crypto_view(request):
 
 
 # ==============================================================================
-#  PAGE VIEWS
+#  PAGE VIEWS & AUTH
 # ==============================================================================
 
 def login_view(request):
     if request.user.is_authenticated: return redirect('terminal')
+
     if request.method == "POST":
         email = request.POST.get('email')
         password = request.POST.get('password')
         try:
+            # Login via Email
             user_obj = User.objects.get(email__iexact=email)
             user = authenticate(request, username=user_obj.username, password=password)
             if user:
@@ -295,6 +297,7 @@ def login_view(request):
                 messages.error(request, "Invalid password.")
         except User.DoesNotExist:
             messages.error(request, "No account found with this email.")
+
     return render(request, 'core/auth/login.html')
 
 
@@ -323,7 +326,6 @@ def landing_view(request):
 
 @login_required
 def terminal_view(request):
-    trial_end = request.user.date_joined + timedelta(days=21)
     return render(request, 'core/terminal.html', {'days_left': 21, 'is_premium': request.user.profile.is_premium})
 
 
@@ -362,20 +364,57 @@ def ops_dashboard_view(request):
                                                                          :10], 'win_rate': 68.5})
 
 
-# --- PRICING (FIXED BUTTON CONTEXT) ---
+# --- PRICING & PAYMENT LOGIC ---
+
 @login_required
 def pricing_view(request):
-    # Sends user_email and sub_id to context so the JS doesn't break
+    key_id = os.getenv("RAZORPAY_KEY_ID")
+    plan_id = os.getenv("RAZORPAY_PLAN_ID")
+
+    # Debug: Check logs if payment popup fails
+    if not key_id or not plan_id:
+        log.error("PAYMENT ERROR: Missing RAZORPAY_KEY_ID or RAZORPAY_PLAN_ID in .env")
+
     context = {
-        "key_id": os.getenv("RAZORPAY_KEY_ID"),
-        "sub_id": os.getenv("RAZORPAY_PLAN_ID", "sub_default_placeholder"),
+        "key_id": key_id,
+        "sub_id": plan_id or "sub_default_placeholder",
         "user_email": request.user.email
     }
     return render(request, 'core/pricing.html', context)
 
 
 @csrf_exempt
-def payment_success_view(request): return redirect('pricing')
+def payment_success_view(request):
+    """Handles the success callback from Razorpay"""
+    if request.method == "POST":
+        try:
+            client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
+
+            data = {
+                'razorpay_payment_id': request.POST.get('razorpay_payment_id'),
+                'razorpay_subscription_id': request.POST.get('razorpay_subscription_id'),
+                'razorpay_signature': request.POST.get('razorpay_signature')
+            }
+
+            # Verify Signature
+            client.utility.verify_subscription_payment_signature(data)
+
+            # Upgrade User
+            if request.user.is_authenticated:
+                profile = request.user.profile
+                profile.is_premium = True
+                profile.subscription_status = 'active'
+                profile.subscription_id = data['razorpay_subscription_id']
+                profile.save()
+                messages.success(request, "Reelioo Pro Activated Successfully!")
+                return render(request, 'core/auth/success.html')  # Render the Success Splash Page
+
+        except Exception as e:
+            log.error(f"Payment Verification Failed: {str(e)}")
+            messages.error(request, "Payment verification failed. Please contact support.")
+            return redirect('pricing')
+
+    return redirect('pricing')
 
 
 @login_required
