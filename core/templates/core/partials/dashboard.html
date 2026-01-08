@@ -13,7 +13,7 @@
                     <h2 class="text-6xl md:text-7xl font-black tracking-tighter leading-none {% if 'LONG' in res.bias %}text-emerald-400{% elif 'SHORT' in res.bias %}text-red-500{% else %}text-slate-500{% endif %}">
                         {% if 'LONG' in res.bias %}BUY{% elif 'SHORT' in res.bias %}SELL{% else %}HOLD{% endif %}
                     </h2>
-                    <span class="text-2xl font-black tracking-widest text-slate-700 select-none">{{ symbol }}</span>
+                    <span class="text-2xl font-black tracking-widest text-slate-600 select-none">{{ symbol }}</span>
                 </div>
                 <p class="text-xs font-bold uppercase tracking-[0.2em] mt-4 pl-3 border-l-2 text-slate-600 border-slate-700">
                     {{ res.narrative|truncatewords:10 }}
@@ -26,7 +26,7 @@
                     <circle cx="70" cy="70" r="60" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="calc(377 - (377 * {{ res.score }} / 100))" class="transition-all duration-1000 ease-out {% if 'LONG' in res.bias %}stroke-emerald-400{% elif 'SHORT' in res.bias %}stroke-red-500{% else %}stroke-slate-600{% endif %}" />
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center z-20">
-                    <span class="text-4xl font-black leading-none tracking-tighter text-white">{{ res.score }}<span class="text-lg opacity-60 text-slate-500">%</span></span>
+                    <span class="text-4xl font-black leading-none tracking-wide text-white">{{ res.score }}<span class="text-lg opacity-60 text-slate-500"> %</span></span>
                     <span class="text-[8px] font-black uppercase tracking-widest text-slate-500 mt-1">Confidence</span>
                 </div>
             </div>
