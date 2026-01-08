@@ -1,0 +1,52 @@
+<tr class="border-b border-white/5 hover:bg-white/[0.02] transition group animate-fade-in" id="entry-{{ entry.id }}">
+    <td class="p-5 align-middle font-mono text-xs text-slate-500 font-bold">
+        {{ entry.created_at|date:'Y-m-d' }}
+    </td>
+    <td class="p-5 align-middle font-black text-white text-base">
+        {{ entry.symbol }}
+    </td>
+    <td class="p-5 align-middle">
+        {% if entry.bias == 'LONG' %}
+            <span class="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded uppercase tracking-wider">LONG</span>
+        {% elif entry.bias == 'SHORT' %}
+            <span class="text-[10px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded uppercase tracking-wider">SHORT</span>
+        {% else %}
+            <span class="text-[10px] font-black text-slate-400 bg-slate-500/10 border border-slate-500/20 px-3 py-1 rounded uppercase tracking-wider">{{ entry.bias }}</span>
+        {% endif %}
+    </td>
+    <td class="p-5 align-middle text-right font-mono font-bold text-slate-300">
+        {{ entry.entry_price }}
+    </td>
+    <td class="p-5 align-middle text-right font-mono font-bold text-emerald-500">
+        {{ entry.target }}
+    </td>
+    <td class="p-5 align-middle text-center">
+        <span class="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider min-w-[80px]
+            {% if entry.status == 'PENDING' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-500
+            {% elif entry.status == 'WIN' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400
+            {% elif entry.status == 'LOSS' %}bg-red-500/10 border border-red-500/20 text-red-400
+            {% else %}bg-slate-800 border border-slate-700 text-slate-400{% endif %}">
+            {{ entry.status }}
+        </span>
+    </td>
+    <td class="p-5 align-middle text-right">
+        <div class="flex items-center justify-end gap-2">
+            <button hx-post="{% url 'refresh_journal_entry' entry.id %}"
+                    hx-target="#entry-{{ entry.id }}"
+                    hx-swap="outerHTML"
+                    class="p-2 hover:bg-blue-500/10 border border-transparent hover:border-blue-500/30 rounded-lg text-slate-500 hover:text-blue-400 transition [&.htmx-request>svg]:animate-spin"
+                    title="Sync">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+
+            <button hx-delete="{% url 'delete_journal_entry' entry.id %}"
+                    hx-target="#entry-{{ entry.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Delete this trade?"
+                    class="p-2 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-lg text-slate-500 hover:text-red-400 transition"
+                    title="Delete">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </td>
+</tr>

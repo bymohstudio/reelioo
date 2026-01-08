@@ -210,12 +210,19 @@ class CryptoQuantEngine:
 
         # Explainability
         drivers = []
-        if final_score >= 60:
-            if current_er > 0.6: drivers.append({"desc": "Fractal Alignment", "importance": 100})
-            if is_spring_loaded: drivers.append({"desc": "Spring Compression", "importance": 95})
-            if abs(jerk_val) > 0.1: drivers.append({"desc": "Kinetic Snap", "importance": 90})
-            if is_divergence: drivers.append({"desc": "⚠️ FORCE DIVERGENCE", "importance": -50})
-            if gate_status == "CLOSED": drivers.append({"desc": f"Blocked: {gate_reason}", "importance": 100})
+        # 1. Physics Drivers
+        if abs(whale_z) > 1.5: drivers.append({"desc": "Whale Accumulation", "importance": 95})
+        if abs(jerk_val) > 0.1: drivers.append({"desc": "Kinetic Snap", "importance": 90})
+        if abs(trend_alpha) > 1.0: drivers.append({"desc": "Trend Flow", "importance": 80})
+
+        # 2. Gate Drivers (Negative)
+        if gate_status == "CLOSED":
+            drivers.append({"desc": f"Blocked: {gate_reason}", "importance": 100})
+
+        # 3. FALLBACK DRIVER (The Fix)
+        # If score is high but no specific vector triggered, blame the "Unified Field"
+        if final_score >= 60 and not drivers:
+            drivers.append({"desc": "Composite Force", "importance": 75})
 
         narrative = self._build_narrative(lane, final_score, gate_reason, is_spring_loaded, is_divergence)
 

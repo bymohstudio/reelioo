@@ -1,0 +1,44 @@
+{% if stats.total_trades > 0 %}
+<div class="w-full space-y-6 font-sans">
+
+    <div class="grid grid-cols-3 gap-4">
+        <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 text-center">
+            <span class="text-[9px] text-slate-500 uppercase font-black tracking-widest block mb-1">Win Rate</span>
+            <div class="text-2xl font-mono font-bold text-emerald-400">{{ stats.win_rate }}%</div>
+        </div>
+        <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 text-center">
+            <span class="text-[9px] text-slate-500 uppercase font-black tracking-widest block mb-1">Profit Factor</span>
+            <div class="text-2xl font-mono font-bold text-blue-400">{{ stats.profit_factor }}</div>
+        </div>
+        <div class="bg-[#0b1121] p-4 rounded-xl border border-white/5 text-center">
+            <span class="text-[9px] text-slate-500 uppercase font-black tracking-widest block mb-1">Trades</span>
+            <div class="text-2xl font-mono font-bold text-white">{{ stats.total_trades }}</div>
+        </div>
+    </div>
+
+    <div>
+        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Recent Executions</h4>
+        <div class="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+            {% for t in stats.trades_log %}
+            <div class="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-lg hover:bg-white/10 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-bold
+                        {% if t.result == 'WIN' %}bg-emerald-500/20 text-emerald-400{% else %}bg-red-500/20 text-red-400{% endif %}">
+                        {{ t.result|slice:":1" }}
+                    </span>
+                    <span class="font-mono text-slate-400 text-xs font-bold">${{ t.entry }}</span>
+                </div>
+                <span class="font-mono font-bold text-sm {% if t.pnl > 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                    {% if t.pnl > 0 %}+{% endif %}{{ t.pnl }}%
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center h-full py-12 text-slate-500">
+    <i data-lucide="bar-chart-2" class="w-12 h-12 mb-4 opacity-20"></i>
+    <p class="text-xs font-black uppercase tracking-widest">No trades found in simulation window.</p>
+</div>
+{% endif %}

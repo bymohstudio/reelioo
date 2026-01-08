@@ -4,13 +4,38 @@
 <div class="max-w-2xl mx-auto px-6 py-20 font-sans" x-data="{ cancelModal: false, failModal: {{ form.errors|yesno:'true,false' }} }">
     <h1 class="text-3xl font-black text-white mb-2">Account Settings</h1>
 
-    <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 mb-8">
+    <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl p-8 mb-8 shadow-xl">
        <form method="post" class="space-y-6">
            {% csrf_token %}
-           <div><label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Username</label>{{ form.username }}</div>
-           <div><label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Email</label>{{ form.email }}</div>
-           <div><label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Country</label>{{ form.country }}</div>
-           <button type="submit" class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition">Save Changes</button>
+
+           <div>
+               <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Username</label>
+               {{ form.username }}
+               {% if form.username.errors %}<p class="text-red-500 text-[10px] mt-1">{{ form.username.errors.0 }}</p>{% endif %}
+           </div>
+
+           <div>
+               <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Email</label>
+               {{ form.email }}
+               {% if form.email.errors %}<p class="text-red-500 text-[10px] mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+           </div>
+
+           <div>
+               <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Country</label>
+               {{ form.country }}
+               {% if form.country.errors %}<p class="text-red-500 text-[10px] mt-1">{{ form.country.errors.0 }}</p>{% endif %}
+           </div>
+
+           <div>
+               <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">New Password</label>
+               {{ form.password }}
+               <p class="text-[10px] text-slate-600 mt-1">Leave blank to keep your current password.</p>
+               {% if form.password.errors %}<p class="text-red-500 text-[10px] mt-1">{{ form.password.errors.0 }}</p>{% endif %}
+           </div>
+
+           <button type="submit" class="px-6 py-3 bg-white text-black font-bold text-xs rounded-lg uppercase tracking-widest hover:bg-slate-200 transition shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+               Save Changes
+           </button>
        </form>
     </div>
 
@@ -21,7 +46,7 @@
                 <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Current Status</p>
                 {% if user.profile.is_premium and user.profile.subscription_status == 'active' %}
                     <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide">
-                        <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> SUPREME ACTIVE
+                        <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> PRO ACTIVE
                     </div>
                     <p class="text-[10px] text-slate-600 font-mono">Renews automatically.</p>
                 {% elif user.profile.subscription_status == 'cancellation_pending' %}

@@ -1,5 +1,4 @@
 import os
-import json
 import logging
 from datetime import datetime
 from django.core.cache import cache
@@ -11,65 +10,48 @@ log = logging.getLogger(__name__)
 class NewsService:
     """
     Reelioo V2 Neural Engine.
-    Uses OpenAI GPT-4o-mini to generate institutional-grade market briefs.
+    Generates high-fidelity institutional market notes.
     """
 
     @staticmethod
     def get_smart_insights(symbol="BTC"):
         coin = symbol.replace("USDT", "").replace("-PERP", "").upper()
-        cache_key = f"ai_insights_v2:{coin}"
+        cache_key = f"desk_note_v7:{coin}"
 
-        # 1. CACHE CHECK (2 Hours - Strategic Insights)
+        # 1. Cache Check
         cached = cache.get(cache_key)
         if cached: return cached
 
-        # 2. OPENAI GENERATION
+        # 2. OpenAI Generation
         try:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+            # PROMPT: Enforce "TAG|Message" format
             prompt = (
-                f"Act as a senior quantitative analyst. "
-                f"Generate 3 distinct, high-alpha market insights for {coin} based on current market structure. "
-                f"Focus strictly on: Order Flow, Volatility Regimes, and Macro Correlation. "
-                f"Use professional, terse language. No financial advice. Max 15 words per point. "
-                f"Return ONLY a raw JSON list of strings."
+                f"Analyze {coin} market structure. Return a single string in this exact format: 'TAG|Message'. "
+                f"The TAG must be 1-3 words, uppercase (e.g. LIQUIDITY GRAB, WHALE BUYING, STOP HUNT). "
+                f"The Message must be concise (max 12 words) and actionable. "
+                f"Example output: 'ORDER BLOCK|High volume rejection at 60k confirms support.'"
             )
 
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # Cost-effective & Fast
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.5,
-                max_tokens=150
+                temperature=0.4, max_tokens=40
             )
 
-            content = response.choices[0].message.content.strip()
-            # Clean Markdown
-            if content.startswith("```"):
-                content = content.split("```")[1].replace("json", "").strip()
+            content = response.choices[0].message.content.strip().replace('"', '')
 
-            insights = json.loads(content)
+            # Fallback if AI forgets format
+            if "|" not in content:
+                content = f"MARKET NOTE|{content}"
 
-            # Format
-            data = []
-            for txt in insights:
-                data.append({
-                    "title": txt,
-                    "source": "REELIOO NEURAL",
-                    "url": "#",
-                    "published_at": datetime.now().isoformat()
-                })
-
-            if data:
-                cache.set(cache_key, data, timeout=7200)
-                return data
+            if content:
+                cache.set(cache_key, content, timeout=7200)
+                return content
 
         except Exception as e:
-            log.error(f"AI Insight Error: {e}")
+            log.error(f"AI Error: {e}")
 
-        # 3. FALLBACK
-        return [
-            {"title": f"Volatility matrix calculation active for {coin}.", "source": "SYSTEM",
-             "published_at": datetime.now().isoformat()},
-            {"title": "Monitoring institutional order block depth.", "source": "QUANT CORE",
-             "published_at": datetime.now().isoformat()}
-        ]
+        # 3. Fallback
+        return f"VOLATILITY ALERT|Liquidity thin at current levels, expect rapid moves."

@@ -1,242 +1,86 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 font-sans min-h-screen relative" x-data="journal()">
+<div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-12 font-sans min-h-screen relative" x-data>
 
-    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
         <div>
-            <h1 class="text-3xl font-black text-white mb-2">Performance Journal</h1>
-            <p class="text-sm text-slate-500">Your personal trading ledger.</p>
-            <p class="text-[10px] text-slate-600 mt-2 flex items-center gap-1.5 bg-white/5 w-fit px-2 py-1 rounded border border-white/5">
-                <i data-lucide="database" class="w-3 h-3 text-slate-500"></i>
-                <span>Data Retention Policy: Signals older than 90 days are automatically overwritten.</span>
-            </p>
+            <h1 class="text-4xl font-black text-white mb-2 tracking-tight">Performance Ledger</h1>
+            <p class="text-sm text-slate-500 font-medium">Your institutional trading record.</p>
+        </div>
+        <div class="flex items-center gap-2 bg-[#0b1121] px-4 py-2 rounded-lg border border-white/5">
+            <i data-lucide="database" class="w-3 h-3 text-blue-500"></i>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">90-Day Retention</span>
         </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
-            <div class="flex justify-between items-start relative z-10">
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
+            <div class="relative z-10 flex justify-between items-start">
                 <div>
-                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Net Growth (ROI)</span>
-                    <span class="text-3xl font-black tracking-tighter {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
-                        {% if net_roi > 0 %}+{% endif %}{{ net_roi }}%
+                    <span class="text-[10px] uppercase text-slate-500 font-black tracking-widest block mb-2">Net Growth (R)</span>
+                    <span class="text-4xl font-black tracking-tighter {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                        {% if net_roi > 0 %}+{% endif %}{{ net_roi }}
                     </span>
                 </div>
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
             </div>
         </div>
-
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
-            <div class="flex justify-between items-start relative z-10">
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
+            <div class="relative z-10 flex justify-between items-start">
                 <div>
-                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded border
-                            {% if profit_factor >= 2.0 %}text-emerald-400 border-emerald-500/30 bg-emerald-500/10
-                            {% elif profit_factor >= 1.5 %}text-blue-400 border-blue-500/30 bg-blue-500/10
-                            {% elif profit_factor >= 1.0 %}text-yellow-400 border-yellow-500/30 bg-yellow-500/10
-                            {% else %}text-red-400 border-red-500/30 bg-red-500/10{% endif %}">
-                            {% if profit_factor >= 2.0 %}EXCELLENT
-                            {% elif profit_factor >= 1.5 %}GOOD
-                            {% elif profit_factor >= 1.0 %}PROFITABLE
-                            {% else %}UNPROFITABLE{% endif %}
-                        </span>
-                    </div>
+                    <span class="text-[10px] uppercase text-slate-500 font-black tracking-widest block mb-2">Profit Factor</span>
+                    <span class="text-4xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
                 </div>
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="scale" class="w-5 h-5"></i></div>
             </div>
         </div>
-
-        <div class="bg-[#0a0a0a] border border-white/10 rounded-xl p-6 relative overflow-hidden group">
-            <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
-            <div class="flex justify-between items-start relative z-10">
-                <div><span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span><span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span></div>
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
+            <div class="relative z-10 flex justify-between items-start">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-black tracking-widest block mb-2">Active Signals</span>
+                    <span class="text-4xl font-black text-white tracking-tighter">{{ active_pending }}</span>
+                </div>
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="activity" class="w-5 h-5"></i></div>
             </div>
         </div>
     </div>
 
-    <div class="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
+    <div class="bg-[#0b1121] border border-white/5 rounded-2xl overflow-hidden shadow-2xl relative">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="border-b border-white/5 bg-white/[0.02]">
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Symbol</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Signal</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Entry</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Target</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Result</th>
-                        <th class="p-5 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Action</th>
+                    <tr class="border-b border-white/5 bg-[#0f172a]">
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Date</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Symbol</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Signal</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Entry</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Target</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
+                        <th class="p-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="text-sm text-slate-300">
                     {% for entry in page_obj %}
-                    <tr class="border-b border-white/5 hover:bg-white/[0.02] transition group" x-show="!deleted.includes({{ entry.id }})">
-                        <td class="p-5 align-middle font-mono text-xs text-slate-500" x-data x-text="new Date('{{ entry.created_at|date:'c' }}').toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})"></td>
-                        <td class="p-5 align-middle font-bold text-white">
-                            {{ entry.symbol }}
-                            <span class="block text-[9px] font-normal text-slate-500 font-mono">LEV: {{ entry.leverage }}</span>
-                        </td>
-                        <td class="p-5 align-middle">
-                            {% if entry.status == 'SHIELD' or entry.status == 'SAVED' or entry.status == 'MISSED' %}
-                                <span class="text-[10px] font-bold text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2 py-1 rounded flex items-center gap-1 w-fit"><i data-lucide="shield" class="w-3 h-3"></i> BLOCKED</span>
-                            {% elif entry.bias == 'LONG' %}
-                                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">LONG</span>
-                            {% else %}
-                                <span class="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded">SHORT</span>
-                            {% endif %}
-                            <div class="mt-1 text-[9px] text-slate-600 font-mono">{{ entry.confidence }}% Conf.</div>
-                        </td>
-                        <td class="p-5 align-middle text-right font-mono">{{ entry.entry_price }}</td>
-                        <td class="p-5 align-middle text-right font-mono text-emerald-500/80">{{ entry.target }}</td>
-
-                        <td class="p-5 align-middle text-center">
-                            <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide min-w-[70px]
-                                {% if entry.status == 'PENDING' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-500
-                                {% elif entry.status == 'WIN' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400
-                                {% elif entry.status == 'LOSS' %}bg-red-500/10 border border-red-500/20 text-red-400
-                                {% else %}bg-slate-800 border border-slate-700 text-slate-400{% endif %}">
-                                {{ entry.status }}
-                            </span>
-                        </td>
-
-                        <td class="p-5 align-middle text-right">
-                            <div class="flex items-center justify-end gap-2">
-                                <button @click="checkResult({{ entry.id }})" class="p-2 hover:bg-blue-500/20 rounded-lg text-slate-500 hover:text-blue-400 transition" title="Refresh Status">
-                                    <i data-lucide="refresh-cw" class="w-4 h-4" :class="loading === {{ entry.id }} ? 'animate-spin' : ''"></i>
-                                </button>
-                                <button @click="deleteEntry({{ entry.id }})" class="p-2 hover:bg-red-500/20 rounded-lg text-slate-500 hover:text-red-400 transition" title="Delete Entry">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
+                        {% include "core/partials/journal_row.html" with entry=entry %}
                     {% empty %}
-                    <tr><td colspan="7" class="p-12 text-center text-slate-500 text-xs italic">No trades recorded yet.</td></tr>
+                    <tr><td colspan="7" class="p-16 text-center text-slate-500 text-xs font-bold uppercase tracking-widest">No entries found.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div class="p-5 border-t border-white/5 flex justify-between items-center">
-            <span class="text-[10px] text-slate-600 uppercase tracking-widest">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <div class="p-5 border-t border-white/5 flex justify-between items-center bg-[#0f172a]">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             <div class="flex gap-2">
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">PREV</a>
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 bg-[#1e293b] hover:bg-[#334155] rounded text-[10px] text-white font-bold uppercase tracking-wider transition">Previous</a>
                 {% endif %}
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">NEXT</a>
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 bg-[#1e293b] hover:bg-[#334155] rounded text-[10px] text-white font-bold uppercase tracking-wider transition">Next</a>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
-
-<script>
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-document.addEventListener('alpine:init', () => {
-    Alpine.data('journal', () => ({
-        loading: null,
-        deleted: [],
-
-        async checkResult(id) {
-            this.loading = id;
-            // CHANGED: Position to top-end for better visibility
-            const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, background: '#1e293b', color: '#fff' });
-            Toast.fire({ icon: 'info', title: 'Syncing result...' });
-
-            try {
-                const token = getCookie('csrftoken');
-
-                const res = await fetch(`/api/journal/refresh/${id}/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': token
-                    }
-                });
-
-                if (!res.ok) throw new Error();
-
-                const data = await res.json();
-
-                if(data.status === 'success') {
-                    if(data.new_status === 'PENDING') {
-                        Toast.fire({ icon: 'info', title: `Status: Pending (Price: ${data.current_price || '--'})` });
-                    } else {
-                        Toast.fire({ icon: 'success', title: `Trade Closed: ${data.new_status}` });
-                        setTimeout(() => location.reload(), 1500);
-                    }
-                } else {
-                    throw new Error();
-                }
-            } catch(e) {
-                Toast.fire({ icon: 'error', title: 'Sync Failed' });
-            } finally {
-                this.loading = null;
-            }
-        },
-
-        async deleteEntry(id) {
-            const result = await Swal.fire({
-                title: 'Delete Entry?',
-                text: "This cannot be undone.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                background: '#0a0a0a',
-                color: '#fff',
-                confirmButtonText: 'Yes, delete it'
-            });
-
-            if (result.isConfirmed) {
-                try {
-                    const token = getCookie('csrftoken');
-                    const res = await fetch(`/api/journal/delete/${id}/`, {
-                        method: 'DELETE',
-                        headers: {'X-CSRFToken': token}
-                    });
-
-                    if(res.ok) {
-                        this.deleted.push(id);
-                        Swal.fire({
-                            title: 'Deleted!',
-                            icon: 'success',
-                            background: '#0a0a0a',
-                            color: '#fff',
-                            showConfirmButton: false,
-                            timer: 1000
-                        });
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        throw new Error();
-                    }
-                } catch(e) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'Could not delete entry', background: '#0a0a0a', color: '#fff' });
-                }
-            }
-        }
-    }));
-});
-</script>
 {% endblock %}
