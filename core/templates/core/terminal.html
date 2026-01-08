@@ -7,7 +7,21 @@
         mode: 'INTRADAY',
         suggestions: [],
         allSymbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT'],
-        showAlpha: false
+        showAlpha: false,
+        validateSearch() {
+            if (!this.symbol || this.symbol.trim() === '') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Input Required',
+                    text: 'Please enter a coin symbol (e.g. BTC) to run the analysis.',
+                    background: '#0f172a',
+                    color: '#fff',
+                    confirmButtonColor: '#2563eb'
+                });
+                return;
+            }
+            this.$refs.scanForm.requestSubmit();
+        }
      }"
      x-init="
         fetch('/api/symbols/').then(r => r.json()).then(data => { if(Array.isArray(data)) allSymbols = data; });
@@ -76,7 +90,7 @@
                               hx-target="#results-view"
                               hx-indicator="#loading-view"
                               x-ref="scanForm"
-                              @submit.prevent="$el.requestSubmit()"
+                              @submit.prevent="validateSearch()"
                               class="space-y-6">
 
                             <div class="relative group">
@@ -94,7 +108,7 @@
                                      class="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-slate-700 rounded-xl z-50 shadow-2xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar"
                                      x-cloak x-transition>
                                     <template x-for="s in suggestions">
-                                        <div @click="symbol = s; suggestions = []; $nextTick(() => $refs.scanForm.requestSubmit())"
+                                        <div @click="symbol = s; suggestions = []; $nextTick(() => validateSearch())"
                                              class="px-5 py-4 hover:bg-slate-800 cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center transition">
                                             <span class="text-sm font-bold text-white" x-text="s"></span>
                                             <span class="text-[9px] text-slate-500 font-mono font-bold">PERP</span>
@@ -113,7 +127,7 @@
                         <button hx-post="{% url 'hx_backtest' %}"
                                 hx-target="#backtest-content"
                                 hx-include="[name='symbol'], [name='mode']"
-                                onclick="document.getElementById('backtest-modal').classList.remove('hidden')"
+                                @click="if(!symbol){ Swal.fire({icon:'warning', title:'Input Required', text:'Enter a coin symbol first.', background:'#0f172a', color:'#fff'}); } else { document.getElementById('backtest-modal').classList.remove('hidden') }"
                                 class="w-full py-4 rounded-xl border border-slate-700 bg-[#020617] text-slate-400 hover:text-white hover:border-slate-500 transition font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
                             <i data-lucide="history" class="w-4 h-4"></i> Run Historical Simulation
                         </button>
@@ -121,11 +135,11 @@
                         <div class="pt-6 border-t border-white/5">
                             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 block">Market Radar</label>
                             <div class="grid grid-cols-2 gap-3">
-                                <button type="button" @click="symbol='BTCUSDT'; $nextTick(() => $refs.scanForm.requestSubmit())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-orange-500/50 transition group text-left w-full">
+                                <button type="button" @click="symbol='BTCUSDT'; $nextTick(() => validateSearch())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-orange-500/50 transition group text-left w-full">
                                     <div class="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500"><i data-lucide="bitcoin" class="w-5 h-5"></i></div>
                                     <div><div class="text-sm font-black text-white">BTC</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-orange-400">LEADER</div></div>
                                 </button>
-                                <button type="button" @click="symbol='ETHUSDT'; $nextTick(() => $refs.scanForm.requestSubmit())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-blue-500/50 transition group text-left w-full">
+                                <button type="button" @click="symbol='ETHUSDT'; $nextTick(() => validateSearch())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-blue-500/50 transition group text-left w-full">
                                     <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><i data-lucide="layers" class="w-5 h-5"></i></div>
                                     <div><div class="text-sm font-black text-white">ETH</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-blue-400">SMART</div></div>
                                 </button>

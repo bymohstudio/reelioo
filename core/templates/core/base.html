@@ -30,47 +30,7 @@
         div.swal2-cancel { background-color: #1e293b !important; color: #fff !important; border-radius: 8px !important; }
     </style>
 </head>
-
-<body class="antialiased min-h-screen flex flex-col"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-      hx-boost="true"
-      x-data="{
-          initSystem() {
-              // 1. Init Icons
-              if(window.lucide) lucide.createIcons();
-              document.body.addEventListener('htmx:afterSwap', () => lucide.createIcons());
-
-              // 2. SweetAlert Interceptor for HTMX Confirm
-              document.body.addEventListener('htmx:confirm', (e) => {
-                  if (!e.target.hasAttribute('hx-confirm')) return;
-                  e.preventDefault();
-                  Swal.fire({
-                      title: 'Are you sure?',
-                      text: e.target.getAttribute('hx-confirm'),
-                      icon: 'warning',
-                      showCancelButton: true,
-                      confirmButtonColor: '#ef4444',
-                      cancelButtonColor: '#1e293b',
-                      confirmButtonText: 'Yes, proceed',
-                      background: '#0f172a', color: '#fff'
-                  }).then((res) => { if(res.isConfirmed) e.detail.issueRequest(true); });
-              });
-
-              // 3. Global Toast Handler
-              document.body.addEventListener('showJournalToast', (evt) => {
-                  const data = evt.detail;
-                  Swal.fire({
-                      toast: true, position: 'top-end',
-                      icon: data.type || 'info',
-                      title: data.title || 'Notification',
-                      text: data.message || '',
-                      showConfirmButton: false, timer: 3000,
-                      background: '#0f172a', color: '#fff'
-                  });
-              });
-          }
-      }"
-      x-init="initSystem()">
+<body class="antialiased min-h-screen flex flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-boost="true">
 
     <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#020617]/90 backdrop-blur-md">
         <div class="max-w-[1400px] mx-auto px-4 h-16 flex items-center justify-between">
@@ -92,7 +52,15 @@
                     </a>
 
                     {% if not user.profile.is_premium %}
-                    <a href="{% url 'pricing' %}" class="text-[10px] font-black text-white bg-emerald-600 hover:bg-emerald-500 uppercase tracking-widest px-4 py-2 rounded-full transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">Upgrade</a>
+                    <div class="flex items-center gap-3 ml-2">
+                        <span class="text-[10px] font-bold text-yellow-500 uppercase tracking-widest border border-yellow-500/30 bg-yellow-500/10 px-2 py-1.5 rounded cursor-help" title="Trial Active">
+                            Trial: {{ user.profile.get_days_left }} Days
+                        </span>
+
+                        <a href="{% url 'pricing' %}" class="text-[10px] font-bold text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/10 uppercase tracking-widest px-4 py-1.5 rounded-lg transition flex items-center gap-2">
+                            <i data-lucide="zap" class="w-3 h-3"></i> Upgrade
+                        </a>
+                    </div>
                     {% endif %}
 
                     <form action="{% url 'logout' %}" method="post" class="inline" hx-boost="false">
@@ -133,13 +101,13 @@
                         </div>
 
                         {% if not user.profile.is_premium %}
-                        <a href="{% url 'pricing' %}" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl text-center uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 mt-4">
+                        <a href="{% url 'pricing' %}" class="w-full py-4 bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 font-bold rounded-xl text-center uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 mt-4">
                             <i data-lucide="zap" class="w-5 h-5"></i> Upgrade Plan
                         </a>
                         {% endif %}
 
                     {% else %}
-                        <div class="flex flex-col gap-6">
+                        <div class="space-y-6">
                             <a href="{% url 'about' %}" class="flex items-center gap-4 text-xl font-bold text-slate-400"><i data-lucide="book-open" class="w-6 h-6 text-slate-600"></i> Methodology</a>
                             <a href="{% url 'login' %}" class="flex items-center gap-4 text-xl font-bold text-white"><i data-lucide="log-in" class="w-6 h-6 text-slate-500"></i> Sign In</a>
                         </div>
@@ -201,5 +169,41 @@
             </div>
         </div>
     </footer>
+
+    <script>
+        function initIcons() { if (window.lucide) lucide.createIcons(); }
+        document.addEventListener('DOMContentLoaded', initIcons);
+        document.body.addEventListener('htmx:afterSwap', initIcons);
+
+        document.addEventListener("htmx:confirm", function(e) {
+            if (!e.target.hasAttribute('hx-confirm')) return;
+            e.preventDefault();
+            Swal.fire({
+                title: 'Are you sure?',
+                text: e.target.getAttribute('hx-confirm'),
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#1e293b',
+                confirmButtonText: 'Yes, proceed',
+                background: '#0f172a',
+                color: '#fff'
+            }).then((result) => {
+                if(result.isConfirmed) e.detail.issueRequest(true);
+            });
+        });
+
+        document.body.addEventListener('showJournalToast', function(evt) {
+            const data = evt.detail;
+            Swal.fire({
+                toast: true, position: 'top-end',
+                icon: data.type || 'info',
+                title: data.title || 'Notification',
+                text: data.message || '',
+                showConfirmButton: false, timer: 3000,
+                background: '#0f172a', color: '#fff'
+            });
+        });
+    </script>
 </body>
 </html>

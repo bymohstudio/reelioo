@@ -3,6 +3,7 @@ import json
 import logging
 import requests
 import concurrent.futures
+import csv
 from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
@@ -15,7 +16,7 @@ from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.conf import settings
-import csv
+from django.contrib import messages  # <--- ADDED THIS
 
 from .quant.crypto_engine import CryptoQuantEngine
 from .backtest.backtest_engine import CryptoBacktestEngine
@@ -87,7 +88,10 @@ def hx_analyze(request):
     if not has_access(request.user):
         return HttpResponse('<div class="text-center text-red-500 font-bold p-10">TRIAL EXPIRED</div>')
 
-    symbol = request.POST.get("symbol", "BTCUSDT").upper().strip()
+    symbol = request.POST.get("symbol", "").upper().strip()
+    if not symbol:
+        return HttpResponse("")
+
     if not symbol.endswith("USDT"): symbol += "USDT"
     mode = request.POST.get("mode", "INTRADAY")
 
@@ -231,8 +235,6 @@ def delete_journal_entry(request, entry_id):
 def cron_scan_trigger(request, secret_key):
     if secret_key != os.getenv("CRON_SECRET", "reelioo_master_key"): return JsonResponse({'status': 'forbidden'},
                                                                                          status=403)
-    # ... (Keep existing cron logic logic as is, it was correct in previous version) ...
-    # For brevity, ensuring the update logic is here:
     pending = JournalEntry.objects.filter(status='PENDING')
     updated = 0
     for t in pending:
@@ -260,7 +262,31 @@ def cron_scan_trigger(request, secret_key):
                 send_discord_alert(f"Trade Result: {t.symbol} {new_s}", type=new_s.lower())
         except:
             continue
-    return JsonResponse({'status': 'ok', 'updated': updated})
+
+    new_sig = 0
+    engine = CryptoQuantEngine()
+    vip = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    for s in vip:
+        try:
+            df = MarketService.get_historical_data(s, "PERP", "INTRADAY")
+            if df.empty: continue
+            res = engine.analyze(df, "INTRADAY")
+            if res.bias in ["LONG", "SHORT"] and res.score >= 80:
+                users = User.objects.filter(
+                    Q(profile__is_premium=True) | Q(date_joined__gt=timezone.now() - timedelta(days=21)))
+                sent_alert = False
+                for u in users:
+                    if not JournalEntry.objects.filter(user=u, symbol=res.symbol,
+                                                       created_at__gt=timezone.now() - timedelta(hours=24)).exists():
+                        JournalEntry.objects.create(user=u, symbol=res.symbol, bias=res.bias, entry_price=res.entry,
+                                                    stop_loss=res.stop, target=res.target1, confidence=res.score,
+                                                    status='PENDING')
+                        new_sig += 1
+                        sent_alert = True
+                if sent_alert: send_discord_alert(f"🚨 SIGNAL: {res.symbol} {res.bias} @ {res.entry}", type="new")
+        except:
+            continue
+    return JsonResponse({'status': 'ok', 'updated': updated, 'auto_added': new_sig})
 
 
 @login_required
@@ -286,8 +312,51 @@ def search_crypto_view(request):
 
 
 # ==============================================================================
-#  PAGE VIEWS
+#  PAGE VIEWS (AUTH FIXED)
 # ==============================================================================
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('terminal')
+
+    if request.method == "POST":
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        try:
+            # Login by Email
+            user_obj = User.objects.get(email__iexact=email)
+            user = authenticate(request, username=user_obj.username, password=password)
+            if user:
+                login(request, user)
+                return redirect('terminal')
+            else:
+                messages.error(request, "Invalid password.")
+        except User.DoesNotExist:
+            messages.error(request, "No account found with this email.")
+
+    return render(request, 'core/auth/login.html')
+
+
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('terminal')
+
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('terminal')
+    else:
+        form = SignupForm()
+
+    return render(request, 'core/auth/signup.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('landing')
+
 
 def landing_view(request):
     if request.user.is_authenticated: return redirect('terminal')
@@ -310,8 +379,6 @@ def settings_view(request):
     return render(request, 'core/auth/settings.html', {'form': form})
 
 
-# (Keep other views: journal_view, ops_dashboard_view, login, signup etc. as they were correct)
-# Re-declaring for completeness of file:
 @login_required
 def journal_view(request):
     entries = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
@@ -328,21 +395,13 @@ def journal_view(request):
 
 @login_required
 def ops_dashboard_view(request):
+    if not request.user.is_superuser: return redirect('terminal')
     return render(request, 'core/ops_dashboard.html', {'total_users': User.objects.count(),
                                                        'active_subs': User.objects.filter(
                                                            profile__is_premium=True).count(),
                                                        'total_signals': JournalEntry.objects.count(),
                                                        'recent_signals': JournalEntry.objects.order_by('-created_at')[
                                                                          :10], 'win_rate': 68.5})
-
-
-def login_view(request): return render(request, 'core/auth/login.html')
-
-
-def signup_view(request): return render(request, 'core/auth/signup.html')
-
-
-def logout_view(request): logout(request); return redirect('landing')
 
 
 @login_required
