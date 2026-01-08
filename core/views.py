@@ -3,7 +3,6 @@ import json
 import logging
 import requests
 import concurrent.futures
-import csv
 from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
@@ -16,7 +15,7 @@ from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.conf import settings
-from django.contrib import messages  # <--- ADDED THIS
+from django.contrib import messages
 
 from .quant.crypto_engine import CryptoQuantEngine
 from .backtest.backtest_engine import CryptoBacktestEngine
@@ -58,27 +57,20 @@ def has_access(user):
 
 @require_http_methods(["GET"])
 def hx_ticker(request):
-    """
-    Fetches LIVE prices for the marquee ticker.
-    """
+    """Fetches LIVE prices for the marquee ticker."""
     symbols = ["BTC", "ETH", "SOL", "BNB", "XRP"]
     data = []
-
     for s in symbols:
         try:
-            # Fetch latest candle close
             df = MarketService.get_historical_data(f"{s}USDT", "PERP", "SCALP")
             if df is not None and not df.empty:
                 price = float(df['close'].iloc[-1])
-                # Format: $96,000.00 or $0.50
                 fmt_price = f"${price:,.2f}" if price > 1.0 else f"${price:,.4f}"
                 data.append({'symbol': s, 'price': fmt_price})
             else:
                 data.append({'symbol': s, 'price': "---"})
         except Exception:
             data.append({'symbol': s, 'price': "---"})
-
-    # Duplicate list to make the CSS marquee loop seamless
     return render(request, 'core/partials/ticker.html', {'ticker': data * 4})
 
 
@@ -89,8 +81,7 @@ def hx_analyze(request):
         return HttpResponse('<div class="text-center text-red-500 font-bold p-10">TRIAL EXPIRED</div>')
 
     symbol = request.POST.get("symbol", "").upper().strip()
-    if not symbol:
-        return HttpResponse("")
+    if not symbol: return HttpResponse("")  # Safety check
 
     if not symbol.endswith("USDT"): symbol += "USDT"
     mode = request.POST.get("mode", "INTRADAY")
@@ -101,7 +92,6 @@ def hx_analyze(request):
         engine = CryptoQuantEngine()
         res = engine.analyze(df, mode)
 
-        # Note Splitting
         raw_note = NewsService.get_smart_insights(symbol)
         note_tag, note_msg = raw_note.split("|", 1) if "|" in raw_note else ("INSIGHT", raw_note)
 
@@ -262,36 +252,11 @@ def cron_scan_trigger(request, secret_key):
                 send_discord_alert(f"Trade Result: {t.symbol} {new_s}", type=new_s.lower())
         except:
             continue
-
-    new_sig = 0
-    engine = CryptoQuantEngine()
-    vip = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-    for s in vip:
-        try:
-            df = MarketService.get_historical_data(s, "PERP", "INTRADAY")
-            if df.empty: continue
-            res = engine.analyze(df, "INTRADAY")
-            if res.bias in ["LONG", "SHORT"] and res.score >= 80:
-                users = User.objects.filter(
-                    Q(profile__is_premium=True) | Q(date_joined__gt=timezone.now() - timedelta(days=21)))
-                sent_alert = False
-                for u in users:
-                    if not JournalEntry.objects.filter(user=u, symbol=res.symbol,
-                                                       created_at__gt=timezone.now() - timedelta(hours=24)).exists():
-                        JournalEntry.objects.create(user=u, symbol=res.symbol, bias=res.bias, entry_price=res.entry,
-                                                    stop_loss=res.stop, target=res.target1, confidence=res.score,
-                                                    status='PENDING')
-                        new_sig += 1
-                        sent_alert = True
-                if sent_alert: send_discord_alert(f"🚨 SIGNAL: {res.symbol} {res.bias} @ {res.entry}", type="new")
-        except:
-            continue
-    return JsonResponse({'status': 'ok', 'updated': updated, 'auto_added': new_sig})
+    return JsonResponse({'status': 'ok', 'updated': updated})
 
 
 @login_required
 def global_symbols_view(request):
-    """API for search bar"""
     csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
     symbols = []
     if os.path.exists(csv_path):
@@ -312,18 +277,15 @@ def search_crypto_view(request):
 
 
 # ==============================================================================
-#  PAGE VIEWS (AUTH FIXED)
+#  PAGE VIEWS
 # ==============================================================================
 
 def login_view(request):
-    if request.user.is_authenticated:
-        return redirect('terminal')
-
+    if request.user.is_authenticated: return redirect('terminal')
     if request.method == "POST":
         email = request.POST.get('email')
         password = request.POST.get('password')
         try:
-            # Login by Email
             user_obj = User.objects.get(email__iexact=email)
             user = authenticate(request, username=user_obj.username, password=password)
             if user:
@@ -333,14 +295,11 @@ def login_view(request):
                 messages.error(request, "Invalid password.")
         except User.DoesNotExist:
             messages.error(request, "No account found with this email.")
-
     return render(request, 'core/auth/login.html')
 
 
 def signup_view(request):
-    if request.user.is_authenticated:
-        return redirect('terminal')
-
+    if request.user.is_authenticated: return redirect('terminal')
     if request.method == 'POST':
         form = SignupForm(request.POST)
         if form.is_valid():
@@ -349,7 +308,6 @@ def signup_view(request):
             return redirect('terminal')
     else:
         form = SignupForm()
-
     return render(request, 'core/auth/signup.html', {'form': form})
 
 
@@ -404,8 +362,16 @@ def ops_dashboard_view(request):
                                                                          :10], 'win_rate': 68.5})
 
 
+# --- PRICING (FIXED BUTTON CONTEXT) ---
 @login_required
-def pricing_view(request): return render(request, 'core/pricing.html', {"key_id": os.getenv("RAZORPAY_KEY_ID")})
+def pricing_view(request):
+    # Sends user_email and sub_id to context so the JS doesn't break
+    context = {
+        "key_id": os.getenv("RAZORPAY_KEY_ID"),
+        "sub_id": os.getenv("RAZORPAY_PLAN_ID", "sub_default_placeholder"),
+        "user_email": request.user.email
+    }
+    return render(request, 'core/pricing.html', context)
 
 
 @csrf_exempt

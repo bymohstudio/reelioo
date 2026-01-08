@@ -1,7 +1,6 @@
 {% extends "core/base.html" %}
 {% block content %}
-<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans"
-     x-data="pricing()">
+<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans" x-data="pricing()">
 
     <div class="mb-12">
         {% if is_trial_expired %}
@@ -14,7 +13,7 @@
             <span class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 rounded-full">Upgrade Available</span>
             <h1 class="text-4xl font-black text-white mt-6 mb-4">Go Pro</h1>
             <p class="text-slate-400 max-w-lg mx-auto leading-relaxed text-sm">
-                You are currently on a trial. Lock in the <strong>Founder's Rate ($19)</strong> before it expires.
+                You are currently on a trial. Lock in the <strong>Launch Price ($19)</strong> before it expires.
             </p>
         {% endif %}
     </div>
@@ -22,7 +21,7 @@
     <div class="bg-[#0a0a0a] border border-blue-600/30 rounded-3xl p-10 max-w-md mx-auto shadow-[0_0_60px_rgba(37,99,235,0.15)] relative overflow-hidden group hover:border-blue-600/50 transition duration-500">
 
         <div class="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-4 py-1.5 rounded-bl-xl tracking-widest shadow-lg">
-            MOST POPULAR
+            LAUNCH PRICE
         </div>
 
         <div class="text-left mb-8 border-b border-white/5 pb-8">
@@ -50,13 +49,19 @@
         </ul>
 
         <button @click="initPayment" :disabled="loading"
-                class="w-full py-4 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition shadow-[0_0_20px_rgba(255,255,255,0.2)] text-xs uppercase tracking-widest flex justify-center items-center gap-2">
-            <span x-show="!loading">SECURE ACCESS</span>
-            <span x-show="loading" class="flex items-center gap-2"><i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> PROCESSING...</span>
+                class="relative w-full py-4 bg-white hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition shadow-[0_0_20px_rgba(255,255,255,0.2)] text-xs uppercase tracking-widest flex justify-center items-center gap-2 overflow-hidden">
+
+            <span x-show="!loading" class="relative z-10 flex items-center gap-2">
+                <i data-lucide="lock" class="w-3 h-3"></i> SECURE ACCESS
+            </span>
+
+            <span x-show="loading" class="relative z-10 flex items-center gap-2" x-cloak>
+                <i data-lucide="loader-2" class="animate-spin w-4 h-4"></i> PROCESSING...
+            </span>
         </button>
 
         <div class="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-600 font-bold">
-            <i data-lucide="lock" class="w-3 h-3"></i><span>Encrypted & Secured by Razorpay.</span>
+            <span>Encrypted & Secured by Razorpay.</span>
         </div>
     </div>
 </div>
@@ -77,7 +82,7 @@
                     Swal.fire({
                         icon: 'error',
                         title: 'System Offline',
-                        text: 'Payment gateway is currently maintenance. Please try again later.',
+                        text: 'Payment gateway is maintenance.',
                         background: '#0f172a', color: '#fff'
                     });
                     this.loading = false;
