@@ -301,9 +301,14 @@ def hx_journal_add(request):
             stop_loss=float(request.POST.get('stop', 0)), target=float(request.POST.get('target', 0)),
             confidence=float(request.POST.get('score', 0)), status='PENDING'
         )
-        return HttpResponse('<button class="w-full px-6 py-4 bg-emerald-500/10 text-emerald-400 font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-emerald-500/50 cursor-default flex items-center justify-center gap-2 shadow-lg"><i data-lucide="check" class="w-4 h-4"></i> SAVED TO JOURNAL</button>')
+        # FIX: Added 'mt-8' to prevent jumping. Matches the original form's margin.
+        return HttpResponse(
+            '<button class="w-full mt-8 px-6 py-4 bg-emerald-500/10 text-emerald-400 font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-emerald-500/50 cursor-default flex items-center justify-center gap-2 shadow-lg"><i data-lucide="check" class="w-4 h-4"></i> SAVED TO JOURNAL</button>')
     except:
-        return HttpResponse('<button class="w-full px-6 py-4 bg-red-500/10 text-red-500 font-bold rounded-xl text-xs uppercase tracking-widest border border-red-500/50">ERROR SAVING</button>')
+        return HttpResponse(
+            '<button class="w-full mt-8 px-6 py-4 bg-red-500/10 text-red-500 font-bold rounded-xl text-xs uppercase tracking-widest border border-red-500/50">ERROR SAVING</button>')
+
+    # --- JOURNAL ACTIONS ---
 
 # --- JOURNAL ACTIONS ---
 
