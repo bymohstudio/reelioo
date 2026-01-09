@@ -1,5 +1,3 @@
-# core/quant/backtest_engine.py
-
 import numpy as np
 import pandas as pd
 import logging
@@ -8,31 +6,22 @@ from core.quant.feature_engineering import generate_features
 log = logging.getLogger(__name__)
 
 
-def cap(x, limit=3.0):
-    return max(-limit, min(limit, x))
-
-
 class CryptoBacktestEngine:
     """
-    PHYSICS BACKTEST ENGINE (v16.0 - Aligned with Fractal Geometry)
-    - Updated to match CryptoQuantEngine v16.0 logic exactly.
-    - Uses Vectorized Pandas for speed.
+    PHYSICS BACKTEST ENGINE (v18.0 - KINETIC POTENTIAL)
+    - Perfectly aligned with CryptoQuantEngine v18.0.
+    - Simulates the "Projectile Motion" targeting logic.
     """
 
     def __init__(self, df, symbol):
         self.df = df
         self.symbol = symbol
         self.trades = []
-        self.SIGMOID_K = 0.5  # Updated to match v16
-        self.ATTACK_THRESH = 80
-        self.ENGAGE_THRESH = 65
 
-        # Gates
-        self.MIN_VOLUME_RATIO = 0.6
-        self.MAX_ATR_PCT = 0.05
-
-    def _sigmoid(self, x):
-        return 100 / (1 + np.exp(-self.SIGMOID_K * x))
+        # Physics Constants (Match Engine)
+        self.MASS_WINDOW = 20
+        self.VELOCITY_WINDOW = 3
+        self.GRAVITY = 9.8
 
     def run(self, trade_style="INTRADAY"):
         try:
@@ -40,167 +29,175 @@ class CryptoBacktestEngine:
 
             # 1. Feature Engineering
             try:
+                # We need ATR and basic features
                 df = generate_features(self.df.copy())
             except:
                 return self._empty_result()
 
             # --------------------------------------------------------------
-            # REPLICATE v16.0 LOGIC (VECTORIZED)
+            # REPLICATE v18.0 PHYSICS LOGIC (VECTORIZED)
             # --------------------------------------------------------------
 
-            # A. PHYSICS
-            # Mass & Velocity
-            mass = df.get('quote_volume', df['volume'])
-            velocity = df['close'].diff()
+            # A. CONSTRUCT PHYSICS WORLD
+            close = df['close']
+            volume = df['volume']
+            high = df['high']
+            low = df['low']
+
+            # Mass (m)
+            vol_avg = volume.rolling(self.MASS_WINDOW).mean()
+            mass = volume / (vol_avg + 0.0001)
+
+            # Velocity (v)
+            # Normalized by ATR to make it asset-agnostic
+            atr = df['atr_14']
+            velocity = close.diff(self.VELOCITY_WINDOW) / (atr + 0.0001)
+
+            # Acceleration (a)
             acceleration = velocity.diff()
-            jerk = acceleration.diff()
 
-            # B. FRACTAL EFFICIENCY (ER)
-            # ER = Change / Sum of absolute changes (Period 10)
-            period = 10
-            change = df['close'].diff(period).abs()
-            volatility = df['close'].diff().abs().rolling(period).sum()
-            efficiency_ratio = change / (volatility + 0.00001)
+            # Force (F = ma)
+            force = mass * acceleration
 
-            # C. FORCE DIVERGENCE
-            force = mass * velocity
-            # Price > 5 bars ago AND Force < 5 bars ago
-            price_trend_5 = df['close'] > df['close'].shift(5)
-            force_trend_5 = force < force.shift(5)
-            is_divergence = price_trend_5 & force_trend_5
+            # Kinetic Energy (KE = 0.5 * m * v^2)
+            ke = 0.5 * mass * (velocity ** 2)
 
-            # D. VECTORS
-            # Trend Vector (Fractal Adjusted)
-            raw_trend = df['ema_diff'].clip(-0.03, 0.03) * 100 * 2.0
-            # Vectorized conditional: if ER > 0.5 then 1.5 else 0.5
-            fractal_quality = np.where(efficiency_ratio > 0.5, 1.5, 0.5)
-            trend_alpha = raw_trend * fractal_quality
+            # Potential Energy (PE)
+            # Inverse normalized volatility
+            norm_vol = atr / close
+            pe_raw = (1.0 / (norm_vol + 0.001)).rolling(10).mean()
+            pe_min = pe_raw.rolling(50).min()
+            pe_max = pe_raw.rolling(50).max()
+            pe_score = (pe_raw - pe_min) / (pe_max - pe_min + 0.001) * 100
 
-            # Whale Vector
-            whale_z = df['whale_z'].clip(-3, 3)
+            # Baseline (Gravity)
+            baseline = close.ewm(span=50).mean()
 
-            # Kinetic Snap
-            # Replicating: if abs(kinetic) > 1.0: alpha += jerk*10 + kinetic*0.5
-            kinetic_energy = df['kinetic_energy']
-            jerk_impact = jerk.clip(-0.3, 0.3) * 10.0
+            # B. IDENTIFY STATES (Boolean Masks)
+            is_compressed = (pe_score > 80) & (ke < 1.0)
+            is_exploding = (ke > 2.0) & (mass > 1.2)
+            is_trending = (ke > 1.0) & (velocity.abs() > 0.5)
 
-            physics_alpha = np.zeros(len(df))
-            mask_kinetic = kinetic_energy.abs() > 1.0
-            physics_alpha[mask_kinetic] = jerk_impact[mask_kinetic] + (kinetic_energy[mask_kinetic] * 0.5)
+            # C. SCORING VECTORS
+            score = pd.Series(50, index=df.index, dtype='float64')
 
-            # Spring Compression
-            # if comp < 0.6 and whale > 0.8: alpha += 4.0 * sign(jerk + trend)
-            compression = df['volatility_compression']
-            is_spring = (compression < 0.6) & (whale_z.abs() > 0.8)
+            # Vector 1: Force Alignment
+            # Force > 0 and Velo > 0 (Pushing Up)
+            score += np.where((force > 0) & (velocity > 0), 15, 0)
+            # Force < 0 and Velo < 0 (Pushing Down)
+            score += np.where((force < 0) & (velocity < 0), 15, 0)
 
-            breakout_dir = np.sign(jerk_impact + trend_alpha)
-            # Add spring boost where applicable
-            physics_alpha = np.where(is_spring, physics_alpha + (4.0 * breakout_dir), physics_alpha)
+            # Vector 2: Mass Confirmation
+            score += np.where(mass > 1.5, 15, 0)
+            score -= np.where(mass < 0.5, 10, 0)
 
-            # E. SCORING
-            total_alpha = trend_alpha + whale_z + physics_alpha
-            # Apply Sigmoid manually to array
-            raw_score = 100 / (1 + np.exp(-self.SIGMOID_K * total_alpha))
+            # Vector 3: Kinetic State
+            score += np.where(is_exploding, 25, 0)
+            score += np.where(is_trending, 10, 0)
 
-            # F. GATES & PENALTIES
-            # Fakeout Penalty
-            # if vol_slope > 0.25 and kinetic < 0.8: penalty 30
-            vol_slope = df['volatility_slope']
-            penalty = np.where((vol_slope > 0.25) & (kinetic_energy.abs() < 0.8), 30, 0)
+            # Vector 4: Potential (Compression Bias)
+            # If compressed, bias slightly towards current velocity drift
+            score += np.where(is_compressed & (velocity > 0), 5, 0)
+            score += np.where(is_compressed & (velocity < 0), 5, 0)
 
-            # Force Divergence Penalty
-            penalty = np.where(is_divergence & (~is_spring), penalty + 25, penalty)
+            # D. DECISION LOGIC
+            # Direction
+            # Long: Velocity > 0 and Price > Baseline
+            # Short: Velocity < 0 and Price < Baseline
 
-            final_score = raw_score - penalty
-
-            # G. HARD GATES (Zero out score if gate closed)
-            # Liquidity Gate
-            avg_vol = df['volume'].rolling(20).mean()
-            gate_liquid = df['volume'] >= (avg_vol * self.MIN_VOLUME_RATIO)
-
-            # Fractal Noise Gate
-            gate_fractal = (efficiency_ratio >= 0.25) | is_spring
-
-            # Volatility Gate
-            atr_pct = df['atr_pct']
-            gate_vol = (atr_pct <= self.MAX_ATR_PCT) | is_spring
-
-            # Combine Gates
-            open_gates = gate_liquid & gate_fractal & gate_vol
-
-            # Final Signal Series (0 to 100, or 50 if closed)
-            final_score = np.where(open_gates, final_score, 50)
+            # Normalize Score
+            score = score.clip(1, 99)
 
             # --------------------------------------------------------------
-            # EXECUTION LOOP
+            # SIMULATION LOOP (Trade Management)
             # --------------------------------------------------------------
             position = None
             entry_price = 0
             stop_loss = 0
             take_profit = 0
-            TRADING_FEE_PCT = 0.1
+            TRADING_FEE_PCT = 0.06  # Binance Taker Fee approx
 
-            start_idx = 50  # Allow indicators to warm up
+            start_idx = 50
 
             for i in range(start_idx, len(df)):
-                curr_score = final_score[i]
-                price = df['close'].iloc[i]
-                low = df['low'].iloc[i]
-                high = df['high'].iloc[i]
-                atr = df['atr_14'].iloc[i]
-                curr_er = efficiency_ratio.iloc[i]
+                c_score = score.iloc[i]
+                c_price = close.iloc[i]
+                c_low = low.iloc[i]
+                c_high = high.iloc[i]
+                c_atr = atr.iloc[i]
+                c_ke = ke.iloc[i]
+                c_base = baseline.iloc[i]
+                c_velo = velocity.iloc[i]
 
                 # --- EXIT LOGIC ---
                 if position:
                     res = None
-                    exit_price = price
+                    exit_price = c_price
+
                     if position == 'LONG':
-                        if low <= stop_loss:
+                        if c_low <= stop_loss:
                             res, exit_price = "LOSS", stop_loss
-                        elif high >= take_profit:
+                        elif c_high >= take_profit:
                             res, exit_price = "WIN", take_profit
+
                     elif position == 'SHORT':
-                        if high >= stop_loss:
+                        if c_high >= stop_loss:
                             res, exit_price = "LOSS", stop_loss
-                        elif low <= take_profit:
+                        elif c_low <= take_profit:
                             res, exit_price = "WIN", take_profit
 
                     if res:
-                        pnl = (exit_price - entry_price) / entry_price * 100
-                        if position == 'SHORT': pnl = -pnl
+                        # Calculate PnL
+                        raw_pnl = (exit_price - entry_price) / entry_price * 100
+                        if position == 'SHORT': raw_pnl = -raw_pnl
+
+                        net_pnl = raw_pnl - TRADING_FEE_PCT
+
                         self.trades.append({
                             "result": res,
-                            "pnl": round(pnl - TRADING_FEE_PCT, 2),
+                            "pnl": round(net_pnl, 2),
                             "entry": entry_price,
                             "date": str(df.index[i])
                         })
                         position = None
                         continue
 
-                # --- ENTRY LOGIC (Mapped from v16 Lanes) ---
+                # --- ENTRY LOGIC (Physics Based) ---
                 if not position:
                     bias = "HOLD"
 
-                    if curr_score >= self.ATTACK_THRESH:
-                        bias = "LONG"
-                    elif curr_score <= (100 - self.ATTACK_THRESH):
-                        bias = "SHORT"
-                    elif curr_score >= self.ENGAGE_THRESH:
-                        bias = "LONG"
-                    elif curr_score <= (100 - self.ENGAGE_THRESH):
-                        bias = "SHORT"
+                    # Lane Logic from Engine
+                    if c_score >= 80:  # POWER Zone
+                        # Direction Check
+                        if c_velo > 0 and c_price > c_base:
+                            bias = "LONG"
+                        elif c_velo < 0 and c_price < c_base:
+                            bias = "SHORT"
 
+                    elif c_score >= 60:  # Active Zone
+                        if c_velo > 0 and c_price > c_base:
+                            bias = "LONG"
+                        elif c_velo < 0 and c_price < c_base:
+                            bias = "SHORT"
+
+                    # Trade Execution
                     if bias != "HOLD":
                         direction = 1 if bias == 'LONG' else -1
 
-                        # Dynamic Extension (Fractal)
-                        fractal_mult = 1.5 if curr_er > 0.6 else 1.0
+                        # Projectile Physics Targeting
+                        # Stop: 1.5 ATR (Where momentum breaks)
+                        stop_dist = c_atr * 1.5
 
-                        entry_price = price
-                        # Stop is 2.0 ATR in v16
-                        stop_loss = price - direction * (atr * 2.0)
-                        # Target 2 is 4.0 * fractal_mult
-                        take_profit = price + direction * (atr * 4.0 * fractal_mult)
+                        # Throw Power: Based on Kinetic Energy (Cap at 3x)
+                        throw_power = max(1.0, min(3.0, c_ke))
+
+                        # Target: 3.0 ATR * Power
+                        # We use Target 2 from the engine as the primary exit for backtest
+                        target_dist = c_atr * 3.0 * throw_power
+
+                        entry_price = c_price
+                        stop_loss = c_price - (direction * stop_dist)
+                        take_profit = c_price + (direction * target_dist)
 
                         position = bias
 

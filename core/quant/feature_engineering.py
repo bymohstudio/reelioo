@@ -1,18 +1,14 @@
-# core/quant/ml_training/feature_engineering.py
-
-# core/quant/ml_training/feature_engineering.py
-
 import pandas as pd
 import numpy as np
 
-# FEATURES (Updated list)
+# FEATURES (Updated list with vol_z included)
 FEATURES = [
     "ret_1", "log_ret", "body_pct", "wick_ratio",
     "vwap_dist", "liq_sweep", "order_block",
     "rsi_14", "ema_diff", "trend_strength",
     "atr_pct", "ttm_squeeze", "volatility_slope",
-    "whale_z", "cvd_divergence", "flow_imbalance", "efficiency_ratio",
-    "kinetic_energy", "momentum_shock", "volatility_compression"  # <--- NEW
+    "whale_z", "vol_z", "cvd_divergence", "flow_imbalance", "efficiency_ratio",
+    "kinetic_energy", "momentum_shock", "volatility_compression"
 ]
 
 
@@ -55,7 +51,7 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     delta = df['close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-    rs = gain / loss
+    rs = gain / (loss + 1e-9)
     df['rsi_14'] = 100 - (100 / (1 + rs))
     df['trend_strength'] = np.where(df['close'] > df['ema_20'], 1, -1)
 
@@ -105,7 +101,6 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     # --- 7. NEW: PHYSICS ENHANCEMENTS (PROFITABILITY BOOSTERS) ---
 
     # A. KINETIC ENERGY: (0.5 * Mass * Velocity^2)
-    # High Energy + Small Body = Explosion Imminent (Compressed Energy)
     velocity = df['close'].pct_change(1)
     df['kinetic_energy'] = 0.5 * df['volume'] * (velocity ** 2)
 
@@ -114,53 +109,45 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     ke_std = df['kinetic_energy'].rolling(50).std()
     df['kinetic_energy'] = (df['kinetic_energy'] - ke_mean) / (ke_std + 1e-9)
 
-    # B. MOMENTUM SHOCK (Jerk): Derivative of Acceleration
-    # Detects immediate shifts in force before price fully reacts
+    # B. MOMENTUM SHOCK (Jerk)
     momentum = df['close'].diff(3)
     acceleration = momentum.diff(3)
     df['momentum_shock'] = acceleration.diff(3)
 
     # C. VOLATILITY COMPRESSION (Potential Energy)
-    # Ratio of current volatility to historical volatility.
-    # Low values (< 0.5) mean the spring is loaded.
     long_term_vol = df['tr'].rolling(100).mean()
     df['volatility_compression'] = df['atr_14'] / (long_term_vol + 1e-9)
 
     return df.fillna(0)
 
-# --- ASYMMETRIC PHYSICS (REWRITTEN) ---
+
 def generate_targets(df: pd.DataFrame, risk_reward=2.0, stop_mult=1.0, candles=24) -> pd.DataFrame:
     """
-    Applies SNIPER LOGIC for both sides:
-    - LONGS: Did price hit (Entry + 1.5 ATR) at any point? (Max High)
-    - SHORTS: Did price hit (Entry - 1.5 ATR) at any point? (Min Low)
+    Applies SNIPER LOGIC with dynamic parameters:
+    - Calculates dynamic Stop/TP distances based on ATR.
+    - Checks if targets were hit within the 'candles' window.
     """
     data = df.copy()
     atr = data['atr_14']
     close = data['close']
     low = data['low']
-    high = data['high']  # <--- Added High
+    high = data['high']
 
-    # --- LONG LOGIC (Pump Catching) ---
-    # Old Logic: Wait 24h, check Close (Too strict).
-    # New Logic: Look ahead 16h, check Max High.
+    # 1. Define Dynamic Distances
+    stop_distance = atr * stop_mult
+    target_distance = stop_distance * risk_reward
 
-    # We reduce horizon to 16h (faster) and target 1.5 ATR (standard scalp)
-    future_max_high = high.rolling(window=16).max().shift(-16)
-    target_long = atr * 1.5
-
+    # --- LONG LOGIC ---
+    future_max_high = high.rolling(window=candles).max().shift(-candles)
     data['target_long'] = np.where(
-        future_max_high > close + target_long,
+        future_max_high > (close + target_distance),
         1, 0
     )
 
-    # --- SHORT LOGIC (Crash Catching) ---
-    # Logic: Look ahead 12h, check Min Low.
-    future_min_low = low.rolling(window=12).min().shift(-12)
-    target_short = atr * 1.5
-
+    # --- SHORT LOGIC ---
+    future_min_low = low.rolling(window=candles).min().shift(-candles)
     data['target_short'] = np.where(
-        future_min_low < close - target_short,
+        future_min_low < (close - target_distance),
         1, 0
     )
 
