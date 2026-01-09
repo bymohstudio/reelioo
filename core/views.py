@@ -1,9 +1,12 @@
 import os
+import csv
+import hmac
+import hashlib
 import json
 import logging
 import requests
 import concurrent.futures
-import razorpay  # REQUIRED for payments
+from dateutil import parser
 from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
@@ -22,78 +25,225 @@ from .quant.crypto_engine import CryptoQuantEngine
 from .backtest.backtest_engine import CryptoBacktestEngine
 from .services.marketdata_service import MarketService
 from .services.news_service import NewsService
-from .models import JournalEntry
+from .models import JournalEntry, UserProfile
 from .forms import UserUpdateForm, SignupForm
 
 log = logging.getLogger(__name__)
 
+# --- CONFIG ---
+LS_API_KEY = os.getenv("LEMONSQUEEZY_API_KEY")
+LS_VARIANT_ID = os.getenv("LEMONSQUEEZY_VARIANT_ID")
+LS_SIGNING_SECRET = os.getenv("LEMONSQUEEZY_SIGNING_SECRET")
 
 # --- HELPERS ---
-def send_discord_alert(message, type="info"):
+
+def has_access(user):
+    """Checks if user has premium access via Profile Property"""
+    return user.profile.is_premium
+
+def send_discord_alert(symbol, data=None, alert_type="SNIPER"):
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url: return
-    color = 3447003
-    if type == "win":
-        color = 5763719
-    elif type == "loss":
-        color = 15548997
-    elif type == "new":
-        color = 15105570
-    payload = {"embeds": [{"title": "Reelioo Intelligence", "description": message, "color": color,
-                           "footer": {"text": "Institutional Market Structure"}}]}
+
+    # --- 1. GENERATE DEEP LINK ---
+    terminal_link = f"https://reelioo.app/terminal?ticker={symbol}"
+
+    # --- 2. DESIGN THE TEASER ---
+    if alert_type == "SNIPER":
+        color = 5814783  # Blurple
+        title = f"🎯 SNIPER TARGET IDENTIFIED: {symbol}"
+        description = "**Institutional Activity Detected.**\nNeural engines have locked onto a high-probability setup."
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/3121/3121575.png"
+    elif alert_type == "WIN":
+        color = 5763719  # Green
+        title = f"✅ TARGET HIT: {symbol}"
+        description = "Trade closed in profit."
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/190/190411.png"
+    elif alert_type == "LOSS":
+        color = 15548997  # Red
+        title = f"🛑 STOP HIT: {symbol}"
+        description = "Trade closed at stop loss."
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/1828/1828843.png"
+    else:
+        color = 16776960  # Yellow
+        title = f"📡 RADAR CONTACT: {symbol}"
+        description = "Volatility Spike Detected."
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/564/564619.png"
+
+    # --- 3. CONSTRUCT PAYLOAD ---
+    payload = {
+        "username": "Reelioo Intelligence",
+        "avatar_url": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
+        "embeds": [{
+            "title": title,
+            "description": description,
+            "color": color,
+            "thumbnail": {"url": thumbnail},
+            "fields": [
+                {"name": "Asset", "value": f"`{symbol}`", "inline": True},
+                {"name": "Signal Strength", "value": "██████▒▒▒▒ **[ACTIVE]**", "inline": True},
+                {"name": "Full Analysis", "value": f"👉 [**OPEN TERMINAL**]({terminal_link})", "inline": False}
+            ],
+            "footer": {"text": "🔒 Auth Required • Reelioo Terminal"},
+            "timestamp": timezone.now().isoformat()
+        }]
+    }
     try:
         requests.post(webhook_url, json=payload, timeout=3)
     except:
         pass
 
+# ==============================================================================
+#  LEMON SQUEEZY WEBHOOK (Source of Truth)
+# ==============================================================================
 
-def has_access(user):
-    if user.profile.is_premium: return True
-    return timezone.now() < (user.date_joined + timedelta(days=21))
+@csrf_exempt
+@require_http_methods(["POST"])
+def lemon_squeezy_webhook(request):
+    """Syncs Lemon Squeezy status to local DB"""
+    signature = request.headers.get("X-Signature")
+    if not signature or not LS_SIGNING_SECRET:
+        return HttpResponse("Signature Missing", status=403)
 
+    digest = hmac.new(LS_SIGNING_SECRET.encode('utf-8'), request.body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(digest, signature):
+        return HttpResponse("Invalid Signature", status=403)
+
+    try:
+        payload = json.loads(request.body)
+        data = payload.get('data', {})
+        attributes = data.get('attributes', {})
+
+        custom_data = attributes.get('checkout_data', {}).get('custom', {})
+        user_id = custom_data.get('user_id')
+        email = attributes.get('user_email')
+
+        user = None
+        if user_id:
+            try: user = User.objects.get(id=user_id)
+            except User.DoesNotExist: pass
+        if not user and email:
+            try: user = User.objects.get(email__iexact=email)
+            except User.DoesNotExist: pass
+
+        if not user:
+            return HttpResponse("User not found", status=200)
+
+        profile = user.profile
+        event_name = payload.get('meta', {}).get('event_name')
+
+        if event_name in ['subscription_created', 'subscription_updated', 'subscription_cancelled', 'subscription_expired', 'subscription_resumed']:
+            profile.lemon_squeezy_subscription_id = data.get('id')
+            profile.lemon_squeezy_customer_id = attributes.get('customer_id')
+            profile.subscription_status = attributes.get('status')
+            profile.update_payment_url = attributes.get('urls', {}).get('update_payment_method')
+
+            renews_at_str = attributes.get('renews_at') or attributes.get('ends_at')
+            if renews_at_str:
+                profile.renews_at = parser.parse(renews_at_str)
+
+            profile.save()
+            log.info(f"Updated Subscription for {user.username}: {profile.subscription_status}")
+
+        return HttpResponse("Webhook Processed")
+    except Exception as e:
+        log.error(f"Webhook Error: {e}")
+        return HttpResponse("Server Error", status=500)
 
 # ==============================================================================
-#  HTMX PARTIALS
+#  BILLING VIEWS
+# ==============================================================================
+
+@login_required
+def pricing_view(request):
+    checkout_url = f"https://reelioo.lemonsqueezy.com/checkout/buy/{LS_VARIANT_ID}?"
+    checkout_url += f"checkout[email]={request.user.email}&"
+    checkout_url += f"checkout[custom][user_id]={request.user.id}"
+
+    context = {
+        "checkout_url": checkout_url,
+        "is_premium": request.user.profile.is_premium
+    }
+    return render(request, 'core/pricing.html', context)
+
+@login_required
+def billing_portal_view(request):
+    sub_id = request.user.profile.lemon_squeezy_subscription_id
+    if not sub_id:
+        messages.error(request, "No active subscription found.")
+        return redirect('pricing')
+
+    try:
+        url = f"https://api.lemonsqueezy.com/v1/subscriptions/{sub_id}"
+        headers = {
+            "Accept": "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json",
+            "Authorization": f"Bearer {LS_API_KEY}"
+        }
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        customer_portal_url = data['data']['attributes']['urls']['customer_portal']
+        return redirect(customer_portal_url)
+    except Exception as e:
+        log.error(f"Portal Error: {e}")
+        messages.error(request, "Could not load billing portal.")
+        return redirect('settings')
+
+# ==============================================================================
+#  HTMX PARTIALS & CORE APP
 # ==============================================================================
 
 @require_http_methods(["GET"])
 def hx_ticker(request):
-    """Fetches LIVE prices for the marquee ticker."""
     symbols = ["BTC", "ETH", "SOL", "BNB", "XRP"]
     data = []
     for s in symbols:
         try:
+            # Fetch data
             df = MarketService.get_historical_data(f"{s}USDT", "PERP", "SCALP")
+
             if df is not None and not df.empty:
                 price = float(df['close'].iloc[-1])
-                fmt_price = f"${price:,.2f}" if price > 1.0 else f"${price:,.4f}"
-                data.append({'symbol': s, 'price': fmt_price})
-            else:
-                data.append({'symbol': s, 'price': "---"})
-        except Exception:
-            data.append({'symbol': s, 'price': "---"})
-    return render(request, 'core/partials/ticker.html', {'ticker': data * 4})
 
+                # Logic: Compare current price with previous close to determine color
+                if len(df) > 1:
+                    prev_price = float(df['close'].iloc[-2])
+                else:
+                    prev_price = price  # No history, assume neutral
+
+                if price > prev_price:
+                    direction = 'up'  # Green
+                elif price < prev_price:
+                    direction = 'down'  # Red
+                else:
+                    direction = 'flat'  # White
+
+                fmt = f"${price:,.2f}" if price > 1.0 else f"${price:,.4f}"
+                data.append({'symbol': s, 'price': fmt, 'direction': direction})
+            else:
+                data.append({'symbol': s, 'price': "---", 'direction': 'flat'})
+        except:
+            data.append({'symbol': s, 'price': "---", 'direction': 'flat'})
+
+    return render(request, 'core/partials/ticker.html', {'ticker': data * 4})
 
 @login_required
 @require_http_methods(["POST"])
 def hx_analyze(request):
     if not has_access(request.user):
-        return HttpResponse('<div class="text-center text-red-500 font-bold p-10">TRIAL EXPIRED</div>')
+        return HttpResponse('<div class="text-center text-red-500 font-bold p-10">UPGRADE TO ACCESS</div>')
 
     symbol = request.POST.get("symbol", "").upper().strip()
     if not symbol: return HttpResponse("")
-
     if not symbol.endswith("USDT"): symbol += "USDT"
-    mode = request.POST.get("mode", "INTRADAY")
 
     try:
+        mode = request.POST.get("mode", "INTRADAY")
         df = MarketService.get_historical_data(symbol, "PERP", mode)
         if df is None or df.empty: return HttpResponse('<div class="text-red-500 p-4">DATA ERROR</div>')
         engine = CryptoQuantEngine()
         res = engine.analyze(df, mode)
-
-        raw_note = NewsService.get_smart_insights(symbol)
+        raw_note = NewsService.get_smart_insights(symbol, mode)
         note_tag, note_msg = raw_note.split("|", 1) if "|" in raw_note else ("INSIGHT", raw_note)
 
         return render(request, 'core/partials/dashboard.html', {
@@ -103,27 +253,22 @@ def hx_analyze(request):
     except Exception as e:
         return HttpResponse(f'<div class="text-red-500 p-4">ERROR: {str(e)}</div>')
 
-
 @login_required
 @require_http_methods(["POST"])
 def hx_backtest(request):
-    symbol = request.POST.get("symbol")
-    mode = request.POST.get("mode", "INTRADAY")
     try:
-        df = MarketService.get_historical_data(symbol, "PERP", mode)
+        df = MarketService.get_historical_data(request.POST.get("symbol"), "PERP", "INTRADAY")
         if df is None: return HttpResponse("No Data")
-        engine = CryptoBacktestEngine(df, symbol)
-        stats = engine.run(mode)
+        engine = CryptoBacktestEngine(df, request.POST.get("symbol"))
+        stats = engine.run("INTRADAY")
         return render(request, 'core/partials/backtest_result.html', {'stats': stats})
     except Exception as e:
         return HttpResponse(f"Error: {e}")
 
-
 @login_required
 @require_http_methods(["GET"])
 def hx_alpha_scan(request):
-    if not has_access(request.user): return HttpResponse(
-        '<div class="text-center text-red-500 font-bold p-10">ACCESS DENIED</div>')
+    if not has_access(request.user): return HttpResponse('<div class="text-center text-red-500 font-bold p-10">ACCESS DENIED</div>')
     vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
     engine = CryptoQuantEngine()
     results = []
@@ -136,8 +281,7 @@ def hx_alpha_scan(request):
             if res.bias in ["LONG", "SHORT"] and res.score >= 70:
                 return {'symbol': sym, 'bias': res.bias, 'score': res.score, 'entry': res.entry, 'stop': res.stop,
                         'target': res.target1, 'explanation': getattr(res, 'narrative', 'Strong Momentum')}
-        except:
-            return None
+        except: return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         for r in executor.map(scan, vip_assets):
@@ -146,7 +290,6 @@ def hx_alpha_scan(request):
     if not results: return render(request, 'core/partials/alpha_result.html', {'res': {'found': False}})
     results.sort(key=lambda x: x['score'], reverse=True)
     return render(request, 'core/partials/alpha_result.html', {'res': {'found': True, **results[0]}})
-
 
 @login_required
 @require_http_methods(["POST"])
@@ -158,148 +301,191 @@ def hx_journal_add(request):
             stop_loss=float(request.POST.get('stop', 0)), target=float(request.POST.get('target', 0)),
             confidence=float(request.POST.get('score', 0)), status='PENDING'
         )
-        return HttpResponse(
-            '<button class="px-6 py-4 bg-emerald-500/20 text-emerald-400 font-bold rounded-xl text-xs uppercase tracking-widest border border-emerald-500/50 cursor-default">SAVED</button>')
+        return HttpResponse('<button class="w-full px-6 py-4 bg-emerald-500/10 text-emerald-400 font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-emerald-500/50 cursor-default flex items-center justify-center gap-2 shadow-lg"><i data-lucide="check" class="w-4 h-4"></i> SAVED TO JOURNAL</button>')
     except:
-        return HttpResponse('<button class="text-red-500 font-bold">Error</button>')
+        return HttpResponse('<button class="w-full px-6 py-4 bg-red-500/10 text-red-500 font-bold rounded-xl text-xs uppercase tracking-widest border border-red-500/50">ERROR SAVING</button>')
 
-
-# ==============================================================================
-#  JOURNAL ACTIONS
-# ==============================================================================
+# --- JOURNAL ACTIONS ---
 
 @login_required
 def refresh_journal_entry(request, entry_id):
+    """
+    Checks the specific trade against current market data.
+    Updates status (WIN/LOSS/PENDING) and renders the row row for HTMX.
+    """
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
     msg_type, title, message = "info", "Market Data", "Synced."
+
     if entry.status == 'PENDING':
         try:
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
             if df is not None and not df.empty:
-                price = float(df['close'].iloc[-1])
-                new_s = 'PENDING'
-                if entry.bias == 'LONG':
-                    if price >= entry.target:
-                        new_s = 'WIN'; entry.exit_price = price
-                    elif price <= entry.stop_loss:
-                        new_s = 'LOSS'; entry.exit_price = price
-                elif entry.bias == 'SHORT':
-                    if price <= entry.target:
-                        new_s = 'WIN'; entry.exit_price = price
-                    elif price >= entry.stop_loss:
-                        new_s = 'LOSS'; entry.exit_price = price
+                current_price = float(df['close'].iloc[-1])
+                new_status = 'PENDING'
 
-                if new_s != 'PENDING':
-                    entry.status = new_s;
-                    entry.exit_price = price;
-                    entry.closed_at = timezone.now();
+                # Check Long
+                if entry.bias == 'LONG':
+                    if current_price >= entry.target: new_status = 'WIN'
+                    elif current_price <= entry.stop_loss: new_status = 'LOSS'
+                # Check Short
+                elif entry.bias == 'SHORT':
+                    if current_price <= entry.target: new_status = 'WIN'
+                    elif current_price >= entry.stop_loss: new_status = 'LOSS'
+
+                if new_status != 'PENDING':
+                    entry.status = new_status
+                    entry.exit_price = current_price
+                    entry.closed_at = timezone.now()
                     entry.save()
-                    msg_type = "success" if new_s == 'WIN' else "warning"
-                    title = f"Closed: {new_s}";
-                    message = f"Exit: ${price}"
-                    send_discord_alert(f"Sync: {entry.symbol} Closed as {new_s}", type=new_s.lower())
+                    msg_type = "success" if new_status == 'WIN' else "warning"
+                    title = f"Closed: {new_status}"
+                    message = f"Exit: ${current_price}"
+                    # Optional: send_discord_alert(f"{entry.symbol} {new_status}", alert_type=new_status)
                 else:
-                    message = f"Current: ${price}"
-        except:
+                    message = f"Current: ${current_price}"
+        except Exception as e:
             msg_type, title = "error", "Sync Failed"
+            log.error(f"Journal Sync Error: {e}")
+
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
     response['HX-Trigger'] = json.dumps({'showJournalToast': {'type': msg_type, 'title': title, 'message': message}})
     return response
-
 
 @login_required
 @require_http_methods(["DELETE"])
 def delete_journal_entry(request, entry_id):
     JournalEntry.objects.filter(id=entry_id, user=request.user).delete()
     response = HttpResponse("")
-    response['HX-Trigger'] = json.dumps(
-        {'showJournalToast': {'type': 'success', 'title': 'Deleted', 'message': 'Entry removed.'}})
+    response['HX-Trigger'] = json.dumps({'showJournalToast': {'type': 'success', 'title': 'Deleted', 'message': 'Entry removed.'}})
     return response
 
-
-# ==============================================================================
-#  CRON & API
-# ==============================================================================
+# --- CRON JOB (Signal Engine) ---
 
 def cron_scan_trigger(request, secret_key):
-    if secret_key != os.getenv("CRON_SECRET", "reelioo_master_key"): return JsonResponse({'status': 'forbidden'},
-                                                                                         status=403)
-    pending = JournalEntry.objects.filter(status='PENDING')
-    updated = 0
-    for t in pending:
-        try:
-            df = MarketService.get_historical_data(t.symbol, "PERP", "SCALP")
-            if df is None: continue
-            price = float(df['close'].iloc[-1])
-            new_s = 'PENDING'
-            if t.bias == 'LONG':
-                if price >= t.target:
-                    new_s = 'WIN'
-                elif price <= t.stop_loss:
-                    new_s = 'LOSS'
-            elif t.bias == 'SHORT':
-                if price <= t.target:
-                    new_s = 'WIN'
-                elif price >= t.stop_loss:
-                    new_s = 'LOSS'
-            if new_s != 'PENDING':
-                t.status = new_s;
-                t.exit_price = price;
-                t.closed_at = timezone.now();
-                t.save();
-                updated += 1
-                send_discord_alert(f"Trade Result: {t.symbol} {new_s}", type=new_s.lower())
-        except:
-            continue
-    return JsonResponse({'status': 'ok', 'updated': updated})
+    # 1. SECURITY CHECK
+    required_secret = getattr(settings, 'CRON_SECRET', 'reelioo_master_key')
+    if secret_key != required_secret:
+        return JsonResponse({'status': 'forbidden', 'message': 'Access Denied'}, status=403)
 
+    logs = []
+
+    # 2. CLEANUP OLD DATA
+    retention_cutoff = timezone.now() - timedelta(days=90)
+    deleted_count, _ = JournalEntry.objects.filter(created_at__lt=retention_cutoff).delete()
+    if deleted_count > 0: logs.append(f"Purged {deleted_count} entries.")
+
+    # 3. SCAN LOGIC
+    watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
+    scanned = 0
+    signals_sent = 0
+    engine = CryptoQuantEngine()
+
+    # Find users who should receive signals (Admins + Active/Trial Subs)
+    active_users = User.objects.filter(
+        Q(is_superuser=True) |
+        Q(profile__subscription_status__in=['active', 'on_trial'])
+    ).distinct()
+
+    for symbol in watchlist:
+        try:
+            df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
+            if df is None or df.empty: continue
+
+            res = engine.analyze(df, "INTRADAY")
+
+            # TRIGGER: High Score + Directional
+            if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
+                # Global Debounce (Check master admin)
+                master_admin = User.objects.filter(is_superuser=True).first()
+                recent_exists = False
+                if master_admin:
+                    recent_exists = JournalEntry.objects.filter(
+                        user=master_admin, symbol=symbol, status='PENDING',
+                        created_at__gte=timezone.now() - timedelta(hours=4)
+                    ).exists()
+
+                if not recent_exists:
+                    # Alert Discord
+                    send_discord_alert(symbol, alert_type="SNIPER")
+
+                    # Distribute to Users
+                    for user in active_users:
+                        if not JournalEntry.objects.filter(user=user, symbol=symbol, status='PENDING').exists():
+                            JournalEntry.objects.create(
+                                user=user, symbol=symbol, bias=res.bias,
+                                entry_price=res.entry, stop_loss=res.stop, target=res.target1,
+                                confidence=res.score, status='PENDING', leverage='Low'
+                            )
+                    signals_sent += 1
+                    logs.append(f"Signal: {symbol} -> {active_users.count()} users")
+
+        except Exception as e:
+            logs.append(f"Error {symbol}: {str(e)}")
+            continue
+        scanned += 1
+
+    return JsonResponse({
+        'status': 'success',
+        'scanned': scanned,
+        'signals_distributed': signals_sent,
+        'logs': logs
+    })
+
+# --- PAGE VIEWS & CSV SEARCH ---
 
 @login_required
-def global_symbols_view(request):
-    """API for search bar"""
-    csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
-    symbols = []
-    if os.path.exists(csv_path):
-        try:
-            with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if 'symbol' in row: symbols.append(row['symbol'])
-        except:
-            pass
-    if not symbols: symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
-    return JsonResponse(symbols, safe=False)
+def journal_view(request):
+    entries = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
 
+    # --- ROI CALCULATION ---
+    net_roi = 0.0
+    gross_profit = 0.0
+    gross_loss = 0.0
 
-def search_crypto_view(request):
-    q = request.GET.get("q", "")
-    return JsonResponse(MarketService.search_assets(q), safe=False)
+    for trade in entries:
+        if trade.status in ['WIN', 'LOSS']:
+            try:
+                # Calculate % movement
+                if trade.bias == 'LONG':
+                    potential_win = (trade.target - trade.entry_price) / trade.entry_price
+                    potential_loss = (trade.entry_price - trade.stop_loss) / trade.entry_price
+                else:  # SHORT
+                    potential_win = (trade.entry_price - trade.target) / trade.entry_price
+                    potential_loss = (trade.stop_loss - trade.entry_price) / trade.entry_price
 
+                if trade.status == 'WIN':
+                    net_roi += potential_win
+                    gross_profit += potential_win
+                elif trade.status == 'LOSS':
+                    net_roi -= potential_loss
+                    gross_loss += potential_loss
+            except: continue
 
-# ==============================================================================
-#  PAGE VIEWS & AUTH
-# ==============================================================================
+    # Calculate Display Values
+    display_roi = round(net_roi * 100, 2)
+    pf = round(gross_profit / gross_loss, 2) if gross_loss > 0 else (round(gross_profit, 2) if gross_profit > 0 else 0)
+    active = entries.filter(status='PENDING').count()
+
+    paginator = Paginator(entries, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'core/journal.html', {
+        'page_obj': page_obj,
+        'net_roi': display_roi, # Passed as float for correct template coloring
+        'profit_factor': pf,
+        'active_pending': active
+    })
 
 def login_view(request):
     if request.user.is_authenticated: return redirect('terminal')
-
     if request.method == "POST":
-        email = request.POST.get('email')
-        password = request.POST.get('password')
         try:
-            # Login via Email
-            user_obj = User.objects.get(email__iexact=email)
-            user = authenticate(request, username=user_obj.username, password=password)
-            if user:
-                login(request, user)
-                return redirect('terminal')
-            else:
-                messages.error(request, "Invalid password.")
-        except User.DoesNotExist:
-            messages.error(request, "No account found with this email.")
-
+            user_obj = User.objects.get(email__iexact=request.POST.get('email'))
+            user = authenticate(request, username=user_obj.username, password=request.POST.get('password'))
+            if user: login(request, user); return redirect('terminal')
+            else: messages.error(request, "Invalid password.")
+        except: messages.error(request, "User not found.")
     return render(request, 'core/auth/login.html')
-
 
 def signup_view(request):
     if request.user.is_authenticated: return redirect('terminal')
@@ -308,142 +494,49 @@ def signup_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('terminal')
-    else:
-        form = SignupForm()
+            return redirect('pricing') # Start Trial
+    else: form = SignupForm()
     return render(request, 'core/auth/signup.html', {'form': form})
 
-
-def logout_view(request):
-    logout(request)
-    return redirect('landing')
-
-
-def landing_view(request):
-    if request.user.is_authenticated: return redirect('terminal')
-    return render(request, 'core/landing.html')
-
-
+def logout_view(request): logout(request); return redirect('landing')
+def landing_view(request): return redirect('terminal') if request.user.is_authenticated else render(request, 'core/landing.html')
 @login_required
-def terminal_view(request):
-    return render(request, 'core/terminal.html', {'days_left': 21, 'is_premium': request.user.profile.is_premium})
-
-
+def terminal_view(request): return render(request, 'core/terminal.html')
 @login_required
 def settings_view(request):
     if request.method == 'POST':
         form = UserUpdateForm(request.POST, instance=request.user)
         if form.is_valid(): form.save(); return render(request, 'core/auth/profile_saved.html')
-    else:
-        form = UserUpdateForm(instance=request.user)
+    else: form = UserUpdateForm(instance=request.user)
     return render(request, 'core/auth/settings.html', {'form': form})
-
-
 @login_required
-def journal_view(request):
-    entries = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
-    wins = entries.filter(status='WIN').count()
-    losses = entries.filter(status='LOSS').count()
-    active = entries.filter(status='PENDING').count()
-    net_roi = (wins * 2) - (losses * 1)
-    pf = round((wins * 2) / (losses * 1), 2) if losses > 0 else (wins * 2)
-    paginator = Paginator(entries, 10)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'core/journal.html',
-                  {'page_obj': page_obj, 'net_roi': net_roi, 'profit_factor': pf, 'active_pending': active})
-
-
-@login_required
-def ops_dashboard_view(request):
-    if not request.user.is_superuser: return redirect('terminal')
-    return render(request, 'core/ops_dashboard.html', {'total_users': User.objects.count(),
-                                                       'active_subs': User.objects.filter(
-                                                           profile__is_premium=True).count(),
-                                                       'total_signals': JournalEntry.objects.count(),
-                                                       'recent_signals': JournalEntry.objects.order_by('-created_at')[
-                                                                         :10], 'win_rate': 68.5})
-
-
-# --- PRICING & PAYMENT LOGIC ---
-
-@login_required
-def pricing_view(request):
-    key_id = os.getenv("RAZORPAY_KEY_ID")
-    plan_id = os.getenv("RAZORPAY_PLAN_ID")
-
-    # Debug: Check logs if payment popup fails
-    if not key_id or not plan_id:
-        log.error("PAYMENT ERROR: Missing RAZORPAY_KEY_ID or RAZORPAY_PLAN_ID in .env")
-
-    context = {
-        "key_id": key_id,
-        "sub_id": plan_id or "sub_default_placeholder",
-        "user_email": request.user.email
-    }
-    return render(request, 'core/pricing.html', context)
-
-
-@csrf_exempt
-def payment_success_view(request):
-    """Handles the success callback from Razorpay"""
-    if request.method == "POST":
-        try:
-            client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
-
-            data = {
-                'razorpay_payment_id': request.POST.get('razorpay_payment_id'),
-                'razorpay_subscription_id': request.POST.get('razorpay_subscription_id'),
-                'razorpay_signature': request.POST.get('razorpay_signature')
-            }
-
-            # Verify Signature
-            client.utility.verify_subscription_payment_signature(data)
-
-            # Upgrade User
-            if request.user.is_authenticated:
-                profile = request.user.profile
-                profile.is_premium = True
-                profile.subscription_status = 'active'
-                profile.subscription_id = data['razorpay_subscription_id']
-                profile.save()
-                messages.success(request, "Reelioo Pro Activated Successfully!")
-                return render(request, 'core/auth/success.html')  # Render the Success Splash Page
-
-        except Exception as e:
-            log.error(f"Payment Verification Failed: {str(e)}")
-            messages.error(request, "Payment verification failed. Please contact support.")
-            return redirect('pricing')
-
-    return redirect('pricing')
-
-
-@login_required
-def cancel_subscription_view(request): return redirect('settings')
-
-
+def ops_dashboard_view(request): return render(request, 'core/ops_dashboard.html') if request.user.is_superuser else redirect('terminal')
 def terms_view(request): return render(request, 'core/legal/terms.html')
-
-
 def about_view(request): return render(request, 'core/why_reelioo.html')
-
-
 def privacy_view(request): return render(request, 'core/legal/privacy.html')
-
-
 def refund_view(request): return render(request, 'core/legal/refund.html')
-
-
 def contact_view(request): return render(request, 'core/legal/contact.html')
-
-
 def pricing_footer_view(request): return render(request, 'core/legal/pricing_footer.html')
-
-
 def robots_view(request): return HttpResponse("User-agent: *\nDisallow:", content_type="text/plain")
-
-
 def sitemap_view(request): return HttpResponse("", content_type="application/xml")
-
-
 @login_required
 def add_journal_entry(request): return JsonResponse({'status': 'ok'})
+
+# --- CSV SEARCH (RESTORED) ---
+@login_required
+def global_symbols_view(request):
+    csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
+    symbols = []
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'symbol' in row: symbols.append(row['symbol'])
+        except: pass
+    if not symbols: symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+    return JsonResponse(symbols, safe=False)
+
+def search_crypto_view(request):
+    q = request.GET.get("q", "")
+    return JsonResponse(MarketService.search_assets(q), safe=False)

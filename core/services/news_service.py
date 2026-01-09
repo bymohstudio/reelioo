@@ -1,6 +1,5 @@
 import os
 import logging
-from datetime import datetime
 from django.core.cache import cache
 from openai import OpenAI
 
@@ -14,9 +13,12 @@ class NewsService:
     """
 
     @staticmethod
-    def get_smart_insights(symbol="BTC"):
+    def get_smart_insights(symbol="BTC", mode="INTRADAY"):
         coin = symbol.replace("USDT", "").replace("-PERP", "").upper()
-        cache_key = f"desk_note_v7:{coin}"
+
+        # FIX 1: Make cache key unique to the MODE (Scalp vs Intraday)
+        # FIX 2: Version bump to v8 to invalidate old stuck keys
+        cache_key = f"desk_note_v8:{coin}:{mode}"
 
         # 1. Cache Check
         cached = cache.get(cache_key)
@@ -26,10 +28,12 @@ class NewsService:
         try:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-            # PROMPT: Enforce "TAG|Message" format
+            # FIX 3: Inject the MODE into the prompt so the AI context changes
+            context_str = "short-term scalping" if mode == "SCALP" else "intraday swing trading"
+
             prompt = (
-                f"Analyze {coin} market structure. Return a single string in this exact format: 'TAG|Message'. "
-                f"The TAG must be 1-3 words, uppercase (e.g. LIQUIDITY GRAB, WHALE BUYING, STOP HUNT). "
+                f"Analyze {coin} market structure for {context_str}. Return a single string in this exact format: 'TAG|Message'. "
+                f"The TAG must be 1-3 words, uppercase (e.g. LIQUIDITY SWEEP, MOMENTUM SHIFT, RANGE BOUND). "
                 f"The Message must be concise (max 12 words) and actionable. "
                 f"Example output: 'ORDER BLOCK|High volume rejection at 60k confirms support.'"
             )
@@ -37,21 +41,21 @@ class NewsService:
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.4, max_tokens=40
+                temperature=0.5,  # Slightly higher temp for more variety
+                max_tokens=50
             )
 
             content = response.choices[0].message.content.strip().replace('"', '')
 
-            # Fallback if AI forgets format
             if "|" not in content:
                 content = f"MARKET NOTE|{content}"
 
             if content:
-                cache.set(cache_key, content, timeout=7200)
+                # FIX 4: Reduce timeout from 7200s (2hr) to 900s (15 min)
+                cache.set(cache_key, content, timeout=900)
                 return content
 
         except Exception as e:
             log.error(f"AI Error: {e}")
 
-        # 3. Fallback
-        return f"VOLATILITY ALERT|Liquidity thin at current levels, expect rapid moves."
+        return f"VOLATILITY ALERT|Liquidity thin, expect rapid moves."

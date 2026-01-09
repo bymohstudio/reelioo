@@ -1,58 +1,59 @@
 {% extends "core/base.html" %}
 {% block content %}
-<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans" x-data="pricing()">
+<div class="max-w-4xl mx-auto px-6 py-24 text-center fade-in font-sans">
 
     <div class="mb-12">
-        {% if is_trial_expired %}
-            <span class="text-red-400 text-[10px] font-bold uppercase tracking-widest border border-red-500/30 bg-red-500/10 px-3 py-1 rounded-full">Trial Expired</span>
-            <h1 class="text-4xl font-black text-white mt-6 mb-4">Unlock The Terminal</h1>
-            <p class="text-slate-400 max-w-lg mx-auto leading-relaxed text-sm">
-                Your evaluation period has ended. Secure your seat to regain access to live market data.
-            </p>
-        {% else %}
-            <span class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 rounded-full">Upgrade Available</span>
-            <h1 class="text-4xl font-black text-white mt-6 mb-4">Go Pro</h1>
-            <p class="text-slate-400 max-w-lg mx-auto leading-relaxed text-sm">
-                You are currently on a trial. Lock in the <strong>Launch Price ($19)</strong> before it expires.
-            </p>
-        {% endif %}
+        <span class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 rounded-full">14-Day Free Trial</span>
+        <h1 class="text-4xl font-black text-white mt-6 mb-4">Go Professional</h1>
+        <p class="text-slate-400 max-w-lg mx-auto leading-relaxed text-sm">
+            Full terminal access. Start your **14-day free trial**. Cancel anytime.
+        </p>
     </div>
 
     <div class="bg-[#0a0a0a] border border-blue-600/30 rounded-3xl p-10 max-w-md mx-auto shadow-[0_0_60px_rgba(37,99,235,0.15)] relative overflow-hidden group hover:border-blue-600/50 transition duration-500">
 
-        <div class="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-4 py-1.5 rounded-bl-xl tracking-widest shadow-lg">
-            LAUNCH PRICE
-        </div>
+        <div class="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-bold px-4 py-1.5 rounded-bl-xl tracking-widest shadow-lg">MOST POPULAR</div>
 
         <div class="text-left mb-8 border-b border-white/5 pb-8">
             <h2 class="text-5xl font-black text-white mb-2">$19 <span class="text-lg text-slate-500 font-normal">/ month</span></h2>
-            <p class="text-xs text-blue-400 font-bold uppercase tracking-widest">Limited Time Offer (Regular $49)</p>
+            <p class="text-xs text-blue-400 font-bold uppercase tracking-widest">14 Days Free • Then $19/mo</p>
         </div>
 
         <ul class="text-left space-y-5 mb-10 text-sm text-slate-300">
-            <li class="flex items-center gap-3">
-                <div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="scan" class="text-emerald-500 w-4 h-4"></i></div>
-                <span>Unlimited <strong>Market Scans</strong></span>
-            </li>
-            <li class="flex items-center gap-3">
-                <div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="waves" class="text-emerald-500 w-4 h-4"></i></div>
-                <span>Real-Time <strong>Whale Volume</strong></span>
-            </li>
-            <li class="flex items-center gap-3">
-                <div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="shield-check" class="text-emerald-500 w-4 h-4"></i></div>
-                <span>Trend <strong>Confirmation Engine</strong></span>
-            </li>
-            <li class="flex items-center gap-3">
-                <div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="zap" class="text-emerald-500 w-4 h-4"></i></div>
-                <span><strong>Sniper Mode</strong> (Scalping)</span>
-            </li>
+            <li class="flex items-center gap-3"><div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="scan" class="text-emerald-500 w-4 h-4"></i></div><span>Unlimited <strong>Market Scans</strong></span></li>
+            <li class="flex items-center gap-3"><div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="waves" class="text-emerald-500 w-4 h-4"></i></div><span>Real-Time <strong>Whale Volume</strong></span></li>
+            <li class="flex items-center gap-3"><div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="shield-check" class="text-emerald-500 w-4 h-4"></i></div><span>Trend <strong>Confirmation</strong></span></li>
+            <li class="flex items-center gap-3"><div class="p-1 bg-emerald-500/10 rounded"><i data-lucide="zap" class="text-emerald-500 w-4 h-4"></i></div><span><strong>Sniper Mode</strong> (Scalping)</span></li>
         </ul>
 
-        <button @click="initPayment" :disabled="loading"
-                class="relative w-full py-4 bg-white hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition shadow-[0_0_20px_rgba(255,255,255,0.2)] text-xs uppercase tracking-widest flex justify-center items-center gap-2 overflow-hidden">
+        <button x-data="{
+                    loading: false,
+                    checkoutUrl: '{{ checkout_url|escapejs }}',
+                    openCheckout() {
+                        if(!this.checkoutUrl || this.checkoutUrl.includes('None')) return;
+                        this.loading = true;
+
+                        // Use Lemon Squeezy SDK
+                        if (window.LemonSqueezy) {
+                            window.LemonSqueezy.Url.Open(this.checkoutUrl);
+                            window.LemonSqueezy.Setup({
+                                eventHandler: (event) => {
+                                    if (event.event === 'LemonSqueezy.Url.Close') this.loading = false;
+                                    if (event.event === 'PaymentSuccess') window.location.href = '{% url 'terminal' %}?success=true';
+                                }
+                            });
+                        } else {
+                            // Fallback if SDK fails to load
+                            window.location.href = this.checkoutUrl;
+                        }
+                    }
+                }"
+                @click="openCheckout"
+                :disabled="loading"
+                class="relative w-full py-4 bg-white hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition shadow-lg text-xs uppercase tracking-widest flex justify-center items-center gap-2 overflow-hidden cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">
 
             <span x-show="!loading" class="relative z-10 flex items-center gap-2">
-                <i data-lucide="lock" class="w-3 h-3"></i> SECURE ACCESS
+                <i data-lucide="zap" class="w-4 h-4 text-emerald-600 fill-current"></i> START FREE TRIAL
             </span>
 
             <span x-show="loading" class="relative z-10 flex items-center gap-2" x-cloak>
@@ -61,56 +62,10 @@
         </button>
 
         <div class="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-600 font-bold">
-            <span>Encrypted & Secured by Razorpay.</span>
+            <i data-lucide="lock" class="w-3 h-3"></i> Secured by Lemon Squeezy
         </div>
     </div>
 </div>
 
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('pricing', () => ({
-            loading: false,
-            initPayment() {
-                this.loading = true;
-                const razorpayKey = "{{ key_id|default:'' }}";
-                const subId = "{{ sub_id|default:'' }}";
-                const userEmail = "{{ user_email|default:'' }}";
-                const callbackUrl = window.location.origin + "{% url 'payment_success' %}";
-
-                if (!razorpayKey || !subId || subId === "error") {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'System Offline',
-                        text: 'Payment gateway is maintenance.',
-                        background: '#0f172a', color: '#fff'
-                    });
-                    this.loading = false;
-                    return;
-                }
-
-                var options = {
-                    "key": razorpayKey,
-                    "subscription_id": subId,
-                    "name": "Reelioo Pro",
-                    "description": "Professional Access",
-                    "image": "https://cdn-icons-png.flaticon.com/512/217/217853.png",
-                    "callback_url": callbackUrl,
-                    "redirect": true,
-                    "prefill": { "email": userEmail },
-                    "theme": { "color": "#2563eb" },
-                    "modal": { "ondismiss": () => { this.loading = false; } }
-                };
-
-                try {
-                    var rzp1 = new Razorpay(options);
-                    rzp1.open();
-                } catch (err) {
-                    Swal.fire({ icon: 'error', title: 'Connection Error', text: 'Gateway unreachable.', background: '#0f172a', color: '#fff' });
-                    this.loading = false;
-                }
-            }
-        }));
-    });
-</script>
+<script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
 {% endblock %}

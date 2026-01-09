@@ -24,8 +24,6 @@ urlpatterns = [
     path("", views.landing_view, name="landing"),
     path("terminal/", views.terminal_view, name="terminal"),
     path("pricing/", views.pricing_view, name="pricing"),
-    path("payment/success/", views.payment_success_view, name="payment_success"),
-    path("settings/cancel/", views.cancel_subscription_view, name="cancel_subscription"),
     path('ops/console/', views.ops_dashboard_view, name='ops_dashboard'),
     path('journal/', views.journal_view, name='journal'),
 
@@ -34,6 +32,9 @@ urlpatterns = [
     path("auth/signup/", views.signup_view, name="signup"),
     path("auth/logout/", views.logout_view, name="logout"),
     path("account/settings/", views.settings_view, name="settings"),
+    # --- LEMON SQUEEZY (The Missing Links) ---
+    path('billing/portal/', views.billing_portal_view, name='billing_portal'),  # <--- FIXED ERROR HERE
+    path('webhooks/ls/', views.lemon_squeezy_webhook, name='lemon_squeezy_webhook'),
 
     # --- SYSTEM ---
     path('robots.txt', robots_view, name='robots'),

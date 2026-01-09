@@ -1,80 +1,57 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils import timezone
-from datetime import timedelta
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from datetime import datetime
+from django.utils import timezone
 
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
 
-    # Subscription Logic
-    trial_start_date = models.DateTimeField(auto_now_add=True)
+    # --- LEMON SQUEEZY SYNC ---
+    lemon_squeezy_customer_id = models.CharField(max_length=100, blank=True, null=True)
+    lemon_squeezy_subscription_id = models.CharField(max_length=100, blank=True, null=True)
 
-    # We keep is_premium as a flag, but access depends on the End Date now
-    is_premium = models.BooleanField(default=False)
+    # Status: 'active', 'on_trial', 'past_due', 'cancelled', 'expired'
+    # Default is 'inactive' because new signups don't have a sub yet.
+    subscription_status = models.CharField(max_length=50, default="inactive")
 
-    # NEW: Stores exactly when the paid access ends
-    subscription_end_date = models.DateTimeField(blank=True, null=True)
+    # When access truly ends (synced from LS 'renews_at' or 'ends_at')
+    renews_at = models.DateTimeField(blank=True, null=True)
 
-    razorpay_subscription_id = models.CharField(max_length=100, blank=True, null=True)
+    # URL to update card details (synced from LS webhook)
+    update_payment_url = models.URLField(blank=True, null=True)
 
-    # Statuses: 'trial', 'active', 'cancellation_pending', 'expired'
-    subscription_status = models.CharField(max_length=50, default="trial")
-
-    # Extended Profile Fields
+    # Meta
     country = models.CharField(max_length=100, blank=True, null=True)
     terms_accepted = models.BooleanField(default=False)
 
-    def is_access_granted(self):
+    @property
+    def is_premium(self):
         """
-        Master check for Terminal Access.
+        Determines if the user gets Pro Access.
+        PRIORITY 1: GOD MODE (Superuser)
+        PRIORITY 2: Lemon Squeezy Status
         """
-        # 1. Check Paid Access (Active OR Cancellation Pending but time remains)
-        if self.is_premium:
-            # Lazy Expiration Check: If end date exists and we are PAST it
-            if self.subscription_end_date and timezone.now() > self.subscription_end_date:
-                self.perform_lazy_expiration()  # Revoke access
-                return False
+        # 1. GOD MODE: You always have access
+        if self.user.is_superuser:
             return True
 
-        # 2. Check Trial Access
-        if not self.is_trial_expired():
+        # 2. Valid Paid/Trial Statuses
+        # 'on_trial' means they are in the 14-day LS trial.
+        # 'active' means they are paying.
+        valid_statuses = ['active', 'on_trial']
+        if self.subscription_status in valid_statuses:
             return True
+
+        # 3. Grace Period (Cancelled but not expired yet)
+        if self.subscription_status == 'cancelled' and self.renews_at:
+            return timezone.now() < self.renews_at
 
         return False
 
-    def perform_lazy_expiration(self):
-        """Helper to downgrade user if time is up"""
-        if self.is_premium:
-            self.is_premium = False
-            self.subscription_status = "expired"
-            self.save()
-
-    def is_trial_expired(self):
-        trial_end = self.trial_start_date + timedelta(days=21)
-        return timezone.now() > trial_end
-
-    def get_days_left(self):
-        # Case A: Premium (Active or Cancelling)
-        if self.is_premium and self.subscription_end_date:
-            remaining = self.subscription_end_date - timezone.now()
-            days = max(0, remaining.days)
-            return f"{days} DAYS (PREMIUM)"
-
-        # Case B: Lifetime/Manual Premium (No date set)
-        if self.is_premium:
-            return "UNLIMITED"
-
-        # Case C: Trial
-        trial_end = self.trial_start_date + timedelta(days=21)
-        remaining = trial_end - timezone.now()
-        return max(0, remaining.days)
-
     def __str__(self):
-        return f"{self.user.username} | Status: {self.subscription_status}"
+        return f"{self.user.username} | {self.subscription_status}"
 
 
 @receiver(post_save, sender=User)
@@ -83,55 +60,31 @@ def create_user_profile(sender, instance, created, **kwargs):
         UserProfile.objects.get_or_create(user=instance)
 
 
-# core/models.py
-from django.db import models
-from django.contrib.auth.models import User
-
-
-# ... existing imports ...
-
+# --- JOURNAL & ANALYTICS (Unchanged) ---
 class JournalEntry(models.Model):
-    STATUS_CHOICES = [
-        ('PENDING', 'Pending'),
-        ('WIN', 'Win'),
-        ('LOSS', 'Loss'),
-        ('BREAKEVEN', 'Breakeven'),
-    ]
-
+    STATUS_CHOICES = [('PENDING', 'Pending'), ('WIN', 'Win'), ('LOSS', 'Loss'), ('BREAKEVEN', 'Breakeven')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="journal_entries")
     symbol = models.CharField(max_length=20)
-    bias = models.CharField(max_length=10)  # LONG or SHORT
-
-    # Price Data Snapshot
+    bias = models.CharField(max_length=10)
     entry_price = models.FloatField()
     stop_loss = models.FloatField()
     target = models.FloatField()
-
-    # Metadata
     confidence = models.FloatField(default=0.0)
     leverage = models.CharField(max_length=20, default="Low")
-
-    # Outcome
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
-    pnl_percent = models.FloatField(default=0.0)  # Realized PnL
-
+    pnl_percent = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ['-created_at']
+    class Meta: ordering = ['-created_at']
 
-    def __str__(self):
-        return f"{self.symbol} ({self.bias}) - {self.status}"
+    def __str__(self): return f"{self.symbol} ({self.bias}) - {self.status}"
 
 
-
-# --- ANALYTICS MODELS (For future Admin Dashboard) ---
 class PredictionLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     symbol = models.CharField(max_length=20)
     score = models.FloatField()
     bias = models.CharField(max_length=10)
 
-    def __str__(self):
-        return f"{self.symbol} - {self.bias} ({self.score})"
+    def __str__(self): return f"{self.symbol} - {self.bias} ({self.score})"

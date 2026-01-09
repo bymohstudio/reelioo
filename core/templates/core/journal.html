@@ -15,17 +15,19 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
             <div class="relative z-10 flex justify-between items-start">
                 <div>
                     <span class="text-[10px] uppercase text-slate-500 font-black tracking-widest block mb-2">Net Growth (R)</span>
-                    <span class="text-4xl font-black tracking-tighter {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                    <span class="text-4xl font-black tracking-tighter {% if net_roi < 0 %}text-red-400{% else %}text-emerald-400{% endif %}">
                         {% if net_roi > 0 %}+{% endif %}{{ net_roi }}
                     </span>
                 </div>
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
             </div>
         </div>
+
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
             <div class="relative z-10 flex justify-between items-start">
                 <div>
@@ -35,6 +37,7 @@
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="scale" class="w-5 h-5"></i></div>
             </div>
         </div>
+
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-white/10 transition">
             <div class="relative z-10 flex justify-between items-start">
                 <div>
