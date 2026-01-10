@@ -1,10 +1,10 @@
 # ============================================================
-# 1. Base Image
+# Python Base
 # ============================================================
 FROM python:3.13-slim
 
 # ============================================================
-# 2. System Dependencies
+# System deps (Python + Node for Tailwind)
 # ============================================================
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -15,45 +15,41 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================================================
-# 3. Environment Variables
+# Environment
 # ============================================================
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV NODE_ENV=production
 
-# ============================================================
-# 4. Work Directory
-# ============================================================
 WORKDIR /app
 
 # ============================================================
-# 5. Python Dependencies
+# Python deps
 # ============================================================
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ============================================================
-# 6. Node / Tailwind Dependencies
+# Tailwind deps
 # ============================================================
 COPY theme/package.json theme/package-lock.json ./theme/
 RUN cd theme && npm install
 
 # ============================================================
-# 7. Copy Project Code
+# App source
 # ============================================================
 COPY . .
 
 # ============================================================
-# 8. Build Tailwind CSS
+# Build Tailwind
 # ============================================================
 RUN python manage.py tailwind build
 
 # ============================================================
-# 9. Collect Static Files
+# Collect static
 # ============================================================
 RUN python manage.py collectstatic --noinput
 
 # ============================================================
-# 10. Run Server
+# Run server
 # ============================================================
-CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:${PORT:-8000}
+CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:$PORT
