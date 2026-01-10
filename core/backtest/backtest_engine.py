@@ -26,10 +26,13 @@ class CryptoBacktestEngine:
     # ------------------------------------------------
     # CORE RUN
     # ------------------------------------------------
-    def run(self):
+    # FIXED: Added 'mode' parameter to match views.py call
+    def run(self, mode="INTRADAY"):
         if self.df.empty:
             return self._empty_result()
 
+        # You can pass 'mode' to feature engineering if needed,
+        # otherwise it just prevents the TypeError.
         df = generate_features(self.df)
 
         # -------------------------------
