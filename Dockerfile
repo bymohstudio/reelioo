@@ -31,8 +31,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ============================================================
 # Tailwind deps
 # ============================================================
+# 1. Copy package files to the correct subfolder
 COPY theme/static_src/package.json theme/static_src/package-lock.json ./theme/static_src/
-RUN cd theme && npm install
+
+# 2. FIXED: Go into static_src (where package.json is) to run install
+RUN cd theme/static_src && npm install
 
 # ============================================================
 # App source
@@ -42,6 +45,7 @@ COPY . .
 # ============================================================
 # Build Tailwind
 # ============================================================
+# This command invokes the npm script from Django
 RUN python manage.py tailwind build
 
 # ============================================================
