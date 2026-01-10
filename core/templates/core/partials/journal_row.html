@@ -1,50 +1,63 @@
-<tr class="border-b border-white/5 hover:bg-white/[0.02] transition group animate-fade-in" id="entry-{{ entry.id }}">
-    <td class="p-5 align-middle font-mono text-xs text-slate-500 font-bold">
-        {{ entry.created_at|date:'Y-m-d' }}
+<tr class="hover:bg-white/[0.03] transition-colors duration-200 group" id="row-{{ entry.id }}">
+
+    <td class="py-5 px-6 align-middle">
+        <div class="flex flex-col gap-0.5">
+            <span class="text-xs font-bold font-mono text-slate-300">{{ entry.created_at|date:"M d" }}</span>
+            <span class="text-[10px] font-medium text-slate-600 uppercase tracking-wider">{{ entry.created_at|date:"H:i" }} UTC</span>
+        </div>
     </td>
-    <td class="p-5 align-middle font-black text-white text-base">
-        {{ entry.symbol }}
+
+    <td class="py-5 px-6 align-middle">
+        <div class="flex flex-col gap-0.5">
+            <span class="font-black text-white text-sm tracking-tight">{{ entry.symbol }}</span>
+            <span class="text-[9px] font-bold text-slate-500 bg-white/5 px-1.5 py-0.5 rounded w-fit uppercase tracking-wider">{{ entry.leverage|default:"Low" }} Lev</span>
+        </div>
     </td>
-    <td class="p-5 align-middle">
+
+    <td class="py-5 px-6 align-middle">
         {% if entry.bias == 'LONG' %}
-            <span class="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded uppercase tracking-wider">LONG</span>
-        {% elif entry.bias == 'SHORT' %}
-            <span class="text-[10px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded uppercase tracking-wider">SHORT</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                <i data-lucide="arrow-up" class="w-3 h-3"></i> Long
+            </span>
         {% else %}
-            <span class="text-[10px] font-black text-slate-400 bg-slate-500/10 border border-slate-500/20 px-3 py-1 rounded uppercase tracking-wider">{{ entry.bias }}</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                <i data-lucide="arrow-down" class="w-3 h-3"></i> Short
+            </span>
         {% endif %}
     </td>
-    <td class="p-5 align-middle text-right font-mono font-bold text-slate-300">
-        {{ entry.entry_price }}
+
+    <td class="py-5 px-6 align-middle text-right font-mono font-medium text-slate-400 text-xs tracking-tight">{{ entry.entry_price }}</td>
+    <td class="py-5 px-6 align-middle text-right font-mono font-bold text-emerald-500/80 text-xs tracking-tight">{{ entry.target }}</td>
+    <td class="py-5 px-6 align-middle text-right font-mono font-bold text-red-500/80 text-xs tracking-tight">{{ entry.stop_loss }}</td>
+
+    <td class="py-5 px-6 align-middle text-center">
+        {% if entry.status == 'PENDING' %}
+            <span class="inline-flex justify-center w-24 py-1.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500 uppercase tracking-widest shadow-sm">Pending</span>
+        {% elif entry.status == 'WIN' %}
+            <span class="inline-flex justify-center w-24 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-widest shadow-sm">Win</span>
+        {% elif entry.status == 'LOSS' %}
+            <span class="inline-flex justify-center w-24 py-1.5 rounded-md bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-400 uppercase tracking-widest shadow-sm">Loss</span>
+        {% else %}
+            <span class="inline-flex justify-center w-24 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-widest shadow-sm">{{ entry.status }}</span>
+        {% endif %}
     </td>
-    <td class="p-5 align-middle text-right font-mono font-bold text-emerald-500">
-        {{ entry.target }}
-    </td>
-    <td class="p-5 align-middle text-center">
-        <span class="inline-flex items-center justify-center px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider min-w-[80px]
-            {% if entry.status == 'PENDING' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-500
-            {% elif entry.status == 'WIN' %}bg-emerald-500/10 border border-emerald-500/20 text-emerald-400
-            {% elif entry.status == 'LOSS' %}bg-red-500/10 border border-red-500/20 text-red-400
-            {% else %}bg-slate-800 border border-slate-700 text-slate-400{% endif %}">
-            {{ entry.status }}
-        </span>
-    </td>
-    <td class="p-5 align-middle text-right">
-        <div class="flex items-center justify-end gap-2">
+
+    <td class="py-5 px-6 align-middle text-right">
+        <div class="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-all duration-200">
             <button hx-post="{% url 'refresh_journal_entry' entry.id %}"
-                    hx-target="#entry-{{ entry.id }}"
+                    hx-target="#row-{{ entry.id }}"
                     hx-swap="outerHTML"
-                    class="p-2 hover:bg-blue-500/10 border border-transparent hover:border-blue-500/30 rounded-lg text-slate-500 hover:text-blue-400 transition [&.htmx-request>svg]:animate-spin"
-                    title="Sync">
+                    class="p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-lg text-slate-400 transition"
+                    title="Sync Live Price">
                 <i data-lucide="refresh-cw" class="w-4 h-4"></i>
             </button>
 
             <button hx-delete="{% url 'delete_journal_entry' entry.id %}"
-                    hx-target="#entry-{{ entry.id }}"
+                    hx-confirm="Delete this trade record permanently?"
+                    hx-target="#row-{{ entry.id }}"
                     hx-swap="outerHTML"
-                    hx-confirm="Delete this trade?"
-                    class="p-2 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-lg text-slate-500 hover:text-red-400 transition"
-                    title="Delete">
+                    class="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-400 transition"
+                    title="Delete Record">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
         </div>

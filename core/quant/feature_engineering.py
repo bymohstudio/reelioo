@@ -1,154 +1,127 @@
+# core/quant/feature_engineering.py
 import pandas as pd
 import numpy as np
 
-# FEATURES (Updated list with vol_z included)
-FEATURES = [
-    "ret_1", "log_ret", "body_pct", "wick_ratio",
-    "vwap_dist", "liq_sweep", "order_block",
-    "rsi_14", "ema_diff", "trend_strength",
-    "atr_pct", "ttm_squeeze", "volatility_slope",
-    "whale_z", "vol_z", "cvd_divergence", "flow_imbalance", "efficiency_ratio",
-    "kinetic_energy", "momentum_shock", "volatility_compression"
+# These features are DESCRIPTIVE ONLY
+# They do NOT decide trades
+
+PHYSICS_FEATURES = [
+    "signed_ke",
+    "ke_decay",
+    "mass",
+    "velocity",
+    "atr_14",
+    "atr_pct",
+    "structure_state",
+    "liquidity_state",
+    "event_risk",
+    "volatility_compression"
 ]
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Standardizes market data into institutional vectors.
+    Physics-aligned feature generator.
+    Compatible with CryptoQuantEngine v19 / v20.
+
+    PURPOSE:
+    - Diagnostics
+    - Explainability
+    - Research
+    - UI context
+
+    NOT USED FOR DECISION MAKING.
     """
-    if df.empty: return df
+    if df.empty:
+        return df
+
     df = df.copy()
 
-    # --- 1. NORMALIZED PRICE ACTION ---
-    df['log_ret'] = np.log(df['close'] / df['close'].shift(1))
-    df['ret_1'] = df['close'].pct_change(1)
-    df['body_pct'] = abs(df['close'] - df['open']) / df['close']
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
+    volume = df["volume"]
 
-    # Wick Ratio
-    upper_wick = df['high'] - df[['open', 'close']].max(axis=1)
-    lower_wick = df[['open', 'close']].min(axis=1) - df['low']
-    total_range = df['high'] - df['low']
-    df['wick_ratio'] = (upper_wick + lower_wick) / (total_range + 1e-9)
+    # -------------------------
+    # TRUE RANGE / ATR
+    # -------------------------
+    tr = pd.concat([
+        high - low,
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs()
+    ], axis=1).max(axis=1)
 
-    # --- 2. INSTITUTIONAL ANCHORS ---
-    typical_price = (df['high'] + df['low'] + df['close']) / 3
-    vp = typical_price * df['volume']
-    df['vwap'] = vp.rolling(24).sum() / df['volume'].rolling(24).sum()
-    df['vwap_dist'] = (df['close'] - df['vwap']) / (df['vwap'] + 1e-9)
+    df["atr_14"] = tr.rolling(14).mean()
+    df["atr_pct"] = df["atr_14"] / close
 
-    # --- 3. LIQUIDITY SWEEPS ---
-    roll_high = df['high'].rolling(10).max().shift(1)
-    roll_low = df['low'].rolling(10).min().shift(1)
-    df['liq_sweep'] = 0
-    df.loc[(df['high'] > roll_high) & (df['close'] < roll_high), 'liq_sweep'] = -1
-    df.loc[(df['low'] < roll_low) & (df['close'] > roll_low), 'liq_sweep'] = 1
+    # -------------------------
+    # MASS (Participation)
+    # -------------------------
+    vol_avg = volume.rolling(20).mean()
+    df["mass"] = volume / (vol_avg + 1e-6)
 
-    # --- 4. MOMENTUM & TREND ---
-    df['ema_20'] = df['close'].ewm(span=20).mean()
-    df['ema_50'] = df['close'].ewm(span=50).mean()
-    df['ema_diff'] = (df['ema_20'] - df['ema_50']) / df['close']
+    # -------------------------
+    # VELOCITY (Directional)
+    # -------------------------
+    df["velocity"] = close.diff() / (df["atr_14"] + 1e-6)
 
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-    rs = gain / (loss + 1e-9)
-    df['rsi_14'] = 100 - (100 / (1 + rs))
-    df['trend_strength'] = np.where(df['close'] > df['ema_20'], 1, -1)
+    # -------------------------
+    # SIGNED KINETIC ENERGY
+    # -------------------------
+    ke = 0.5 * df["mass"] * df["velocity"].abs()
+    df["signed_ke"] = ke * np.sign(df["velocity"])
 
-    # --- 5. VOLATILITY ENERGY ---
-    df['tr'] = np.maximum(df['high'] - df['low'], abs(df['high'] - df['close'].shift(1)))
-    df['atr_14'] = df['tr'].rolling(14).mean()
-    df['atr_pct'] = df['atr_14'] / df['close']
-    df['volatility_slope'] = df['atr_14'].pct_change(3) * 100
+    # -------------------------
+    # ENERGY DECAY (Exhaustion)
+    # -------------------------
+    ke_peak = df["signed_ke"].abs().rolling(5).max()
+    df["ke_decay"] = df["signed_ke"].abs() < (ke_peak * 0.65)
 
-    std = df['close'].rolling(20).std()
-    k_upper = df['ema_20'] + (1.5 * df['atr_14'])
-    df['ttm_squeeze'] = np.where((df['ema_20'] + 2 * std) < k_upper, 1, 0)
+    # -------------------------
+    # STRUCTURE STATE (DESCRIPTIVE)
+    # -------------------------
+    hh = high > high.shift(1)
+    hl = low > low.shift(1)
+    lh = high < high.shift(1)
+    ll = low < low.shift(1)
 
-    # --- 6. ORDER FLOW ALPHA ---
-    vol_mean = df['volume'].rolling(20).mean()
-    vol_std = df['volume'].rolling(20).std()
-    df['vol_z'] = (df['volume'] - vol_mean) / (vol_std + 1e-9)
+    df["structure_state"] = np.select(
+        [
+            hh & hl,
+            lh & ll
+        ],
+        [
+            "UPTREND",
+            "DOWNTREND"
+        ],
+        default="RANGE"
+    )
 
-    vol_per_move = df['volume'] / (df['body_pct'] + 1e-9)
-    df['whale_z'] = (vol_per_move - vol_per_move.rolling(50).mean()) / (vol_per_move.rolling(50).std() + 1e-9)
+    # -------------------------
+    # LIQUIDITY STATE
+    # -------------------------
+    wick_up = high - np.maximum(df["open"], close)
+    wick_down = np.minimum(df["open"], close) - low
+    wick_ratio = (wick_up + wick_down) / (tr + 1e-6)
 
-    df['order_block'] = np.where((df['vol_z'] > 1.5) & (df['body_pct'] < df['atr_pct'] * 0.3), 1, 0)
+    df["liquidity_state"] = np.where(
+        wick_ratio > 0.6,
+        "STOP_HUNT",
+        "CLEAN"
+    )
 
-    # CVD / Flow Imbalance
-    if 'taker_base' in df.columns:
-        taker_buy = df['taker_base']
-        taker_sell = df['volume'] - taker_buy
-        df['flow_imbalance'] = (taker_buy - taker_sell) / (df['volume'] + 1e-9)
-        df['cvd_slope'] = df['flow_imbalance'].rolling(3).sum()
+    # -------------------------
+    # EVENT RISK (NON-GATING)
+    # -------------------------
+    velocity_spike = df["velocity"].abs() > df["velocity"].rolling(10).mean() * 2.5
+    structure_break = df["structure_state"] == "RANGE"
 
-        price_slope = df['close'].diff(3)
-        cvd_slope_roc = df['cvd_slope'].diff(3)
+    df["event_risk"] = velocity_spike & structure_break
 
-        df['cvd_divergence'] = 0
-        df.loc[(price_slope > 0) & (cvd_slope_roc < 0), 'cvd_divergence'] = -1
-        df.loc[(price_slope < 0) & (cvd_slope_roc > 0), 'cvd_divergence'] = 1
-    else:
-        df['flow_imbalance'] = 0.0
-        df['cvd_slope'] = 0.0
-        df['cvd_divergence'] = 0.0
-
-    # Efficiency Ratio
-    change = abs(df['close'] - df['close'].shift(10))
-    volatility = df['tr'].rolling(10).sum()
-    df['efficiency_ratio'] = change / (volatility + 1e-9)
-
-    # --- 7. NEW: PHYSICS ENHANCEMENTS (PROFITABILITY BOOSTERS) ---
-
-    # A. KINETIC ENERGY: (0.5 * Mass * Velocity^2)
-    velocity = df['close'].pct_change(1)
-    df['kinetic_energy'] = 0.5 * df['volume'] * (velocity ** 2)
-
-    # Normalize KE (Z-Score)
-    ke_mean = df['kinetic_energy'].rolling(50).mean()
-    ke_std = df['kinetic_energy'].rolling(50).std()
-    df['kinetic_energy'] = (df['kinetic_energy'] - ke_mean) / (ke_std + 1e-9)
-
-    # B. MOMENTUM SHOCK (Jerk)
-    momentum = df['close'].diff(3)
-    acceleration = momentum.diff(3)
-    df['momentum_shock'] = acceleration.diff(3)
-
-    # C. VOLATILITY COMPRESSION (Potential Energy)
-    long_term_vol = df['tr'].rolling(100).mean()
-    df['volatility_compression'] = df['atr_14'] / (long_term_vol + 1e-9)
+    # -------------------------
+    # VOLATILITY COMPRESSION
+    # -------------------------
+    long_vol = tr.rolling(100).mean()
+    df["volatility_compression"] = df["atr_14"] / (long_vol + 1e-6)
 
     return df.fillna(0)
-
-
-def generate_targets(df: pd.DataFrame, risk_reward=2.0, stop_mult=1.0, candles=24) -> pd.DataFrame:
-    """
-    Applies SNIPER LOGIC with dynamic parameters:
-    - Calculates dynamic Stop/TP distances based on ATR.
-    - Checks if targets were hit within the 'candles' window.
-    """
-    data = df.copy()
-    atr = data['atr_14']
-    close = data['close']
-    low = data['low']
-    high = data['high']
-
-    # 1. Define Dynamic Distances
-    stop_distance = atr * stop_mult
-    target_distance = stop_distance * risk_reward
-
-    # --- LONG LOGIC ---
-    future_max_high = high.rolling(window=candles).max().shift(-candles)
-    data['target_long'] = np.where(
-        future_max_high > (close + target_distance),
-        1, 0
-    )
-
-    # --- SHORT LOGIC ---
-    future_min_low = low.rolling(window=candles).min().shift(-candles)
-    data['target_short'] = np.where(
-        future_min_low < (close - target_distance),
-        1, 0
-    )
-
-    return data.dropna()

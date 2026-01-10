@@ -43,29 +43,31 @@ def has_access(user):
     return user.profile.is_premium
 
 
-def send_discord_alert(symbol, data=None, alert_type="SNIPER"):
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    if not webhook_url: return
+def send_discord_alert(symbol, alert_type="SNIPER"):
+    webhook_url = os.getenv("DISCORD_URL")  # Ensure this matches your .env variable name
+    if not webhook_url:
+        return
 
+    # Deep link to terminal
     terminal_link = f"https://reelioo.app/terminal?ticker={symbol}"
 
     if alert_type == "SNIPER":
-        color = 5814783
+        color = 5814783  # Blurple
         title = f"🎯 SNIPER TARGET: {symbol}"
-        description = "**Institutional Activity Detected.**\nQuant engine locked onto high-probability setup."
+        description = "**Institutional Flow Detected.**\nMarket structure confirms high-probability setup."
         thumbnail = "https://cdn-icons-png.flaticon.com/512/3121/3121575.png"
     elif alert_type == "WIN":
-        color = 5763719
+        color = 5763719  # Green
         title = f"✅ TARGET HIT: {symbol}"
         description = "Trade closed in profit."
         thumbnail = "https://cdn-icons-png.flaticon.com/512/190/190411.png"
     elif alert_type == "LOSS":
-        color = 15548997
+        color = 15548997  # Red
         title = f"🛑 STOP HIT: {symbol}"
         description = "Trade closed at stop loss."
         thumbnail = "https://cdn-icons-png.flaticon.com/512/1828/1828843.png"
     else:
-        color = 16776960
+        color = 16776960  # Yellow
         title = f"📡 RADAR CONTACT: {symbol}"
         description = "Volatility Spike Detected."
         thumbnail = "https://cdn-icons-png.flaticon.com/512/564/564619.png"
@@ -80,17 +82,18 @@ def send_discord_alert(symbol, data=None, alert_type="SNIPER"):
             "thumbnail": {"url": thumbnail},
             "fields": [
                 {"name": "Asset", "value": f"`{symbol}`", "inline": True},
-                {"name": "Action", "value": "See Terminal for Logic Vectors", "inline": True},
-                {"name": "Full Analysis", "value": f"👉 [**OPEN TERMINAL**]({terminal_link})", "inline": False}
+                {"name": "Action", "value": "Check Terminal", "inline": True},
+                {"name": "Analysis", "value": f"👉 [**OPEN TERMINAL**]({terminal_link})", "inline": False}
             ],
             "footer": {"text": "🔒 Auth Required • Reelioo Terminal"},
             "timestamp": timezone.now().isoformat()
         }]
     }
+
     try:
         requests.post(webhook_url, json=payload, timeout=3)
-    except:
-        pass
+    except Exception as e:
+        print(f"Discord Error: {e}")
 
 
 def generate_market_narrative(res):
@@ -365,36 +368,58 @@ def cron_scan_trigger(request, secret_key):
     return JsonResponse({'status': 'ok'})
 
 
+# --- JOURNAL VIEWS ---
+
 @login_required
 def journal_view(request):
-    entries = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
-    net_roi = 0.0
-    g_profit, g_loss = 0.0, 0.0
-    for t in entries:
-        if t.status in ['WIN', 'LOSS']:
-            try:
-                # Assuming 1:2 RR for simple calculation or use real prices
-                # Here we use real R-multiples based on target/stop distances
-                dist_target = abs(t.target - t.entry_price)
-                dist_stop = abs(t.entry_price - t.stop_loss)
-                r_multiple = dist_target / dist_stop if dist_stop > 0 else 1.0
+    profile = request.user.profile
+    if not profile.is_access_granted():
+        return redirect('pricing')
 
-                if t.status == 'WIN':
-                    net_roi += r_multiple
-                    g_profit += r_multiple
-                elif t.status == 'LOSS':
-                    net_roi -= 1.0  # Loss is always -1R
-                    g_loss += 1.0
-            except:
+    entries_list = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
+
+    # --- Metrics Calculation (R-Multiple Approach) ---
+    net_r = 0.0
+    gross_profit_r = 0.0
+    gross_loss_r = 0.0
+
+    for trade in entries_list:
+        if trade.status in ['WIN', 'LOSS']:
+            # Calculate Risk Distance
+            risk_dist = abs(trade.entry_price - trade.stop_loss)
+
+            # Avoid division by zero
+            if risk_dist == 0:
                 continue
 
-    display_roi = round(net_roi, 2)
-    pf = round(g_profit / g_loss, 2) if g_loss > 0 else (round(g_profit, 2) if g_profit > 0 else 0)
+            if trade.status == 'WIN':
+                reward_dist = abs(trade.target - trade.entry_price)
+                r_gain = reward_dist / risk_dist
+                net_r += r_gain
+                gross_profit_r += r_gain
+            elif trade.status == 'LOSS':
+                # A loss is typically -1R (Risk Unit)
+                net_r -= 1.0
+                gross_loss_r += 1.0
 
-    paginator = Paginator(entries, 10)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'core/journal.html', {'page_obj': page_obj, 'net_roi': display_roi, 'profit_factor': pf,
-                                                 'active_pending': entries.filter(status='PENDING').count()})
+    # Profit Factor: Gross Profit / Gross Loss
+    if gross_loss_r > 0:
+        profit_factor = round(gross_profit_r / gross_loss_r, 2)
+    else:
+        profit_factor = round(gross_profit_r, 2) if gross_profit_r > 0 else 0.0
+
+    # Pagination
+    paginator = Paginator(entries_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'net_roi': round(net_r, 2),  # Displaying Net R-Multiples
+        'profit_factor': profit_factor,
+        'active_pending': entries_list.filter(status='PENDING').count()
+    }
+    return render(request, 'core/journal.html', context)
 
 
 # --- AUTH & SYSTEM ---
