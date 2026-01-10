@@ -48,7 +48,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'core',
+    "tailwind",
+    'theme',
 ]
+
+TAILWIND_APP_NAME = "theme"
+NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

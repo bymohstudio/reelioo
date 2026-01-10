@@ -1,29 +1,59 @@
-# 1. Use Python 3.13 Slim
+# ============================================================
+# 1. Base Image
+# ============================================================
 FROM python:3.13-slim
 
-# 2. Install ONLY essential build tools
-# 'gcc' and 'python3-dev' are kept because some pip packages (like cffi) need them to compile.
+# ============================================================
+# 2. System Dependencies
+# ============================================================
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
+    curl \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Set environment variables
+# ============================================================
+# 3. Environment Variables
+# ============================================================
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV NODE_ENV=production
 
-# 4. Set work directory
+# ============================================================
+# 4. Work Directory
+# ============================================================
 WORKDIR /app
 
-# 5. Install Python dependencies
+# ============================================================
+# 5. Python Dependencies
+# ============================================================
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. Copy project code
+# ============================================================
+# 6. Node / Tailwind Dependencies
+# ============================================================
+COPY theme/package.json theme/package-lock.json ./theme/
+RUN cd theme && npm install
+
+# ============================================================
+# 7. Copy Project Code
+# ============================================================
 COPY . .
 
-# 7. Collect static files (CSS/JS)
+# ============================================================
+# 8. Build Tailwind CSS
+# ============================================================
+RUN python manage.py tailwind build
+
+# ============================================================
+# 9. Collect Static Files
+# ============================================================
 RUN python manage.py collectstatic --noinput
 
-# 8. Start the application
-CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:$PORT
+# ============================================================
+# 10. Run Server
+# ============================================================
+CMD gunicorn reelioo.wsgi:application --bind 0.0.0.0:${PORT:-8000}

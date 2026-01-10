@@ -26,6 +26,7 @@ class CryptoQuantEngine:
     ✓ Event rejection (liquidity traps)
     ✓ Multi-TF physics resonance
     ✓ Auto-regime-based sizing & targets
+    ✓ Whale activity ALWAYS exposed (UI safe)
     """
 
     def __init__(self):
@@ -67,11 +68,11 @@ class CryptoQuantEngine:
             vol_mean = volume.rolling(self.MASS_LEN).mean()
             mass = volume / (vol_mean + 1e-9)
 
-            signed_ke = mass * velocity          # 🔥 signed energy
+            signed_ke = mass * velocity          # signed energy
             ke_decay = signed_ke.diff(3)
 
             # ==================================================
-            # 2. STRUCTURE (NO EMA / RSI)
+            # 2. STRUCTURE (HH / LL)
             # ==================================================
 
             hh = high > high.rolling(self.STRUCT_LEN).max().shift(1)
@@ -113,10 +114,7 @@ class CryptoQuantEngine:
         # ==========================================================
 
         ke_now = signed_ke.iloc[-1]
-        ke_prev = signed_ke.iloc[-4]
         decay = ke_decay.iloc[-1]
-
-        regime = "IDLE"
 
         if abs(ke_now) < 0.5 and abs(decay) < 0.1:
             regime = "COMPRESSION"
@@ -126,9 +124,11 @@ class CryptoQuantEngine:
             regime = "TREND"
         elif decay < 0:
             regime = "EXHAUSTION"
+        else:
+            regime = "IDLE"
 
         # ==========================================================
-        # 6. DECISION ENGINE (REGIME-AWARE)
+        # 6. DECISION ENGINE
         # ==========================================================
 
         bias = "HOLD"
@@ -179,8 +179,7 @@ class CryptoQuantEngine:
 
             stop_mult = {
                 "TREND": 1.5,
-                "EXPANSION": 2.0,
-                "COMPRESSION": 1.8
+                "EXPANSION": 2.0
             }.get(regime, 1.6)
 
             stop = price - direction * atr_now * stop_mult
@@ -200,7 +199,25 @@ class CryptoQuantEngine:
             rr = abs(t1 - price) / abs(price - stop)
 
         # ==========================================================
-        # 8. EXPLAINABILITY (UI SAFE)
+        # 8. WHALE ACTIVITY (ALWAYS PRESENT)
+        # ==========================================================
+
+        whale_z = float(vol_intensity.iloc[-1] - 1.0)
+
+        if abs(whale_z) >= 1.5:
+            whale_label = "High"
+            whale_state = "ACTIVE"
+        elif abs(whale_z) >= 0.7:
+            whale_label = "Elevated"
+            whale_state = "BUILDING"
+        else:
+            whale_label = "Normal"
+            whale_state = "BASELINE"
+
+        whale_zscore = round(whale_z, 2)
+
+        # ==========================================================
+        # 9. EXPLAINABILITY
         # ==========================================================
 
         top_features = [
@@ -222,16 +239,24 @@ class CryptoQuantEngine:
             lane=lane,
             score=score,
             price=price,
+
             entry=price if bias in ["LONG", "SHORT"] else 0.0,
             stop=round(stop, 4),
             target1=round(t1, 4),
             target2=round(t2, 4),
             target3=round(t3, 4),
+
             rr_ratio=round(rr, 2),
             risk_pct=round(risk_pct * 100, 2),
-            expected_duration="2h",
+
             regime=regime,
             regime_color="green" if bias != "HOLD" else "gray",
+
+            # ✅ UI SAFE WHALE FIELDS
+            whale_zscore=whale_zscore,
+            whale_label=whale_label,
+            whale_state=whale_state,
+
             top_features=top_features,
             narrative=narrative,
             lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
@@ -265,9 +290,14 @@ class CryptoQuantEngine:
             target3=0.0,
             rr_ratio=0.0,
             risk_pct=0.0,
-            expected_duration="--",
             regime="NEUTRAL",
             regime_color="gray",
+
+            # ✅ ALWAYS PRESENT
+            whale_zscore=0.0,
+            whale_label="Normal",
+            whale_state="BASELINE",
+
             top_features=[{"desc": "No Trade", "importance": 50}],
             narrative=reason,
             lifecycle="WAITING"
