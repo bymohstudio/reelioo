@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from sys import platform
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -53,7 +54,8 @@ INSTALLED_APPS = [
 ]
 
 TAILWIND_APP_NAME = "theme"
-NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
+
+NPM_BIN_PATH = "/usr/bin/npm"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
