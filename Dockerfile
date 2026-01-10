@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ============================================================
 # Tailwind deps
 # ============================================================
-COPY theme/package.json theme/package-lock.json ./theme/
+COPY theme/static_src/package.json theme/static_src/package-lock.json ./theme/static_src/
 RUN cd theme && npm install
 
 # ============================================================
