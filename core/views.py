@@ -332,7 +332,7 @@ def delete_journal_entry(request, entry_id):
 
 
 def cron_scan_trigger(request, secret_key):
-    if secret_key != getattr(settings, 'CRON_SECRET', 'reelioo_master_key'):
+    if secret_key != getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
         return JsonResponse({'status': 'forbidden'}, status=403)
 
     logs = []
