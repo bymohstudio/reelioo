@@ -8,14 +8,11 @@ log = logging.getLogger(__name__)
 
 class CryptoBacktestEngine:
     """
-    BACKTEST ENGINE v20 – TRUE PHYSICS ALIGNMENT
+    BACKTEST ENGINE v21 – TRUE PHYSICS ALIGNMENT
 
-    ✔ Signed Kinetic Energy
-    ✔ Energy Decay Detection
-    ✔ Structural Confirmation (HH / LL)
-    ✔ Regime-Aware Entries
-    ✔ Adaptive Risk
-    ✔ Silence is VALID
+    - Perfectly mirrors CryptoQuantEngine v21 logic.
+    - Uses Signed Kinetic Energy, Decay, and Regimes.
+    - Dynamic ATR-based fakeout detection.
     """
 
     def __init__(self, df: pd.DataFrame, symbol: str):
@@ -23,157 +20,198 @@ class CryptoBacktestEngine:
         self.symbol = symbol
         self.trades = []
 
+        # v21 Constants
+        self.ATR_LEN = 14
+        self.MASS_LEN = 20
+        self.STRUCT_LEN = 20
+        self.FEE = 0.06  # Binance Taker % (approx)
+
     # ------------------------------------------------
     # CORE RUN
     # ------------------------------------------------
-    # FIXED: Added 'mode' parameter to match views.py call
     def run(self, mode="INTRADAY"):
         if self.df.empty:
             return self._empty_result()
 
-        # You can pass 'mode' to feature engineering if needed,
-        # otherwise it just prevents the TypeError.
-        df = generate_features(self.df)
+        # 1. Generate Features
+        try:
+            df = generate_features(self.df)
+        except Exception as e:
+            log.error(f"Backtest Feature Error: {e}")
+            return self._empty_result()
 
-        # -------------------------------
-        # PHYSICS CONSTRUCTION
-        # -------------------------------
+        # ------------------------------------------------
+        # 2. PHYSICS CONSTRUCTION (Match v21)
+        # ------------------------------------------------
         close = df["close"]
         high = df["high"]
         low = df["low"]
         volume = df["volume"]
-        atr = df["atr_14"]
 
-        # SIGNED KINETIC ENERGY (v20 FIX)
-        velocity = close.diff()
-        mass = volume / (volume.rolling(20).mean() + 1e-9)
-        ke = mass * velocity  # SIGNED
+        # --- A. PHYSICS VECTORS ---
+        # True Range & ATR
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(self.ATR_LEN).mean()
 
-        # ENERGY DECAY
-        ke_slope = ke.diff(3)
+        # Velocity & Mass
+        velocity = close.diff() / (atr + 1e-9)
+        vol_mean = volume.rolling(self.MASS_LEN).mean()
+        mass = volume / (vol_mean + 1e-9)
 
-        # STRUCTURE
-        higher_high = high > high.shift(1)
-        lower_low = low < low.shift(1)
+        # Kinetic Energy & Decay
+        signed_ke = mass * velocity
+        ke_decay = signed_ke.diff(3)
 
-        # TREND BASELINE
-        baseline = close.ewm(span=50).mean()
+        # --- B. STRUCTURE (Lagged) ---
+        roll_high = high.rolling(self.STRUCT_LEN).max().shift(1)
+        roll_low = low.rolling(self.STRUCT_LEN).min().shift(1)
 
-        # REGIME
-        regime = np.where(abs(ke) > ke.rolling(50).std(), "SURGE", "FLOW")
+        hh = high > roll_high
+        hl = low > roll_low
+        lh = high < roll_high
+        ll = low < roll_low
 
+        structure_up = hh & hl
+        structure_down = lh & ll
+
+        # --- C. FAKEOUT DETECTION (Dynamic) ---
+        # v21 Logic: Range > 2.5 ATR and Low Volume Intensity
+        candle_range = high - low
+        is_wide = candle_range > (2.5 * atr)
+        vol_intensity = volume / (vol_mean + 1e-9)
+        is_fake = is_wide & (vol_intensity < 0.8)
+
+        # --- D. RESONANCE ---
+        ht_velocity = close.diff(5) / (atr + 1e-9)
+        ht_ke = (mass * ht_velocity).rolling(5).mean()
+        resonance = np.sign(signed_ke) == np.sign(ht_ke)
+
+        # ------------------------------------------------
+        # 3. SIMULATION LOOP
+        # ------------------------------------------------
         position = None
         entry = stop = target = 0.0
         direction = 0
 
-        FEE = 0.06  # Binance taker %
+        # Start after warmup period
+        start_idx = max(self.MASS_LEN, self.STRUCT_LEN, 50)
 
-        # ------------------------------------------------
-        # LOOP
-        # ------------------------------------------------
-        for i in range(60, len(df)):
+        for i in range(start_idx, len(df)):
 
+            # Current Slice
             price = close.iloc[i]
-            c_ke = ke.iloc[i]
-            c_ke_slope = ke_slope.iloc[i]
+            c_low = low.iloc[i]
+            c_high = high.iloc[i]
             c_atr = atr.iloc[i]
-            c_regime = regime[i]
+
+            # Physics Values
+            ke_now = signed_ke.iloc[i]
+            decay = ke_decay.iloc[i]
+
+            # Booleans
+            is_fake_now = is_fake.iloc[i]
+            struct_up_now = structure_up.iloc[i]
+            struct_down_now = structure_down.iloc[i]
+            res_now = resonance.iloc[i]
 
             # --------------------------------------------
-            # EXIT LOGIC (DECAY + STRUCTURE BREAK)
+            # EXIT LOGIC
             # --------------------------------------------
             if position:
-
-                exit_reason = None
+                exit_res = None
                 exit_price = price
 
-                # STOP / TARGET
-                if direction == 1:
-                    if low.iloc[i] <= stop:
-                        exit_reason = "STOP"
+                if direction == 1:  # LONG
+                    if c_low <= stop:
+                        exit_res = "STOP"
                         exit_price = stop
-                    elif high.iloc[i] >= target:
-                        exit_reason = "TARGET"
+                    elif c_high >= target:
+                        exit_res = "WIN"
+                        exit_price = target
+                    # Optional: Exit on Exhaustion Regime could go here
 
-                else:
-                    if high.iloc[i] >= stop:
-                        exit_reason = "STOP"
+                else:  # SHORT
+                    if c_high >= stop:
+                        exit_res = "STOP"
                         exit_price = stop
-                    elif low.iloc[i] <= target:
-                        exit_reason = "TARGET"
+                    elif c_low <= target:
+                        exit_res = "WIN"
+                        exit_price = target
 
-                # ENERGY DECAY EXIT (CRITICAL v20 RULE)
-                if c_ke_slope < 0:
-                    exit_reason = "ENERGY_DECAY"
-
-                # REGIME BREAK EXIT
-                if c_regime == "FLOW" and abs(c_ke) < 0.3:
-                    exit_reason = "REGIME_FADE"
-
-                if exit_reason:
+                if exit_res:
                     pnl = (exit_price - entry) / entry * 100
                     if direction == -1:
                         pnl *= -1
-                    pnl -= FEE
+                    pnl -= self.FEE
 
                     self.trades.append({
-                        "result": exit_reason,
+                        "result": exit_res,
                         "pnl": round(pnl, 2),
                         "entry": entry,
                         "exit": exit_price,
                         "index": i
                     })
-
                     position = None
                     continue
 
             # --------------------------------------------
-            # ENTRY LOGIC (STRICT BUT SMART)
+            # ENTRY LOGIC (Regime Based)
             # --------------------------------------------
             if not position:
 
+                # 1. Determine Regime (Auto-Switcher)
+                regime = "IDLE"
+                if abs(ke_now) < 0.5 and abs(decay) < 0.1:
+                    regime = "COMPRESSION"
+                elif abs(ke_now) > 1.5 and decay > 0:
+                    regime = "EXPANSION"
+                elif abs(ke_now) > 0.8 and decay >= -0.2:
+                    regime = "TREND"
+                elif decay < -0.5:
+                    regime = "EXHAUSTION"
+
                 bias = "HOLD"
 
-                # LONG CONDITIONS
-                if (
-                    c_ke > 0.5 and
-                    c_ke_slope >= 0 and
-                    higher_high.iloc[i] and
-                    price > baseline.iloc[i]
-                ):
-                    bias = "LONG"
+                # 2. Decision Matrix
+                if regime == "TREND":
+                    if ke_now > 0 and (struct_up_now or res_now) and not is_fake_now:
+                        bias = "LONG"
+                    elif ke_now < 0 and (struct_down_now or res_now) and not is_fake_now:
+                        bias = "SHORT"
 
-                # SHORT CONDITIONS
-                elif (
-                    c_ke < -0.5 and
-                    c_ke_slope <= 0 and
-                    lower_low.iloc[i] and
-                    price < baseline.iloc[i]
-                ):
-                    bias = "SHORT"
+                elif regime == "EXPANSION":
+                    # Breakouts need higher energy threshold
+                    if ke_now > 1.2 and not is_fake_now:
+                        bias = "LONG"
+                    elif ke_now < -1.2 and not is_fake_now:
+                        bias = "SHORT"
 
-                if bias == "HOLD":
-                    continue  # SILENCE IS VALID
+                # 3. Execution
+                if bias != "HOLD":
+                    direction = 1 if bias == "LONG" else -1
 
-                # ----------------------------------------
-                # ADAPTIVE RISK (v20)
-                # ----------------------------------------
-                direction = 1 if bias == "LONG" else -1
+                    # v21 Sizing Logic
+                    stop_mult = 2.5 if regime == "EXPANSION" else 1.5
 
-                energy_strength = min(2.0, max(0.8, abs(c_ke)))
-                stop_dist = c_atr * (1.2 * energy_strength)
-                target_dist = stop_dist * 2.5
+                    # Using "Target 2" from v21 as the backtest target
+                    if regime == "EXPANSION":
+                        target_mult = 3.0  # Quick scalp in volatility
+                    else:
+                        target_mult = 3.5  # Ride the trend
 
-                entry = price
-                stop = price - direction * stop_dist
-                target = price + direction * target_dist
+                    entry = price
+                    stop = price - (direction * c_atr * stop_mult)
+                    target = price + (direction * c_atr * target_mult)
 
-                position = bias
+                    position = bias
 
         return self._stats()
 
     # ------------------------------------------------
-    # STATS
+    # STATS GENERATION
     # ------------------------------------------------
     def _stats(self):
         if not self.trades:

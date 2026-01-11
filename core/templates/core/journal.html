@@ -14,6 +14,16 @@
         </div>
 
         <div class="flex items-center gap-3">
+            <button
+                    hx-swap="none"
+                    class="group bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-70 cursor-pointer"
+                    onclick="toast_scan_start()">
+
+                <i data-lucide="refresh-cw" class="w-4 h-4 transition-transform group-[.htmx-request]:animate-spin"></i>
+
+                <span class="text-[10px] font-bold uppercase tracking-widest">Check Results</span>
+            </button>
+
              <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
                 <div class="relative flex h-2 w-2">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -121,4 +131,33 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    // 1. Toast Notification on Click
+    function toast_scan_start() {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            background: '#0f172a',
+            color: '#cbd5e1',
+            customClass: { popup: 'border border-white/10' }
+        });
+
+        Toast.fire({
+            icon: 'info',
+            title: 'Analyzing Markets',
+            text: 'Physics engine running...'
+        });
+    }
+
+    // 2. Refresh Page when Analysis is Done
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if(evt.detail.elt.getAttribute('hx-post') && evt.detail.elt.getAttribute('hx-post').includes('cron_scan_trigger')) {
+            window.location.reload();
+        }
+    });
+</script>
 {% endblock %}
