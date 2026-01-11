@@ -47,14 +47,14 @@
     div.swal2-cancel { background-color: #1e293b !important; color: #fff !important; border-radius: 8px !important; }
 
     /* ✅ ADD BELOW — SAFE, SCOPED, NON-BREAKING */
-    .htmx-request .rotate-while-loading {
-        animation: spin 0.8s linear infinite;
-    }
+    button.htmx-request .rotate-while-loading {
+    animation: spin 0.8s linear infinite;
+  }
 
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
     </style>
 </head>
 <body class="antialiased min-h-screen flex flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>

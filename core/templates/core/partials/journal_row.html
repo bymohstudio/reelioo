@@ -41,12 +41,10 @@
                 hx-post="{% url 'refresh_journal_entry' entry.id %}"
                 hx-target="#row-{{ entry.id }}"
                 hx-swap="outerHTML"
-                hx-indicator="#sync-icon-{{ entry.id }}"
                 class="p-2 hover:bg-blue-500/20 hover:text-blue-400 rounded-lg text-slate-400 transition"
                 title="Sync Live Price">
 
-                <i id="sync-icon-{{ entry.id }}"
-                   data-lucide="refresh-cw"
+                <i data-lucide="refresh-cw"
                    class="w-4 h-4 rotate-while-loading"></i>
             </button>
 
