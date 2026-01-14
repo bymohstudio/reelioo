@@ -423,24 +423,36 @@ def add_journal_entry(request):
 
 @login_required
 def ops_dashboard_view(request):
-    # Only for Superusers
-    if not request.user.is_superuser: return redirect('terminal')
+    # 1. Security Check
+    if not request.user.is_superuser:
+        return redirect('terminal')
 
-    # Import inside to prevent Circular Import
     from django.contrib.auth.models import User
     from .models import JournalEntry, UserProfile
 
+    # 2. Safe Metrics Calculation
     users = User.objects.count()
     subs = UserProfile.objects.filter(is_premium=True).count()
+
     signals = JournalEntry.objects.count()
     wins = JournalEntry.objects.filter(status='WIN').count()
-    rate = round((wins / signals * 100), 1) if signals else 0
-    feed = JournalEntry.objects.select_related('user').order_by('-created_at')[:50]
+
+    # Avoid ZeroDivisionError
+    win_rate = round((wins / signals * 100), 1) if signals > 0 else 0
+
+    # 3. Crash Prevention: Filter out orphaned trades (user=None)
+    # This prevents the "NoneType has no attribute username" error
+    feed = JournalEntry.objects.select_related('user') \
+               .filter(user__isnull=False) \
+               .order_by('-created_at')[:50]
 
     return render(request, 'core/ops_dashboard.html', {
-        'total_users': users, 'active_subs': subs, 'total_signals': signals, 'win_rate': rate, 'recent_signals': feed
+        'total_users': users,
+        'active_subs': subs,
+        'total_signals': signals,
+        'win_rate': win_rate,
+        'recent_signals': feed
     })
-
 
 # =========================================================
 #  CRON & ALERTS
