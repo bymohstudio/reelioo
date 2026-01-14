@@ -377,15 +377,23 @@ def journal_view(request):
 
 @login_required
 def refresh_journal_entry(request, entry_id):
+    from .models import JournalEntry
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
+
+    # Defaults for the alert
+    msg_type = "info"
+    title = "Status: PENDING"
+    message = "Price updated."
+
     if entry.status == 'PENDING':
         try:
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
             if df is not None:
                 curr = float(df['close'].iloc[-1])
+                message = f"Current Price: ${curr}"
                 new_status = 'PENDING'
 
-                # Check outcome against Target/Stop
+                # Check Outcome
                 if entry.bias == 'LONG':
                     if curr >= entry.target:
                         new_status = 'WIN'
@@ -397,20 +405,57 @@ def refresh_journal_entry(request, entry_id):
                     elif curr >= entry.stop_loss:
                         new_status = 'LOSS'
 
+                # Update DB if changed
                 if new_status != 'PENDING':
                     entry.status = new_status
-                    # Removed: entry.exit_price = curr (Field doesn't exist)
                     entry.save()
-        except:
-            pass
-    return render(request, 'core/partials/journal_row.html', {'entry': entry})
+
+                    # Set Alert Data for Win/Loss
+                    if new_status == 'WIN':
+                        msg_type = "success"
+                        title = "Target Hit!"
+                        message = "Trade closed in profit."
+                    elif new_status == 'LOSS':
+                        msg_type = "error"
+                        title = "Stop Loss Hit"
+                        message = "Trade closed in loss."
+
+        except Exception as e:
+            msg_type = "warning"
+            title = "Sync Error"
+            message = "Could not fetch market data."
+
+    # Render the row
+    response = render(request, 'core/partials/journal_row.html', {'entry': entry})
+
+    # ATTACH THE ALERT TRIGGER
+    response['HX-Trigger'] = json.dumps({
+        'showToast': {
+            'type': msg_type,
+            'title': title,
+            'message': message
+        }
+    })
+    return response
 
 
 @login_required
 def delete_journal_entry(request, entry_id):
+    from .models import JournalEntry
     if request.method == "DELETE":
         JournalEntry.objects.filter(id=entry_id, user=request.user).delete()
-        return HttpResponse("")
+
+        response = HttpResponse("")
+        # Trigger Success Alert
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {
+                'type': 'success',
+                'title': 'Deleted',
+                'message': 'Journal entry removed.'
+            }
+        })
+        return response
+
     return JsonResponse({'status': 'error'}, status=400)
 
 

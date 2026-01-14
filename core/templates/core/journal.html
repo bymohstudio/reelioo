@@ -3,8 +3,7 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 font-sans relative">
 
-    <!-- HEADER -->
-<div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
             <h1 class="text-3xl font-black text-white mb-2">Performance Journal</h1>
             <p class="text-sm text-slate-500">Your personal trading ledger.</p>
@@ -13,15 +12,14 @@
                 <span>Data Retention Policy: Signals older than 90 days are automatically overwritten.</span>
             </p>
         </div>
-    <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
-                <div class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                </div>
-                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Live Sync Active</span>
+        <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
+            <div class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
             </div>
+            <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Live Sync Active</span>
+        </div>
     </div>
-
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
@@ -69,7 +67,6 @@
         </div>
     </div>
 
-    <!-- JOURNAL TABLE -->
     <div class="bg-[#0b1121] border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
         <div class="overflow-x-auto custom-scrollbar">
             <table class="w-full text-left border-collapse min-w-[1000px]">
@@ -85,13 +82,12 @@
                         <th class="py-5 px-6 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-white/5 text-sm">
+                <tbody class="divide-y divide-white/5 text-sm" id="journal-table-body">
                     {% for entry in page_obj %}
                         {% include "core/partials/journal_row.html" %}
                     {% empty %}
                         <tr>
-                            <td colspan="8"
-                                class="py-20 text-center text-slate-500 text-xs font-medium uppercase tracking-widest italic">
+                            <td colspan="8" class="py-20 text-center text-slate-500 text-xs font-medium uppercase tracking-widest italic">
                                 No trade records found.
                             </td>
                         </tr>
@@ -99,20 +95,47 @@
                 </tbody>
             </table>
         </div>
-                <div class="p-5 border-t border-white/5 flex justify-between items-center">
-            <span class="text-[10px] text-slate-600 uppercase tracking-widest">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+        <div class="p-5 border-t border-white/5 flex justify-between items-center bg-[#0f172a]/30 mt-auto">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             <div class="flex gap-2">
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">PREV</a>
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-5 py-2.5 bg-[#1e293b] hover:bg-[#334155] rounded-lg text-[10px] text-white font-bold uppercase tracking-wider transition shadow-lg">Previous</a>
                 {% endif %}
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">NEXT</a>
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-5 py-2.5 bg-[#1e293b] hover:bg-[#334155] rounded-lg text-[10px] text-white font-bold uppercase tracking-wider transition shadow-lg">Next</a>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
-    </div>
 
-</div>
+<script>
+    document.body.addEventListener('showToast', function(evt) {
+        const data = evt.detail;
+
+        // Define colors based on type
+        let iconColor = '#3b82f6'; // info (blue)
+        if(data.type === 'success') iconColor = '#4ade80'; // success (green)
+        if(data.type === 'error') iconColor = '#f87171'; // error (red)
+        if(data.type === 'warning') iconColor = '#fbbf24'; // warning (yellow)
+
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: data.type,
+            title: data.title,
+            text: data.message,
+            showConfirmButton: false,
+            timer: 3000,
+            background: '#0f172a',
+            color: '#e2e8f0',
+            iconColor: iconColor,
+            customClass: {
+                popup: 'border border-white/10 shadow-xl rounded-lg'
+            }
+        });
+    });
+</script>
+
 {% endblock %}
