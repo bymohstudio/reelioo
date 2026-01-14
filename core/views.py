@@ -454,6 +454,7 @@ def ops_dashboard_view(request):
         'recent_signals': feed
     })
 
+
 # =========================================================
 #  CRON & ALERTS
 # =========================================================
@@ -530,6 +531,7 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
     except Exception as e:
         print(f"Discord Error: {e}")
 
+
 def cron_scan_trigger(request, secret_key=None):
     # Auth
     if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
@@ -558,7 +560,7 @@ def cron_scan_trigger(request, secret_key=None):
                 admin = User.objects.filter(is_superuser=True).first()
                 if admin and not JournalEntry.objects.filter(user=admin, symbol=symbol, status='PENDING',
                                                              created_at__gte=timezone.now() - timedelta(
-                                                                     hours=4)).exists():
+                                                                 hours=4)).exists():
                     send_discord_alert(symbol, "SNIPER")
                     for user in active_users:
                         if not JournalEntry.objects.filter(user=user, symbol=symbol, status='PENDING').exists():
@@ -572,6 +574,31 @@ def cron_scan_trigger(request, secret_key=None):
 
     return JsonResponse({'status': 'success', 'signals': sent})
 
+
+# =========================================================
+#  STATIC & SEARCH (CSV LOGIC RESTORED)
+# =========================================================
+
+@login_required
+def global_symbols_view(request):
+    csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
+    symbols = []
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'symbol' in row: symbols.append(row['symbol'])
+        except:
+            pass
+
+    # Fallback if CSV empty or failed
+    if not symbols: symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+    return JsonResponse(symbols, safe=False)
+
+
+def search_crypto_view(request):
+    return JsonResponse(MarketService.search_assets(request.GET.get("q", "")), safe=False)
 
 # =========================================================
 #  STATIC
@@ -600,7 +627,3 @@ def robots_view(request): return HttpResponse("User-agent: *\nDisallow:", conten
 def sitemap_view(request): return HttpResponse("", content_type="application/xml")
 
 
-def global_symbols_view(request): return JsonResponse(["BTCUSDT", "ETHUSDT", "SOLUSDT"], safe=False)
-
-
-def search_crypto_view(request): return JsonResponse(MarketService.search_assets(request.GET.get("q", "")), safe=False)
