@@ -533,43 +533,91 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
 
 
 def cron_scan_trigger(request, secret_key=None):
-    # Auth
+    # 1. Auth Check
+    authorized = False
     if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
-        pass
+        authorized = True
     elif request.user.is_authenticated and request.user.is_staff:
-        pass
-    else:
+        authorized = True
+
+    if not authorized:
         return JsonResponse({'status': 'forbidden'}, status=403)
 
+    # 2. IMPORTS (Inside function to prevent 500 Circular Import Errors)
     from django.contrib.auth.models import User
-    JournalEntry.objects.filter(created_at__lt=timezone.now() - timedelta(days=90)).delete()
+    from django.db.models import Q
+    from django.utils import timezone
+    from datetime import timedelta
+    from .models import JournalEntry
+    from .quant.crypto_engine import CryptoQuantEngine
+    from .services.marketdata_service import MarketService
 
+    # 3. Cleanup Old Data
+    try:
+        JournalEntry.objects.filter(created_at__lt=timezone.now() - timedelta(days=90)).delete()
+    except Exception as e:
+        print(f"Cleanup Warning: {e}")
+
+    # 4. Watchlist
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
+
+    # 5. Get Active Users (THE FIX IS HERE)
+    # Instead of checking a date (which caused the error), we check the status string.
     active_users = User.objects.filter(
-        Q(is_superuser=True) | Q(profile__subscription_end_date__gt=timezone.now())).distinct()
+        Q(is_superuser=True) |
+        Q(profile__subscription_status='active')
+    ).distinct()
+
     engine = CryptoQuantEngine()
     sent = 0
 
+    # 6. Scan Loop
     for symbol in watchlist:
         try:
+            # Get Data
             df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
             if df is None: continue
+
+            # Analyze
             res = engine.analyze(df, "INTRADAY")
 
+            # Check Criteria
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
+
+                # Global Debounce (Check Admin's Journal)
                 admin = User.objects.filter(is_superuser=True).first()
-                if admin and not JournalEntry.objects.filter(user=admin, symbol=symbol, status='PENDING',
-                                                             created_at__gte=timezone.now() - timedelta(
-                                                                 hours=4)).exists():
+                exists = False
+
+                if admin:
+                    # Check if we already alerted on this symbol in the last 4 hours
+                    exists = JournalEntry.objects.filter(
+                        user=admin,
+                        symbol=symbol,
+                        status='PENDING',
+                        created_at__gte=timezone.now() - timedelta(hours=4)
+                    ).exists()
+
+                if not exists:
+                    # A. Send Discord Alert
                     send_discord_alert(symbol, "SNIPER")
+
+                    # B. Distribute to Active Users
                     for user in active_users:
+                        # Prevent duplicates per user
                         if not JournalEntry.objects.filter(user=user, symbol=symbol, status='PENDING').exists():
                             JournalEntry.objects.create(
-                                user=user, symbol=symbol, bias=res.bias, entry_price=res.entry,
-                                stop_loss=res.stop, target=res.target1, confidence=res.score, status='PENDING'
+                                user=user,
+                                symbol=symbol,
+                                bias=res.bias,
+                                entry_price=res.entry,
+                                stop_loss=res.stop,
+                                target=res.target1,
+                                confidence=res.score,
+                                status='PENDING'
                             )
                     sent += 1
-        except:
+        except Exception as e:
+            print(f"Error scanning {symbol}: {e}")
             continue
 
     return JsonResponse({'status': 'success', 'signals': sent})
