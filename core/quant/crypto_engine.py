@@ -9,20 +9,19 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO PHYSICS ENGINE v23 – SNIPER GRADE
+    REELIOO PHYSICS ENGINE v24 – ADAPTIVE VECTORS PATCH
 
-    UPDATES (v23)
+    UPDATES (v24)
     -------------
-    ✓ FASTER: Structure lookback reduced to 10 (Early Entry)
-    ✓ SMARTER: Added 'Over-Extension' filter (Prevents FOMO)
-    ✓ STRICTER: Requires Mass > 1.0 (No low volume trades)
-    ✓ TUNED: Production-Grade Risk/Reward (3.0+ Targets)
+    ✓ RESTORED: Dynamic Explainability (UI now shows real physics drivers)
+    ✓ ADDED: Whale & Resonance vectors in output
+    ✓ FIXED: 'High Quality Volume' logic visualization
     """
 
     def __init__(self):
         self.ATR_LEN = 14
         self.MASS_LEN = 20
-        self.STRUCT_LEN = 10  # WAS 20 -> CHANGED TO 10 (Faster Entries)
+        self.STRUCT_LEN = 10
         self.BASE_RISK = 0.01
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY") -> SimpleNamespace:
@@ -64,7 +63,6 @@ class CryptoQuantEngine:
             # ==================================================
             # 2. STRUCTURE & WICKS
             # ==================================================
-            # Sniper Update: Lookback is now 10 (via self.STRUCT_LEN)
             roll_high = high.rolling(self.STRUCT_LEN).max().shift(1)
             roll_low = low.rolling(self.STRUCT_LEN).min().shift(1)
 
@@ -94,11 +92,10 @@ class CryptoQuantEngine:
             is_wide_range = candle_range.iloc[-1] > (2.5 * current_atr)
             vol_intensity = volume / (vol_mean + 1e-9)
 
-            # Filter 1: Fakeouts (Big move, no volume)
+            # Filter 1: Fakeouts
             is_fake = (is_wide_range and vol_intensity.iloc[-1] < 0.8)
 
-            # Filter 2: Over-Extension (Move is too hot/late)
-            # If Energy > 3.0, we missed the bus. Don't FOMO.
+            # Filter 2: Over-Extension
             is_overextended = abs(signed_ke.iloc[-1]) > 3.0
 
             # Combined Trap Logic
@@ -133,14 +130,13 @@ class CryptoQuantEngine:
             regime = "IDLE"
 
         # ==========================================================
-        # 6. DECISION ENGINE (HIGH WIN RATE)
+        # 6. DECISION ENGINE
         # ==========================================================
         bias = "HOLD"
         lane = "⚫ HOLD"
         score = 50
 
-        # Strict Volume Filter: Must be above average volume to trade
-        # This prevents trading "weak" moves that tend to reverse.
+        # Strict Volume Filter
         is_high_quality = mass.iloc[-1] > 1.0
 
         if regime == "TREND":
@@ -154,7 +150,6 @@ class CryptoQuantEngine:
                 score = 85
 
         elif regime == "EXPANSION":
-            # Breakouts need confirmation but we enter anyway if quality is high
             if ke_now > 1.2 and not is_trap:
                 bias = "LONG"
                 lane = "🚀 BREAKOUT"
@@ -175,7 +170,7 @@ class CryptoQuantEngine:
             score = 45
 
         # ==========================================================
-        # 7. ADAPTIVE SIZING (PRODUCTION GRADE)
+        # 7. ADAPTIVE SIZING
         # ==========================================================
         stop = t1 = t2 = t3 = 0.0
         rr = 0.0
@@ -184,7 +179,6 @@ class CryptoQuantEngine:
         if bias in ["LONG", "SHORT"]:
             direction = 1 if bias == "LONG" else -1
 
-            # Tighter stops for Sniper entries (we expect immediate follow-through)
             stop_mult = {
                 "TREND": 1.2,
                 "EXPANSION": 1.5
@@ -192,8 +186,6 @@ class CryptoQuantEngine:
 
             stop = price - (direction * current_atr * stop_mult)
 
-            # Wider Targets (Production Grade)
-            # We aim for 3.0R moves minimum to cover losses and fees.
             target_mult = {
                 "TREND": (1.5, 3.0, 6.0),
                 "EXPANSION": (2.0, 4.0, 8.0)
@@ -212,7 +204,7 @@ class CryptoQuantEngine:
             risk_pct = self.BASE_RISK * conviction
 
         # ==========================================================
-        # 8. OUTPUT
+        # 8. OUTPUT & VECTORS (FIXED)
         # ==========================================================
         whale_z = float(vol_intensity.iloc[-1] - 1.0)
         if abs(whale_z) >= 2.0:
@@ -225,11 +217,47 @@ class CryptoQuantEngine:
             whale_label = "Retail"
             whale_state = "BASELINE"
 
-        top_features = [
-            {"desc": f"Regime: {regime}", "importance": 100},
-            {"desc": "High Quality Volume", "importance": 90 if is_high_quality else 0}
-        ]
-        if is_overextended: top_features.append({"desc": "Climax Filter (Trade Skipped)", "importance": 95})
+        # --- DYNAMIC EXPLAINABILITY CONSTRUCTION ---
+        top_features = []
+
+        # 1. Regime is always the foundation
+        top_features.append({"desc": f"Regime: {regime}", "importance": 100})
+
+        # 2. Momentum Strength
+        if abs(ke_now) > 0.5:
+            strength = "High" if abs(ke_now) > 1.2 else "Moderate"
+            top_features.append({"desc": f"{strength} Momentum Velocity", "importance": 85})
+
+        # 3. Volume / Whale Context
+        if whale_state == "ACTIVE":
+            top_features.append({"desc": "Institutional Whale Volume", "importance": 95})
+        elif is_high_quality:
+            top_features.append({"desc": "High Quality Volume", "importance": 80})
+        else:
+            if bias == "HOLD":
+                top_features.append({"desc": "Low Volume / Retail Flow", "importance": 40})
+
+        # 4. Resonance (The God Mode Indicator)
+        if resonance:
+            top_features.append({"desc": "Multi-TF Resonance Aligned", "importance": 99})
+
+        # 5. Structure Context
+        if structure_up and bias == "LONG":
+            top_features.append({"desc": "Bullish Structure Break", "importance": 90})
+        elif structure_down and bias == "SHORT":
+            top_features.append({"desc": "Bearish Structure Break", "importance": 90})
+
+        # 6. Negative Vectors (Why are we NOT trading?)
+        if is_trap:
+            if is_fake:
+                top_features.append({"desc": "WARNING: Fakeout Detected", "importance": 100})
+            if is_wick_rejection:
+                top_features.append({"desc": "WARNING: Wick Rejection (SFP)", "importance": 100})
+            if is_overextended:
+                top_features.append({"desc": "WARNING: Climax / Over-Extended", "importance": 95})
+
+        # Sort features by importance so the UI shows the biggest drivers first
+        top_features.sort(key=lambda x: x['importance'], reverse=True)
 
         narrative = self._narrative(regime, bias, resonance, whale_state)
 
