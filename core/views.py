@@ -423,19 +423,33 @@ def add_journal_entry(request):
 
 @login_required
 def ops_dashboard_view(request):
-    if not request.user.is_superuser: return redirect('terminal')
+    if not request.user.is_superuser:
+        return redirect('terminal')
 
     from django.contrib.auth.models import User
-    users = User.objects.count()
-    subs = UserProfile.objects.filter(is_premium=True).count()
-    signals = JournalEntry.objects.count()
-    wins = JournalEntry.objects.filter(status='WIN').count()
-    rate = round((wins / signals * 100), 1) if signals else 0
-    feed = JournalEntry.objects.select_related('user').order_by('-created_at')[:50]
+    from .models import JournalEntry, UserProfile
+    from django.db.models import Sum
 
-    return render(request, 'core/ops_dashboard.html', {
-        'total_users': users, 'active_subs': subs, 'total_signals': signals, 'win_rate': rate, 'recent_signals': feed
-    })
+    # 1. High Level Metrics
+    total_users = User.objects.count()
+    active_subs = UserProfile.objects.filter(is_premium=True).count()
+
+    # 2. PnL Stats (All Users)
+    total_signals = JournalEntry.objects.count()
+    wins = JournalEntry.objects.filter(status='WIN').count()
+    win_rate = round((wins / total_signals * 100), 1) if total_signals > 0 else 0
+
+    # 3. Recent Signals Feed
+    recent_signals = JournalEntry.objects.select_related('user').order_by('-created_at')[:20]
+
+    context = {
+        'total_users': total_users,
+        'active_subs': active_subs,
+        'total_signals': total_signals,
+        'win_rate': win_rate,
+        'recent_signals': recent_signals
+    }
+    return render(request, 'core/ops_dashboard.html', context)
 
 
 # =========================================================
@@ -516,7 +530,7 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
 
 def cron_scan_trigger(request, secret_key=None):
     # Auth
-    if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret'):
+    if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
         pass
     elif request.user.is_authenticated and request.user.is_staff:
         pass
