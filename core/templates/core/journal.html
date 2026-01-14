@@ -4,107 +4,69 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 font-sans relative">
 
     <!-- HEADER -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
-        <div class="space-y-2">
-            <h1 class="text-3xl md:text-4xl font-black text-white tracking-tight">
-                Performance Ledger
-            </h1>
-            <div class="flex items-center gap-3">
-                <p class="text-sm text-slate-500 font-medium">Institutional Record</p>
-                <span class="w-1 h-1 rounded-full bg-slate-700"></span>
-                <p class="text-sm text-slate-500 font-medium">90-Day Retention</p>
-            </div>
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-white mb-2">Performance Journal</h1>
+            <p class="text-sm text-slate-500">Your personal trading ledger.</p>
+            <p class="text-[10px] text-slate-600 mt-2 flex items-center gap-1.5 bg-white/5 w-fit px-2 py-1 rounded border border-white/5">
+                <i data-lucide="database" class="w-3 h-3 text-slate-500"></i>
+                <span>Data Retention Policy: Signals older than 90 days are automatically overwritten.</span>
+            </p>
         </div>
-
-        <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
-            <div class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+    <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
+                <div class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </div>
+                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Live Sync Active</span>
             </div>
-            <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">
-                Live Sync Active
-            </span>
-        </div>
     </div>
 
-    <!-- PERFORMANCE CARDS (RESTORED, UNCHANGED) -->
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-
-        <!-- NET GROWTH -->
-        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-            <div class="absolute top-0 right-0 p-6 opacity-10 text-slate-500">
-                <i data-lucide="bar-chart-2" class="w-16 h-16"></i>
-            </div>
-            <div class="relative z-10">
-                <h3 class="text-[10px] uppercase text-slate-500 font-black tracking-[0.2em] mb-3">
-                    NET GROWTH (R)
-                </h3>
-                <div class="flex items-baseline gap-2">
-                    <span class="text-4xl md:text-5xl font-black tracking-tighter font-mono
-                        {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
-                        {% if net_roi > 0 %}+{% endif %}{{ net_roi }}
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Net Growth (ROI)</span>
+                    <span class="text-3xl font-black tracking-tighter {% if net_roi >= 0 %}text-emerald-400{% else %}text-red-400{% endif %}">
+                        {% if net_roi > 0 %}+{% endif %}{{ net_roi }}%
                     </span>
-                    <span class="text-sm font-bold text-slate-600">R</span>
                 </div>
-                <p class="text-xs text-slate-600 font-medium mt-4">
-                    Cumulative Risk Units
-                </p>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
             </div>
         </div>
 
-        <!-- PROFIT FACTOR -->
-        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-            <div class="absolute top-0 right-0 p-6 opacity-10 text-slate-500">
-                <i data-lucide="scale" class="w-16 h-16"></i>
-            </div>
-            <div class="relative z-10">
-                <h3 class="text-[10px] uppercase text-slate-500 font-black tracking-[0.2em] mb-3">
-                    PROFIT FACTOR
-                </h3>
-                <div class="flex items-center gap-4">
-                    <span class="text-4xl md:text-5xl font-black text-white tracking-tighter font-mono">
-                        {{ profit_factor }}
-                    </span>
-                    <span class="text-[9px] px-2 py-1 rounded-md border font-bold uppercase tracking-wide
-                        {% if profit_factor >= 2.0 %}
-                            text-emerald-400 border-emerald-500/20 bg-emerald-500/10
-                        {% elif profit_factor >= 1.0 %}
-                            text-blue-400 border-blue-500/20 bg-blue-500/10
-                        {% else %}
-                            text-slate-400 border-slate-500/20 bg-slate-500/10
-                        {% endif %}">
-                        {% if profit_factor >= 2.0 %}Excellent
-                        {% elif profit_factor >= 1.0 %}Healthy
-                        {% else %}Negative{% endif %}
-                    </span>
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
+                        <span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded border
+                            {% if profit_factor >= 2.0 %}text-emerald-400 border-emerald-500/30 bg-emerald-500/10
+                            {% elif profit_factor >= 1.5 %}text-blue-400 border-blue-500/30 bg-blue-500/10
+                            {% elif profit_factor >= 1.0 %}text-yellow-400 border-yellow-500/30 bg-yellow-500/10
+                            {% else %}text-red-400 border-red-500/30 bg-red-500/10{% endif %}">
+                            {% if profit_factor >= 2.0 %}EXCELLENT
+                            {% elif profit_factor >= 1.5 %}GOOD
+                            {% elif profit_factor >= 1.0 %}PROFITABLE
+                            {% else %}UNPROFITABLE{% endif %}
+                        </span>
+                    </div>
                 </div>
-                <p class="text-xs text-slate-600 font-medium mt-4">
-                    Gross Win / Gross Loss Ratio
-                </p>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="scale" class="w-5 h-5"></i></div>
             </div>
         </div>
 
-        <!-- ACTIVE SIGNALS -->
-        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-xl">
-            <div class="absolute top-0 right-0 p-6 opacity-10 text-slate-500">
-                <i data-lucide="activity" class="w-16 h-16"></i>
-            </div>
-            <div class="relative z-10">
-                <h3 class="text-[10px] uppercase text-slate-500 font-black tracking-[0.2em] mb-3">
-                    ACTIVE SIGNALS
-                </h3>
-                <span class="text-4xl md:text-5xl font-black text-white tracking-tighter font-mono">
-                    {{ active_pending }}
-                </span>
-                <div class="flex items-center gap-2 mt-4">
-                    <div class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div>
-                    <p class="text-xs text-slate-600 font-medium">
-                        Monitoring open positions
-                    </p>
-                </div>
+        <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
+            <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div><span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span><span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span></div>
+                <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="activity" class="w-5 h-5"></i></div>
             </div>
         </div>
-
     </div>
 
     <!-- JOURNAL TABLE -->
@@ -137,6 +99,19 @@
                 </tbody>
             </table>
         </div>
+                <div class="p-5 border-t border-white/5 flex justify-between items-center">
+            <span class="text-[10px] text-slate-600 uppercase tracking-widest">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">PREV</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 bg-[#111] hover:bg-white/10 rounded text-xs text-white font-bold transition">NEXT</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
     </div>
 
 </div>
