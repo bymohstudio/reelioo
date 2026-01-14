@@ -9,13 +9,13 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO PHYSICS ENGINE v24 – ADAPTIVE VECTORS PATCH
+    REELIOO PHYSICS ENGINE v25 – RETAIL NARRATIVE PATCH
 
-    UPDATES (v24)
+    UPDATES (v25)
     -------------
-    ✓ RESTORED: Dynamic Explainability (UI now shows real physics drivers)
-    ✓ ADDED: Whale & Resonance vectors in output
-    ✓ FIXED: 'High Quality Volume' logic visualization
+    ✓ FIXED: 'HOLD' signals now show lower importance scores (40-60%) to avoid confusion.
+    ✓ TRANSLATED: Technical terms replaced with Retail-Friendly language (e.g., 'Smart Money').
+    ✓ ADAPTIVE: Vector list changes completely based on Trade vs. Wait context.
     """
 
     def __init__(self):
@@ -204,7 +204,7 @@ class CryptoQuantEngine:
             risk_pct = self.BASE_RISK * conviction
 
         # ==========================================================
-        # 8. OUTPUT & VECTORS (FIXED)
+        # 8. OUTPUT & RETAIL NARRATIVE VECTORS (FIXED)
         # ==========================================================
         whale_z = float(vol_intensity.iloc[-1] - 1.0)
         if abs(whale_z) >= 2.0:
@@ -217,47 +217,54 @@ class CryptoQuantEngine:
             whale_label = "Retail"
             whale_state = "BASELINE"
 
-        # --- DYNAMIC EXPLAINABILITY CONSTRUCTION ---
         top_features = []
 
-        # 1. Regime is always the foundation
-        top_features.append({"desc": f"Regime: {regime}", "importance": 100})
+        # --- SCENARIO A: HOLD (REASONS TO WAIT) ---
+        if bias == "HOLD" or bias == "WATCH":
+            # 1. TRAPS (Primary Reason to Hold)
+            if is_trap:
+                if is_fake:
+                    top_features.append({"desc": "Fakeout Risk (Volume Mismatch)", "importance": 65})
+                elif is_wick_rejection:
+                    top_features.append({"desc": "Price Rejection Detected", "importance": 65})
+                elif is_overextended:
+                    top_features.append({"desc": "Market Overheated (Too Late)", "importance": 65})
 
-        # 2. Momentum Strength
-        if abs(ke_now) > 0.5:
-            strength = "High" if abs(ke_now) > 1.2 else "Moderate"
-            top_features.append({"desc": f"{strength} Momentum Velocity", "importance": 85})
+            # 2. MARKET STATE (Secondary Reason)
+            elif regime == "COMPRESSION":
+                top_features.append({"desc": "Squeeze Building (Wait)", "importance": 50})
+            elif regime == "EXHAUSTION":
+                top_features.append({"desc": "Trend Fading", "importance": 45})
+            elif regime == "IDLE":
+                top_features.append({"desc": "Low Volatility", "importance": 30})
 
-        # 3. Volume / Whale Context
-        if whale_state == "ACTIVE":
-            top_features.append({"desc": "Institutional Whale Volume", "importance": 95})
-        elif is_high_quality:
-            top_features.append({"desc": "High Quality Volume", "importance": 80})
+            # 3. VOLUME CHECK
+            if not is_high_quality:
+                top_features.append({"desc": "Weak Participation", "importance": 25})
+
+        # --- SCENARIO B: ACTIVE TRADE (REASONS TO ENTER) ---
         else:
-            if bias == "HOLD":
-                top_features.append({"desc": "Low Volume / Retail Flow", "importance": 40})
+            # 1. SMART MONEY
+            if whale_state == "ACTIVE":
+                top_features.append(
+                    {"desc": "Smart Money Buying" if bias == "LONG" else "Smart Money Selling", "importance": 95})
+            elif is_high_quality:
+                top_features.append({"desc": "Healthy Volume Support", "importance": 80})
 
-        # 4. Resonance (The God Mode Indicator)
-        if resonance:
-            top_features.append({"desc": "Multi-TF Resonance Aligned", "importance": 99})
+            # 2. ALIGNMENT
+            if resonance:
+                top_features.append({"desc": "Perfect Trend Alignment", "importance": 90})
 
-        # 5. Structure Context
-        if structure_up and bias == "LONG":
-            top_features.append({"desc": "Bullish Structure Break", "importance": 90})
-        elif structure_down and bias == "SHORT":
-            top_features.append({"desc": "Bearish Structure Break", "importance": 90})
+            # 3. BREAKOUTS
+            if regime == "EXPANSION":
+                top_features.append({"desc": "High Velocity Breakout", "importance": 85})
+            elif regime == "TREND":
+                top_features.append({"desc": "Trend Continuation", "importance": 85})
 
-        # 6. Negative Vectors (Why are we NOT trading?)
-        if is_trap:
-            if is_fake:
-                top_features.append({"desc": "WARNING: Fakeout Detected", "importance": 100})
-            if is_wick_rejection:
-                top_features.append({"desc": "WARNING: Wick Rejection (SFP)", "importance": 100})
-            if is_overextended:
-                top_features.append({"desc": "WARNING: Climax / Over-Extended", "importance": 95})
-
-        # Sort features by importance so the UI shows the biggest drivers first
+        # Sort: Highest importance first
         top_features.sort(key=lambda x: x['importance'], reverse=True)
+        # Cap at 3 items to keep UI clean
+        top_features = top_features[:3]
 
         narrative = self._narrative(regime, bias, resonance, whale_state)
 
@@ -273,11 +280,11 @@ class CryptoQuantEngine:
         )
 
     def _narrative(self, regime, bias, resonance, whale):
-        if regime == "COMPRESSION": return "Volatility squeezing. Energy building."
-        if regime == "EXHAUSTION": return "Trend fading. Taking defensive stance."
-        if regime == "EXPANSION": return "High-velocity breakout."
-        if whale == "ACTIVE": return "Institutional volume detected."
-        return "Market structure confirms direction."
+        if regime == "COMPRESSION": return "Market is squeezing. Waiting for power."
+        if regime == "EXHAUSTION": return "Trend is tired. Avoid new entries."
+        if regime == "EXPANSION": return "High speed move. Stops are tight."
+        if whale == "ACTIVE": return "Institutions are active here."
+        return "Waiting for a clear setup."
 
     def _neutral(self, price, reason):
         return SimpleNamespace(
@@ -286,6 +293,6 @@ class CryptoQuantEngine:
             rr_ratio=0.0, risk_pct=0.0,
             regime="NEUTRAL", regime_color="gray",
             whale_zscore=0.0, whale_label="Normal", whale_state="BASELINE",
-            top_features=[{"desc": "No Signal", "importance": 50}],
+            top_features=[{"desc": "No Data", "importance": 20}],
             narrative=reason, lifecycle="WAITING"
         )
