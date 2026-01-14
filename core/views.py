@@ -423,32 +423,32 @@ def add_journal_entry(request):
 
 @login_required
 def ops_dashboard_view(request):
-    # 1. Security Check
+    # 1. Access Control: Strict Superuser Only
     if not request.user.is_superuser:
         return redirect('terminal')
 
+    # Import inside to avoid circular import errors
     from django.contrib.auth.models import User
     from .models import JournalEntry, UserProfile
 
-    # 2. Safe Metrics Calculation
+    # 2. METRICS
     users = User.objects.count()
-    subs = UserProfile.objects.filter(is_premium=True).count()
+
+    # FIX: Count users where subscription_status is 'active' (instead of looking for is_premium)
+    subs = UserProfile.objects.filter(subscription_status='active').count()
 
     signals = JournalEntry.objects.count()
     wins = JournalEntry.objects.filter(status='WIN').count()
 
-    # Avoid ZeroDivisionError
+    # Avoid DivisionByZero if no signals exist
     win_rate = round((wins / signals * 100), 1) if signals > 0 else 0
 
-    # 3. Crash Prevention: Filter out orphaned trades (user=None)
-    # This prevents the "NoneType has no attribute username" error
-    feed = JournalEntry.objects.select_related('user') \
-               .filter(user__isnull=False) \
-               .order_by('-created_at')[:50]
+    # 3. FEED: Filter out broken records (where user is None) to prevent 500 errors
+    feed = JournalEntry.objects.select_related('user').filter(user__isnull=False).order_by('-created_at')[:50]
 
     return render(request, 'core/ops_dashboard.html', {
         'total_users': users,
-        'active_subs': subs,
+        'active_subs': subs,  # This now passes the correct count of active subs
         'total_signals': signals,
         'win_rate': win_rate,
         'recent_signals': feed
