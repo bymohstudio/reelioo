@@ -290,7 +290,7 @@ def hx_alpha_scan(request):
     """VIP Alpha Scanner"""
     if not has_access(request.user): return HttpResponse("DENIED")
 
-    vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+    vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT", "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"]
     engine = CryptoQuantEngine()
     results = []
 
