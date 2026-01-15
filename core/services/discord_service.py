@@ -42,8 +42,10 @@ def send_marketing_prompt(symbol, score, whale_status):
     # 3. Build the Tweet Text
     tweet_text = (
         f"{selected_emoji} SYSTEM ALERT: ${symbol}\n\n"
+        f"──────────────\n"
         f"Signal Strength: {score}/100\n"
         f"{selected_context}\n\n"
+        f"──────────────\n\n"
         f"Tracking execution vectors...\n\n"
         f"#Crypto #{symbol} #Trading"
     )
@@ -83,48 +85,53 @@ def send_win_prompt(symbol, roi, duration_hours):
     webhook_url = os.getenv('DISCORD_MARKETING_WEBHOOK_URL')
     if not webhook_url: return
 
-    # 1. Format Time
+    # --- 1. SMART TIME FORMATTING ---
+    # Converts 1.8 hours -> "1h 48m" (Human Readable)
     if duration_hours < 1:
+        # Less than 1 hour (e.g. 0.5h -> 30m)
         time_str = f"{int(duration_hours * 60)}m"
     else:
-        time_str = f"{round(duration_hours, 1)}h"
+        # More than 1 hour (e.g. 1.8h -> 1h 48m)
+        h = int(duration_hours)
+        m = int((duration_hours - h) * 60)
+        time_str = f"{h}h {m}m"
 
-        # 2. Build PREMIUM Tweet Text (The Receipt Look)
-        tweet_text = (
-            f"💠 EXECUTION CONFIRMED: ${symbol}\n\n"
-            f"──────────────\n"
-            f"✅ STATUS   : TARGET HIT\n"
-            f"💰 YIELD    : +{roi}%\n"
-            f"⏱️ DURATION : {time_str}\n"
-            f"──────────────\n\n"
-            f"Calculated precision. No guessing.\n"
-            f"Institutional flow validated.\n\n"
-            f"#{symbol} #Quant #Trading"
-        )
+    # --- 2. PREMIUM RECEIPT DESIGN ---
+    tweet_text = (
+        f"💠 EXECUTION CONFIRMED: ${symbol}\n\n"
+        f"──────────────\n"
+        f"✅ STATUS   : TARGET HIT\n"
+        f"💰 YIELD    : +{roi}%\n"
+        f"⏱️ DURATION : {time_str}\n"
+        f"──────────────\n\n"
+        f"Calculated precision. No guessing.\n"
+        f"Institutional flow validated.\n\n"
+        f"#{symbol} #Quant #Trading"
+    )
 
-        # 3. Create Magic Link
-        encoded_text = urllib.parse.quote(tweet_text)
-        twitter_link = f"https://twitter.com/intent/tweet?text={encoded_text}"
+    # 3. Create Magic Link
+    encoded_text = urllib.parse.quote(tweet_text)
+    twitter_link = f"https://twitter.com/intent/tweet?text={encoded_text}"
 
-        # 4. Send to Discord
-        payload = {
-            "username": "Reelioo Marketing",
-            "embeds": [{
-                "title": f"💰 WIN: {symbol} (+{roi}%)",
-                "description": "Ready to post premium receipt?",
-                "color": 5763719,  # Green
-                "fields": [
-                    {
-                        "name": "⚡ ACTION REQUIRED",
-                        "value": f"👉 **[CLICK TO TWEET RECEIPT]({twitter_link})**",
-                        "inline": False
-                    }
-                ],
-                "footer": {"text": "Clicking opens Twitter with text pre-filled."}
-            }]
-        }
+    # 4. Send to Discord
+    payload = {
+        "username": "Reelioo Marketing",
+        "embeds": [{
+            "title": f"💰 WIN: {symbol} (+{roi}%)",
+            "description": "Premium receipt generated.",
+            "color": 5763719,  # Green
+            "fields": [
+                {
+                    "name": "⚡ ACTION REQUIRED",
+                    "value": f"👉 **[CLICK TO TWEET RECEIPT]({twitter_link})**",
+                    "inline": False
+                }
+            ],
+            "footer": {"text": f"Duration: {time_str} • ROI: {roi}%"}
+        }]
+    }
 
-        try:
-            requests.post(webhook_url, json=payload)
-        except Exception as e:
-            print(f"Marketing Win Fail: {e}")
+    try:
+        requests.post(webhook_url, json=payload)
+    except Exception as e:
+        print(f"Marketing Win Fail: {e}")
