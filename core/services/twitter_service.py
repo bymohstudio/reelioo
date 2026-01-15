@@ -6,28 +6,21 @@ import random
 log = logging.getLogger(__name__)
 
 
+log = logging.getLogger(__name__)
+
 class TwitterBot:
     def __init__(self):
-        # Configure these in your .env file
-        self.api_key = os.getenv("TWITTER_API_KEY")
-        self.api_secret = os.getenv("TWITTER_API_SECRET")
-        self.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
-        self.access_secret = os.getenv("TWITTER_ACCESS_SECRET")
-        self.bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
-
         self.client = None
-        if self.api_key and self.access_token:
-            try:
-                # Client for v2 API
-                self.client = tweepy.Client(
-                    bearer_token=self.bearer_token,
-                    consumer_key=self.api_key,
-                    consumer_secret=self.api_secret,
-                    access_token=self.access_token,
-                    access_token_secret=self.access_secret
-                )
-            except Exception as e:
-                log.error(f"Twitter Auth Failed: {e}")
+        try:
+            # Authenticate using the keys from .env
+            self.client = tweepy.Client(
+                consumer_key=os.getenv("TWITTER_API_KEY"),
+                consumer_secret=os.getenv("TWITTER_API_SECRET"),
+                access_token=os.getenv("TWITTER_ACCESS_TOKEN"),
+                access_token_secret=os.getenv("TWITTER_ACCESS_SECRET")
+            )
+        except Exception as e:
+            log.error(f"Twitter Auth Failed: {e}")
 
     def post_entry_signal(self, symbol, score, whale_status):
         """
