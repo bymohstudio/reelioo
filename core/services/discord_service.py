@@ -89,37 +89,42 @@ def send_win_prompt(symbol, roi, duration_hours):
     else:
         time_str = f"{round(duration_hours, 1)}h"
 
-    # 2. Build Tweet Text
-    tweet_text = (
-        f"✅ TARGET NEUTRALIZED: ${symbol}\n\n"
-        f"• Result: +{roi}% Captured\n"
-        f"• Time: {time_str}\n\n"
-        f"Calculated precision. No guessing.\n\n"
-        f"#{symbol} #CryptoWins"
-    )
+        # 2. Build PREMIUM Tweet Text (The Receipt Look)
+        tweet_text = (
+            f"💠 EXECUTION CONFIRMED: ${symbol}\n\n"
+            f"──────────────\n"
+            f"✅ STATUS   : TARGET HIT\n"
+            f"💰 YIELD    : +{roi}%\n"
+            f"⏱️ DURATION : {time_str}\n"
+            f"──────────────\n\n"
+            f"Calculated precision. No guessing.\n"
+            f"Institutional flow validated.\n\n"
+            f"#{symbol} #Quant #Trading"
+        )
 
-    # 3. Create Magic Link
-    encoded_text = urllib.parse.quote(tweet_text)
-    twitter_link = f"https://twitter.com/intent/tweet?text={encoded_text}"
+        # 3. Create Magic Link
+        encoded_text = urllib.parse.quote(tweet_text)
+        twitter_link = f"https://twitter.com/intent/tweet?text={encoded_text}"
 
-    # 4. Send to Discord
-    payload = {
-        "username": "Reelioo Marketing",
-        "embeds": [{
-            "title": f"💰 WIN CONFIRMED: {symbol}",
-            "description": f"**ROI:** +{roi}%\n**Time:** {time_str}",
-            "color": 5763719,  # Green
-            "fields": [
-                {
-                    "name": "⚡ ACTION REQUIRED",
-                    "value": f"👉 **[CLICK TO TWEET RECEIPT]({twitter_link})**",
-                    "inline": False
-                }
-            ]
-        }]
-    }
+        # 4. Send to Discord
+        payload = {
+            "username": "Reelioo Marketing",
+            "embeds": [{
+                "title": f"💰 WIN: {symbol} (+{roi}%)",
+                "description": "Ready to post premium receipt?",
+                "color": 5763719,  # Green
+                "fields": [
+                    {
+                        "name": "⚡ ACTION REQUIRED",
+                        "value": f"👉 **[CLICK TO TWEET RECEIPT]({twitter_link})**",
+                        "inline": False
+                    }
+                ],
+                "footer": {"text": "Clicking opens Twitter with text pre-filled."}
+            }]
+        }
 
-    try:
-        requests.post(webhook_url, json=payload)
-    except Exception as e:
-        print(f"Marketing Win Fail: {e}")
+        try:
+            requests.post(webhook_url, json=payload)
+        except Exception as e:
+            print(f"Marketing Win Fail: {e}")
