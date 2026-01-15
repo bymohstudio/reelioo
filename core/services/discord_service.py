@@ -1,7 +1,12 @@
+import os
+
 import requests
 import urllib.parse
 import random
-from django.conf import settings
+from dotenv import load_dotenv
+
+# 1. Load Environment Variables
+load_dotenv()
 
 # Note: We do NOT include send_discord_alert here because
 # you already have it defined in views.py
@@ -11,7 +16,7 @@ def send_marketing_prompt(symbol, score, whale_status):
     Sends a private alert to your Marketing Channel with a
     'Click to Tweet' button for ENTRIES.
     """
-    webhook_url = getattr(settings, 'DISCORD_MARKETING_WEBHOOK_URL', '')
+    webhook_url = os.getenv('DISCORD_MARKETING_WEBHOOK_URL')
     if not webhook_url: return
 
     # 1. Visual Hooks
@@ -75,7 +80,7 @@ def send_win_prompt(symbol, roi, duration_hours):
     Sends a private alert to your Marketing Channel with a
     'Click to Tweet' button for WINS.
     """
-    webhook_url = getattr(settings, 'DISCORD_MARKETING_WEBHOOK_URL', '')
+    webhook_url = os.getenv('DISCORD_MARKETING_WEBHOOK_URL')
     if not webhook_url: return
 
     # 1. Format Time
