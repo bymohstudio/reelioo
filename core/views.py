@@ -378,14 +378,16 @@ def journal_view(request):
 @login_required
 def refresh_journal_entry(request, entry_id):
     from .models import JournalEntry
-    from .services.twitter_service import TwitterBot  # NEW IMPORT
+    from .services.twitter_service import TwitterBot
 
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
 
+    # Default: Assume we are just syncing a closed trade
     msg_type = "info"
-    title = "Status: PENDING"
-    message = "Price updated."
+    title = "Synced"
+    message = "Trade is already closed."
 
+    # --- CASE 1: TRADE IS ACTIVE (CHECK PRICE) ---
     if entry.status == 'PENDING':
         try:
             df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
@@ -406,39 +408,54 @@ def refresh_journal_entry(request, entry_id):
                     elif curr >= entry.stop_loss:
                         new_status = 'LOSS'
 
-                # Update DB
+                # Update DB if status changed
                 if new_status != 'PENDING':
                     entry.status = new_status
                     entry.save()
 
-                    # --- AUTO TWEET ON WIN ---
+                    # ALERT: STATUS CHANGE
                     if new_status == 'WIN':
                         msg_type = "success"
                         title = "Target Hit!"
                         message = "Trade closed in profit."
 
-                        # Only tweet if this is the Admin/Superuser closing the trade
-                        # This prevents user actions from spamming your official Twitter
+                        # TWEET (Superuser Only)
                         if request.user.is_superuser:
                             try:
                                 duration = (timezone.now() - entry.created_at).total_seconds() / 3600
                                 roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-
                                 bot = TwitterBot()
-                                bot.post_win_receipt(entry.symbol, round(roi, 2), duration)
+                                if bot.client:
+                                    bot.post_win_receipt(entry.symbol, round(roi, 2), duration)
                             except Exception as e:
-                                print(f"Auto-Tweet Error: {e}")
+                                print(f"Tweet Error: {e}")
 
                     elif new_status == 'LOSS':
                         msg_type = "error"
                         title = "Stop Loss Hit"
                         message = "Trade closed in loss."
+                else:
+                    # ALERT: STILL PENDING
+                    title = "Status: PENDING"
+                    # message is already set to "Current Price: $..." above
 
         except Exception as e:
             msg_type = "warning"
             title = "Sync Error"
             message = "Could not fetch market data."
 
+    # --- CASE 2: TRADE IS ALREADY CLOSED (JUST SHOW STATUS) ---
+    else:
+        if entry.status == 'WIN':
+            msg_type = "success"
+            title = "Trade Complete"
+            message = "Result: WIN (Synced)"
+        elif entry.status == 'LOSS':
+            msg_type = "error"
+            title = "Trade Complete"
+            message = "Result: LOSS (Synced)"
+
+    # Render response
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
     response['HX-Trigger'] = json.dumps({
         'showToast': {'type': msg_type, 'title': title, 'message': message}
