@@ -378,12 +378,12 @@ def journal_view(request):
 @login_required
 def refresh_journal_entry(request, entry_id):
     from .models import JournalEntry
-    # REPLACED: TwitterBot with Discord Win Prompt
+    # Import Discord Service
     from .services.discord_service import send_win_prompt
 
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
 
-    # Default: Assume we are just syncing a closed trade
+    # Default vars
     msg_type = "info"
     title = "Synced"
     message = "Trade is already closed."
@@ -414,43 +414,51 @@ def refresh_journal_entry(request, entry_id):
                     entry.status = new_status
                     entry.save()
 
-                    # ALERT: STATUS CHANGE
                     if new_status == 'WIN':
                         msg_type = "success"
                         title = "Target Hit!"
                         message = "Trade closed in profit."
 
-                        # --- MARKETING TRIGGER (Superuser Only) ---
+                        # --- TRIGGER ALERT (TRANSITION) ---
                         if request.user.is_superuser:
                             try:
                                 duration = (timezone.now() - entry.created_at).total_seconds() / 3600
                                 roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-
-                                # Send "Click-to-Tweet" to Admin Discord
                                 send_win_prompt(entry.symbol, round(roi, 2), duration)
                             except Exception as e:
-                                print(f"Marketing Prompt Error: {e}")
+                                print(f"Marketing Error: {e}")
 
                     elif new_status == 'LOSS':
                         msg_type = "error"
                         title = "Stop Loss Hit"
                         message = "Trade closed in loss."
                 else:
-                    # ALERT: STILL PENDING
                     title = "Status: PENDING"
-                    # message is already set to "Current Price: $..." above
 
         except Exception as e:
             msg_type = "warning"
             title = "Sync Error"
             message = "Could not fetch market data."
 
-    # --- CASE 2: TRADE IS ALREADY CLOSED (JUST SHOW STATUS) ---
+    # --- CASE 2: TRADE IS ALREADY CLOSED ---
     else:
         if entry.status == 'WIN':
             msg_type = "success"
             title = "Trade Complete"
-            message = "Result: WIN"
+            message = "Result: WIN (Alert Sent)"  # UI Feedback
+
+            # --- NEW FIX: ALLOW RE-SENDING ALERT FOR EXISTING WINS ---
+            if request.user.is_superuser:
+                try:
+                    duration = (timezone.now() - entry.created_at).total_seconds() / 3600
+                    roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
+
+                    # Fire the alert again
+                    send_win_prompt(entry.symbol, round(roi, 2), duration)
+                    print(f"✅ Re-sent Win Prompt for {entry.symbol}")
+                except Exception as e:
+                    print(f"Marketing Error: {e}")
+
         elif entry.status == 'LOSS':
             msg_type = "error"
             title = "Trade Complete"
