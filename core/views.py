@@ -378,7 +378,8 @@ def journal_view(request):
 @login_required
 def refresh_journal_entry(request, entry_id):
     from .models import JournalEntry
-    from .services.twitter_service import TwitterBot
+    # REPLACED: TwitterBot with Discord Win Prompt
+    from .services.discord_service import send_win_prompt
 
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
 
@@ -419,16 +420,16 @@ def refresh_journal_entry(request, entry_id):
                         title = "Target Hit!"
                         message = "Trade closed in profit."
 
-                        # TWEET (Superuser Only)
+                        # --- MARKETING TRIGGER (Superuser Only) ---
                         if request.user.is_superuser:
                             try:
                                 duration = (timezone.now() - entry.created_at).total_seconds() / 3600
                                 roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-                                bot = TwitterBot()
-                                if bot.client:
-                                    bot.post_win_receipt(entry.symbol, round(roi, 2), duration)
+
+                                # Send "Click-to-Tweet" to Admin Discord
+                                send_win_prompt(entry.symbol, round(roi, 2), duration)
                             except Exception as e:
-                                print(f"Tweet Error: {e}")
+                                print(f"Marketing Prompt Error: {e}")
 
                     elif new_status == 'LOSS':
                         msg_type = "error"
@@ -606,7 +607,7 @@ def cron_scan_trigger(request, secret_key=None):
     authorized = False
     if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
         authorized = True
-    elif request.user.is_authenticated and request.user.is_staff:
+    elif request.user.is_authenticated and request.user.is_superuser:
         authorized = True
 
     if not authorized:
@@ -620,7 +621,8 @@ def cron_scan_trigger(request, secret_key=None):
     from .models import JournalEntry
     from .quant.crypto_engine import CryptoQuantEngine
     from .services.marketdata_service import MarketService
-    from .services.twitter_service import TwitterBot  # NEW IMPORT
+    # REPLACED: TwitterBot with Discord Marketing Prompt
+    from .services.discord_service import send_marketing_prompt
 
     # 3. Cleanup
     try:
@@ -659,17 +661,16 @@ def cron_scan_trigger(request, secret_key=None):
                     ).exists()
 
                 if not exists:
-                    # A. Send Discord Alert
+                    # A. Public Alert (Uses your existing function in views.py)
                     send_discord_alert(symbol, "SNIPER")
 
-                    # B. Send Twitter Alert (Subtle Hype) - Only for high quality
+                    # B. Marketing Alert (Click-to-Tweet for Admin)
                     if res.score >= 65:
                         try:
-                            bot = TwitterBot()
                             whale_state = getattr(res, 'whale_state', 'BASELINE')
-                            bot.post_entry_signal(symbol, res.score, whale_state)
+                            send_marketing_prompt(symbol, res.score, whale_state)
                         except Exception as e:
-                            print(f"Twitter Error: {e}")
+                            print(f"Marketing Trigger Error: {e}")
 
                     # C. Distribute to Users
                     for user in active_users:
