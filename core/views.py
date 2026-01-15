@@ -378,9 +378,10 @@ def journal_view(request):
 @login_required
 def refresh_journal_entry(request, entry_id):
     from .models import JournalEntry
+    from .services.twitter_service import TwitterBot  # NEW IMPORT
+
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
 
-    # Defaults for the alert
     msg_type = "info"
     title = "Status: PENDING"
     message = "Price updated."
@@ -405,16 +406,29 @@ def refresh_journal_entry(request, entry_id):
                     elif curr >= entry.stop_loss:
                         new_status = 'LOSS'
 
-                # Update DB if changed
+                # Update DB
                 if new_status != 'PENDING':
                     entry.status = new_status
                     entry.save()
 
-                    # Set Alert Data for Win/Loss
+                    # --- AUTO TWEET ON WIN ---
                     if new_status == 'WIN':
                         msg_type = "success"
                         title = "Target Hit!"
                         message = "Trade closed in profit."
+
+                        # Only tweet if this is the Admin/Superuser closing the trade
+                        # This prevents user actions from spamming your official Twitter
+                        if request.user.is_superuser:
+                            try:
+                                duration = (timezone.now() - entry.created_at).total_seconds() / 3600
+                                roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
+
+                                bot = TwitterBot()
+                                bot.post_win_receipt(entry.symbol, round(roi, 2), duration)
+                            except Exception as e:
+                                print(f"Auto-Tweet Error: {e}")
+
                     elif new_status == 'LOSS':
                         msg_type = "error"
                         title = "Stop Loss Hit"
@@ -425,16 +439,9 @@ def refresh_journal_entry(request, entry_id):
             title = "Sync Error"
             message = "Could not fetch market data."
 
-    # Render the row
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
-
-    # ATTACH THE ALERT TRIGGER
     response['HX-Trigger'] = json.dumps({
-        'showToast': {
-            'type': msg_type,
-            'title': title,
-            'message': message
-        }
+        'showToast': {'type': msg_type, 'title': title, 'message': message}
     })
     return response
 
@@ -588,7 +595,7 @@ def cron_scan_trigger(request, secret_key=None):
     if not authorized:
         return JsonResponse({'status': 'forbidden'}, status=403)
 
-    # 2. IMPORTS (Inside function to prevent 500 Circular Import Errors)
+    # 2. Imports
     from django.contrib.auth.models import User
     from django.db.models import Q
     from django.utils import timezone
@@ -596,18 +603,17 @@ def cron_scan_trigger(request, secret_key=None):
     from .models import JournalEntry
     from .quant.crypto_engine import CryptoQuantEngine
     from .services.marketdata_service import MarketService
+    from .services.twitter_service import TwitterBot  # NEW IMPORT
 
-    # 3. Cleanup Old Data
+    # 3. Cleanup
     try:
         JournalEntry.objects.filter(created_at__lt=timezone.now() - timedelta(days=90)).delete()
-    except Exception as e:
-        print(f"Cleanup Warning: {e}")
+    except:
+        pass
 
     # 4. Watchlist
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
 
-    # 5. Get Active Users (THE FIX IS HERE)
-    # Instead of checking a date (which caused the error), we check the status string.
     active_users = User.objects.filter(
         Q(is_superuser=True) |
         Q(profile__subscription_status='active')
@@ -616,25 +622,18 @@ def cron_scan_trigger(request, secret_key=None):
     engine = CryptoQuantEngine()
     sent = 0
 
-    # 6. Scan Loop
     for symbol in watchlist:
         try:
-            # Get Data
             df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
             if df is None: continue
 
-            # Analyze
             res = engine.analyze(df, "INTRADAY")
 
-            # Check Criteria
             if res.score >= 65 and res.bias in ['LONG', 'SHORT']:
-
-                # Global Debounce (Check Admin's Journal)
                 admin = User.objects.filter(is_superuser=True).first()
                 exists = False
 
                 if admin:
-                    # Check if we already alerted on this symbol in the last 4 hours
                     exists = JournalEntry.objects.filter(
                         user=admin,
                         symbol=symbol,
@@ -646,9 +645,17 @@ def cron_scan_trigger(request, secret_key=None):
                     # A. Send Discord Alert
                     send_discord_alert(symbol, "SNIPER")
 
-                    # B. Distribute to Active Users
+                    # B. Send Twitter Alert (Subtle Hype) - Only for high quality
+                    if res.score >= 70:
+                        try:
+                            bot = TwitterBot()
+                            whale_state = getattr(res, 'whale_state', 'BASELINE')
+                            bot.post_entry_signal(symbol, res.score, whale_state)
+                        except Exception as e:
+                            print(f"Twitter Error: {e}")
+
+                    # C. Distribute to Users
                     for user in active_users:
-                        # Prevent duplicates per user
                         if not JournalEntry.objects.filter(user=user, symbol=symbol, status='PENDING').exists():
                             JournalEntry.objects.create(
                                 user=user,
@@ -662,7 +669,7 @@ def cron_scan_trigger(request, secret_key=None):
                             )
                     sent += 1
         except Exception as e:
-            print(f"Error scanning {symbol}: {e}")
+            print(f"Scan Error {symbol}: {e}")
             continue
 
     return JsonResponse({'status': 'success', 'signals': sent})
