@@ -646,7 +646,7 @@ def cron_scan_trigger(request, secret_key=None):
                     send_discord_alert(symbol, "SNIPER")
 
                     # B. Send Twitter Alert (Subtle Hype) - Only for high quality
-                    if res.score >= 70:
+                    if res.score >= 65:
                         try:
                             bot = TwitterBot()
                             whale_state = getattr(res, 'whale_state', 'BASELINE')
