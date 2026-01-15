@@ -449,11 +449,11 @@ def refresh_journal_entry(request, entry_id):
         if entry.status == 'WIN':
             msg_type = "success"
             title = "Trade Complete"
-            message = "Result: WIN (Synced)"
+            message = "Result: WIN"
         elif entry.status == 'LOSS':
             msg_type = "error"
             title = "Trade Complete"
-            message = "Result: LOSS (Synced)"
+            message = "Result: LOSS"
 
     # Render response
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
