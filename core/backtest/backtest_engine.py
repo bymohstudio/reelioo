@@ -8,11 +8,10 @@ log = logging.getLogger(__name__)
 
 class CryptoBacktestEngine:
     """
-    BACKTEST ENGINE v21 – TRUE PHYSICS ALIGNMENT
+    BACKTEST ENGINE v28 – INSTITUTIONAL GRADE
 
-    - Perfectly mirrors CryptoQuantEngine v21 logic.
-    - Uses Signed Kinetic Energy, Decay, and Regimes.
-    - Dynamic ATR-based fakeout detection.
+    - Perfectly mirrors CryptoQuantEngine v28 logic.
+    - Includes: Vector Smoothing, EMA 50 Governor, Strict Thresholds.
     """
 
     def __init__(self, df: pd.DataFrame, symbol: str):
@@ -20,74 +19,57 @@ class CryptoBacktestEngine:
         self.symbol = symbol
         self.trades = []
 
-        # v21 Constants
-        self.ATR_LEN = 14
-        self.MASS_LEN = 20
-        self.STRUCT_LEN = 20
-        self.FEE = 0.06  # Binance Taker % (approx)
+        # v28 Constants
+        self.SIGMA_WINDOW = 14
+        self.MASS_WINDOW = 20
+        self.STRUCT_WINDOW = 20
+        self.FEE = 0.06  # Binance Taker %
 
-    # ------------------------------------------------
-    # CORE RUN
-    # ------------------------------------------------
     def run(self, mode="INTRADAY"):
-        if self.df.empty:
+        if len(self.df) < 60:
             return self._empty_result()
 
-        # 1. Generate Features
-        try:
-            df = generate_features(self.df)
-        except Exception as e:
-            log.error(f"Backtest Feature Error: {e}")
-            return self._empty_result()
-
-        # ------------------------------------------------
-        # 2. PHYSICS CONSTRUCTION (Match v21)
-        # ------------------------------------------------
+        # 1. Feature Generation (Manual calculation to ensure match)
+        df = self.df.copy()
         close = df["close"]
         high = df["high"]
         low = df["low"]
         volume = df["volume"]
 
-        # --- A. PHYSICS VECTORS ---
-        # True Range & ATR
+        # ==================================================
+        # 2. PHYSICS CONSTRUCTION (v28 LOGIC)
+        # ==================================================
+
+        # A. Sigma (Volatility)
         tr1 = high - low
         tr2 = (high - close.shift()).abs()
         tr3 = (low - close.shift()).abs()
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        atr = tr.rolling(self.ATR_LEN).mean()
+        sigma = tr.rolling(self.SIGMA_WINDOW).mean()
 
-        # Velocity & Mass
-        velocity = close.diff() / (atr + 1e-9)
-        vol_mean = volume.rolling(self.MASS_LEN).mean()
-        mass = volume / (vol_mean + 1e-9)
+        # B. Kinetic Vectors
+        velocity = close.diff() / (sigma + 1e-9)
+        mass_mean = volume.rolling(self.MASS_WINDOW).mean()
+        mass = volume / (mass_mean + 1e-9)
 
-        # Kinetic Energy & Decay
-        signed_ke = mass * velocity
-        ke_decay = signed_ke.diff(3)
+        raw_force = mass * velocity
 
-        # --- B. STRUCTURE (Lagged) ---
-        roll_high = high.rolling(self.STRUCT_LEN).max().shift(1)
-        roll_low = low.rolling(self.STRUCT_LEN).min().shift(1)
+        # [v28] Hysteresis Smoothing
+        smooth_force = raw_force.rolling(3).mean()
+        force_decay = smooth_force.diff(3)
 
-        hh = high > roll_high
-        hl = low > roll_low
-        lh = high < roll_high
-        ll = low < roll_low
+        # C. Equilibrium Governor (EMA 50)
+        equilibrium = close.ewm(span=50, adjust=False).mean()
 
-        structure_up = hh & hl
-        structure_down = lh & ll
+        # D. Structure
+        roll_high = high.rolling(self.STRUCT_WINDOW).max().shift(1)
+        roll_low = low.rolling(self.STRUCT_WINDOW).min().shift(1)
 
-        # --- C. FAKEOUT DETECTION (Dynamic) ---
-        # v21 Logic: Range > 2.5 ATR and Low Volume Intensity
+        # E. Anomaly Filters
         candle_range = high - low
-        is_wide = candle_range > (2.5 * atr)
-        vol_intensity = volume / (vol_mean + 1e-9)
-        is_fake = is_wide & (vol_intensity < 0.8)
-
-        # --- D. RESONANCE ---
-        ht_velocity = close.diff(5) / (atr + 1e-9)
-        ht_ke = (mass * ht_velocity).rolling(5).mean()
-        resonance = np.sign(signed_ke) == np.sign(ht_ke)
+        is_wide = candle_range > (2.5 * sigma)
+        mass_intensity = volume / (mass_mean + 1e-9)
+        is_hollow = is_wide & (mass_intensity < 0.9)
 
         # ------------------------------------------------
         # 3. SIMULATION LOOP
@@ -96,26 +78,29 @@ class CryptoBacktestEngine:
         entry = stop = target = 0.0
         direction = 0
 
-        # Start after warmup period
-        start_idx = max(self.MASS_LEN, self.STRUCT_LEN, 50)
+        # Start after smoothing window is valid
+        start_idx = 55
 
         for i in range(start_idx, len(df)):
 
-            # Current Slice
+            # Context
             price = close.iloc[i]
             c_low = low.iloc[i]
             c_high = high.iloc[i]
-            c_atr = atr.iloc[i]
+            c_sigma = sigma.iloc[i]
 
-            # Physics Values
-            ke_now = signed_ke.iloc[i]
-            decay = ke_decay.iloc[i]
+            # Physics
+            force_now = smooth_force.iloc[i]
+            decay_val = force_decay.iloc[i]
+            c_mass = mass.iloc[i]
 
-            # Booleans
-            is_fake_now = is_fake.iloc[i]
-            struct_up_now = structure_up.iloc[i]
-            struct_down_now = structure_down.iloc[i]
-            res_now = resonance.iloc[i]
+            # Structure
+            base_line = equilibrium.iloc[i]
+            r_high = roll_high.iloc[i]
+            r_low = roll_low.iloc[i]
+
+            # Trap Check
+            is_trap = is_hollow.iloc[i] or (abs(force_now) > 3.5)
 
             # --------------------------------------------
             # EXIT LOGIC
@@ -131,8 +116,6 @@ class CryptoBacktestEngine:
                     elif c_high >= target:
                         exit_res = "WIN"
                         exit_price = target
-                    # Optional: Exit on Exhaustion Regime could go here
-
                 else:  # SHORT
                     if c_high >= stop:
                         exit_res = "STOP"
@@ -143,80 +126,112 @@ class CryptoBacktestEngine:
 
                 if exit_res:
                     pnl = (exit_price - entry) / entry * 100
-                    if direction == -1:
-                        pnl *= -1
-                    pnl -= self.FEE
+                    if direction == -1: pnl *= -1
+                    pnl -= self.FEE  # Fee impact
 
                     self.trades.append({
                         "result": exit_res,
                         "pnl": round(pnl, 2),
                         "entry": entry,
                         "exit": exit_price,
-                        "index": i
                     })
                     position = None
                     continue
 
             # --------------------------------------------
-            # ENTRY LOGIC (Regime Based)
+            # ENTRY LOGIC (v28 Strict)
             # --------------------------------------------
             if not position:
 
-                # 1. Determine Regime (Auto-Switcher)
+                # 1. Determine Regime (v28 Thresholds)
                 regime = "IDLE"
-                if abs(ke_now) < 0.5 and abs(decay) < 0.1:
+                if abs(force_now) < 0.6:
                     regime = "COMPRESSION"
-                elif abs(ke_now) > 1.5 and decay > 0:
+                elif abs(force_now) > 2.0 and decay_val > 0:
                     regime = "EXPANSION"
-                elif abs(ke_now) > 0.8 and decay >= -0.2:
+                elif abs(force_now) > 0.8:
                     regime = "TREND"
-                elif decay < -0.5:
+                elif decay_val < -0.5:
                     regime = "EXHAUSTION"
 
                 bias = "HOLD"
+                lane = "HOLD"
 
-                # 2. Decision Matrix
+                # Quality Check
+                is_high_quality = c_mass > 1.2
+
+                # Governor Check
+                is_positive = price > base_line
+                is_negative = price < base_line
+
+                # --- A. TREND ---
                 if regime == "TREND":
-                    if ke_now > 0 and (struct_up_now or res_now) and not is_fake_now:
+                    if force_now > 0 and is_positive and not is_trap and is_high_quality:
                         bias = "LONG"
-                    elif ke_now < 0 and (struct_down_now or res_now) and not is_fake_now:
+                        lane = "TREND"
+                    elif force_now < 0 and is_negative and not is_trap and is_high_quality:
                         bias = "SHORT"
+                        lane = "TREND"
 
+                # --- B. EXPANSION ---
                 elif regime == "EXPANSION":
-                    # Breakouts need higher energy threshold
-                    if ke_now > 1.2 and not is_fake_now:
+                    if force_now > 2.0 and not is_trap and is_positive:
                         bias = "LONG"
-                    elif ke_now < -1.2 and not is_fake_now:
+                        lane = "BREAKOUT"
+                    elif force_now < -2.0 and not is_trap and is_negative:
                         bias = "SHORT"
+                        lane = "BREAKOUT"
+
+                # --- C. RANGE (Compression) ---
+                elif regime == "COMPRESSION":
+                    # Range Width Check (>1.5%)
+                    if r_low > 0:
+                        width = (r_high - r_low) / r_low
+                        if width > 0.015:
+                            dist_sup = (price - r_low) / r_low
+                            dist_res = (r_high - price) / r_high
+                            c_vel = velocity.iloc[i]
+
+                            # Long Support (Only if NOT crashing)
+                            if dist_sup < 0.01 and c_vel > 0 and not is_negative:
+                                bias = "LONG"
+                                lane = "RANGE"
+
+                            # Short Resistance (Only if NOT pumping)
+                            elif dist_res < 0.01 and c_vel < 0 and not is_positive:
+                                bias = "SHORT"
+                                lane = "RANGE"
 
                 # 3. Execution
                 if bias != "HOLD":
                     direction = 1 if bias == "LONG" else -1
 
-                    # v21 Sizing Logic
-                    stop_mult = 2.5 if regime == "EXPANSION" else 1.5
-
-                    # Using "Target 2" from v21 as the backtest target
-                    if regime == "EXPANSION":
-                        target_mult = 3.0  # Quick scalp in volatility
-                    else:
-                        target_mult = 3.5  # Ride the trend
+                    # Sizing based on Lane
+                    if lane == "RANGE":
+                        stop_mult = 1.0
+                        target_mult = 1.0  # 1:1 RR for Range
+                    elif lane == "BREAKOUT":
+                        stop_mult = 1.8
+                        target_mult = 3.0
+                    else:  # Trend
+                        stop_mult = 1.5
+                        target_mult = 3.5
 
                     entry = price
-                    stop = price - (direction * c_atr * stop_mult)
-                    target = price + (direction * c_atr * target_mult)
+                    stop = price - (direction * c_sigma * stop_mult)
+
+                    # For Range, Target is Fixed Level
+                    if lane == "RANGE":
+                        target = r_high if bias == "LONG" else r_low
+                    else:
+                        target = price + (direction * c_sigma * target_mult)
 
                     position = bias
 
         return self._stats()
 
-    # ------------------------------------------------
-    # STATS GENERATION
-    # ------------------------------------------------
     def _stats(self):
-        if not self.trades:
-            return self._empty_result()
-
+        if not self.trades: return self._empty_result()
         wins = [t for t in self.trades if t["pnl"] > 0]
         losses = [t for t in self.trades if t["pnl"] < 0]
 
@@ -233,9 +248,4 @@ class CryptoBacktestEngine:
         }
 
     def _empty_result(self):
-        return {
-            "total_trades": 0,
-            "win_rate": 0.0,
-            "profit_factor": 0.0,
-            "recent_trades": []
-        }
+        return {"total_trades": 0, "win_rate": 0.0, "profit_factor": 0.0, "recent_trades": []}
