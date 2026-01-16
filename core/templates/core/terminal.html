@@ -1,7 +1,7 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="min-h-screen bg-[#020617] text-slate-300 selection:bg-blue-500/30 overflow-x-hidden relative"
+<div class="min-h-screen bg-[#020617] text-slate-300 selection:bg-violet-500/30 overflow-x-hidden relative"
      x-data="{
         symbol: '',
         mode: 'INTRADAY',
@@ -16,7 +16,7 @@
                     text: 'Please enter a coin symbol (e.g. BTC) to run the analysis.',
                     background: '#0f172a',
                     color: '#fff',
-                    confirmButtonColor: '#2563eb'
+                    confirmButtonColor: '#7c3aed'
                 });
                 return;
             }
@@ -28,12 +28,12 @@
         $el.addEventListener('mode-change', (e) => { mode = e.detail; });
      ">
 
-    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-violet-600/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
     <div class="relative z-30 w-full border-b border-white/5 bg-[#0b1121]/80 backdrop-blur-md"
          hx-get="{% url 'hx_ticker' %}"
          hx-trigger="load">
-         <div class="h-12 flex items-center justify-center"><div class="w-4 h-4 border-2 border-slate-600 border-t-blue-500 rounded-full animate-spin"></div></div>
+         <div class="h-12 flex items-center justify-center"><div class="w-4 h-4 border-2 border-slate-600 border-t-violet-500 rounded-full animate-spin"></div></div>
     </div>
 
     <div class="relative z-10 max-w-[1400px] mx-auto md:px-4 md:py-6">
@@ -53,7 +53,7 @@
                                 Intraday
                             </button>
                             <button @click="mode='SCALP'; $dispatch('mode-change', 'SCALP')"
-                                    :class="mode==='SCALP' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'text-slate-500 hover:text-white'"
+                                    :class="mode==='SCALP' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/30' : 'text-slate-500 hover:text-white'"
                                     class="flex-1 md:flex-none px-5 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all duration-200">
                                 Scalp
                             </button>
@@ -64,7 +64,7 @@
                                     hx-get="{% url 'hx_alpha_scan' %}"
                                     hx-target="#alpha-content"
                                     hx-indicator="#alpha-loader"
-                                    class="w-full md:w-auto px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transition-all transform hover:-translate-y-0.5 border border-white/20 flex items-center justify-center gap-2">
+                                    class="w-full md:w-auto px-6 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-black text-[10px] uppercase tracking-widest shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all transform hover:-translate-y-0.5 border border-white/20 flex items-center justify-center gap-2">
                                 <i data-lucide="crosshair" class="w-4 h-4 text-white/70"></i>
                                 <span>Find Alpha</span>
                             </button>
@@ -78,14 +78,15 @@
 
                     <div class="hidden md:flex items-center gap-3 bg-[#020617]/50 px-4 py-2 rounded-lg border border-white/5">
                         <span class="relative flex h-2 w-2">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-lg bg-blue-400 opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-lg bg-violet-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
                         </span>
                         <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Quant Engine Online</span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+
                     <div class="lg:col-span-4 space-y-6">
                         <form hx-post="{% url 'hx_analyze' %}"
                               hx-target="#results-view"
@@ -96,8 +97,8 @@
 
                             <div class="relative group">
                                 <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Target Asset</label>
-                                <div class="flex items-center gap-4 bg-[#020617] border border-slate-700 rounded-xl px-5 py-5 focus-within:border-blue-500 transition shadow-inner">
-                                    <i data-lucide="search" class="w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition"></i>
+                                <div class="flex items-center gap-4 bg-[#020617] border border-slate-700 rounded-xl px-5 py-5 focus-within:border-violet-500 transition shadow-inner">
+                                    <i data-lucide="search" class="w-5 h-5 text-slate-500 group-focus-within:text-violet-500 transition"></i>
                                     <input type="text" name="symbol" x-model="symbol"
                                            @input="if(symbol.length < 1) suggestions=[]; else suggestions = allSymbols.filter(s => s.includes(symbol.toUpperCase())).slice(0, 5)"
                                            class="bg-transparent border-none text-white w-full outline-none font-mono text-xl uppercase font-black placeholder-slate-700"
@@ -120,7 +121,7 @@
 
                             <input type="hidden" name="mode" x-model="mode">
 
-                            <button type="submit" class="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 transition-all transform active:scale-[0.98] border border-white/10 flex items-center justify-center gap-3">
+                            <button type="submit" class="w-full py-5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-violet-900/20 transition-all transform active:scale-[0.98] border border-white/10 flex items-center justify-center gap-3">
                                 <i data-lucide="zap" class="w-4 h-4"></i> Run Reelioo Scan
                             </button>
                         </form>
@@ -128,7 +129,7 @@
                         <button hx-post="{% url 'hx_backtest' %}"
                                 hx-target="#backtest-content"
                                 hx-include="[name='symbol'], [name='mode']"
-                                @click="if(!symbol){ Swal.fire({icon:'warning', title:'Input Required', text:'Enter a coin symbol first.', background:'#0f172a', color:'#fff'}); } else { document.getElementById('backtest-modal').classList.remove('hidden') }"
+                                @click="if(!symbol){ Swal.fire({icon:'warning', title:'Input Required', text:'Enter a coin symbol first.', background:'#0f172a', color:'#fff', confirmButtonColor:'#7c3aed'}); } else { document.getElementById('backtest-modal').classList.remove('hidden') }"
                                 class="w-full py-4 rounded-xl border border-slate-700 bg-[#020617] text-slate-400 hover:text-white hover:border-slate-500 transition font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
                             <i data-lucide="history" class="w-4 h-4"></i> Run Historical Simulation
                         </button>
@@ -138,11 +139,11 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <button type="button" @click="symbol='BTCUSDT'; $nextTick(() => validateSearch())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-orange-500/50 transition group text-left w-full">
                                     <div class="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500"><i data-lucide="bitcoin" class="w-5 h-5"></i></div>
-                                    <div><div class="text-sm font-black text-white">BTC</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-orange-400">LEADER</div></div>
+                                    <div><div class="text-sm font-black text-white">BTC</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-orange-400">MARKET LEADER</div></div>
                                 </button>
-                                <button type="button" @click="symbol='ETHUSDT'; $nextTick(() => validateSearch())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-blue-500/50 transition group text-left w-full">
-                                    <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500"><i data-lucide="layers" class="w-5 h-5"></i></div>
-                                    <div><div class="text-sm font-black text-white">ETH</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-blue-400">SMART</div></div>
+                                <button type="button" @click="symbol='ETHUSDT'; $nextTick(() => validateSearch())" class="flex items-center gap-3 p-4 rounded-xl bg-[#0f172a] border border-slate-800 hover:border-indigo-500/50 transition group text-left w-full">
+                                    <div class="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500"><i data-lucide="layers" class="w-5 h-5"></i></div>
+                                    <div><div class="text-sm font-black text-white">ETH</div><div class="text-[9px] font-bold text-slate-500 group-hover:text-indigo-400">SMART MONEY</div></div>
                                 </button>
                             </div>
                         </div>
@@ -158,8 +159,8 @@
                         </div>
 
                         <div id="loading-view" class="htmx-indicator absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#020617]">
-                            <div class="w-16 h-16 border-2 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-6"></div>
-                            <p class="text-[10px] font-bold font-mono text-blue-400 animate-pulse tracking-widest">CALCULATING VECTORS...</p>
+                            <div class="w-16 h-16 border-2 border-slate-800 border-t-violet-500 rounded-full animate-spin mb-6"></div>
+                            <p class="text-[10px] font-bold font-mono text-violet-400 animate-pulse tracking-widest">CALCULATING VECTORS...</p>
                         </div>
                     </div>
                 </div>
@@ -172,14 +173,14 @@
          x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
          x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
 
-        <div class="w-full max-w-md bg-[#0b1121] border border-white/10 rounded-3xl shadow-[0_0_100px_rgba(59,130,246,0.1)] relative overflow-hidden min-h-[300px]"
+        <div class="w-full max-w-md bg-[#0b1121] border border-white/10 rounded-3xl shadow-[0_0_100px_rgba(124,58,237,0.1)] relative overflow-hidden min-h-[300px]"
              @click.outside="showAlpha = false">
 
             <button @click="showAlpha = false" class="absolute top-6 right-6 text-slate-500 hover:text-white transition z-50"><i data-lucide="x" class="w-6 h-6"></i></button>
 
             <div id="alpha-loader" class="htmx-indicator flex flex-col items-center justify-center py-12 h-full absolute inset-0 bg-[#0b1121] z-40">
-                <div class="w-16 h-16 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-8"></div>
-                <p class="text-xs font-black text-blue-500 animate-pulse tracking-[0.3em] uppercase">Scanning Global Vectors...</p>
+                <div class="w-16 h-16 border-4 border-slate-800 border-t-violet-500 rounded-full animate-spin mb-8"></div>
+                <p class="text-xs font-black text-violet-500 animate-pulse tracking-[0.3em] uppercase">Scanning Global Vectors...</p>
             </div>
 
             <div id="alpha-content"></div>
@@ -201,7 +202,6 @@
 
 <style>
     .glass-panel { background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 24px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05); }
-    /* Mobile-specific adjustments are handled via Tailwind classes in HTML */
     .htmx-indicator { display: none; }
     .htmx-request .htmx-indicator { display: flex; }
     .htmx-request.htmx-indicator { display: flex; }

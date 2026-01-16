@@ -1,7 +1,6 @@
 <tr class="hover:bg-white/[0.03] transition-colors duration-200 group"
     id="row-{{ entry.id }}">
 
-    <!-- DATE -->
     <td class="py-5 px-6 align-middle">
         <div class="flex flex-col gap-0.5">
             <span class="text-xs font-bold font-mono text-slate-300">
@@ -13,7 +12,6 @@
         </div>
     </td>
 
-    <!-- SYMBOL -->
     <td class="py-5 px-6 align-middle">
         <div class="flex flex-col gap-0.5">
             <span class="font-black text-white text-sm tracking-tight">
@@ -25,7 +23,6 @@
         </div>
     </td>
 
-    <!-- BIAS -->
     <td class="py-5 px-6 align-middle">
         {% if entry.bias == 'LONG' %}
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
@@ -38,12 +35,10 @@
         {% endif %}
     </td>
 
-    <!-- PRICES -->
     <td class="py-5 px-6 align-middle text-right font-mono text-xs text-slate-400">{{ entry.entry_price }}</td>
     <td class="py-5 px-6 align-middle text-right font-mono text-xs font-bold text-emerald-500/80">{{ entry.target }}</td>
     <td class="py-5 px-6 align-middle text-right font-mono text-xs font-bold text-red-500/80">{{ entry.stop_loss }}</td>
 
-    <!-- STATUS -->
     <td class="py-5 px-6 align-middle text-center">
         <span class="inline-flex justify-center w-24 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest
             {% if entry.status == 'PENDING' %}bg-yellow-500/10 border border-yellow-500/20 text-yellow-500
@@ -54,7 +49,6 @@
         </span>
     </td>
 
-    <!-- ACTIONS -->
     <td class="py-5 px-6 align-middle text-right">
         <div class="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition">
 
@@ -62,7 +56,7 @@
                 hx-post="{% url 'refresh_journal_entry' entry.id %}"
                 hx-target="#row-{{ entry.id }}"
                 hx-swap="outerHTML"
-                class="p-2 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-blue-500/20 transition"
+                class="p-2 rounded-lg text-slate-400 hover:text-violet-400 hover:bg-violet-500/20 transition"
                 title="Sync Live Price">
 
                 <i data-lucide="refresh-cw" class="w-4 h-4 rotate-while-loading"></i>

@@ -1,7 +1,5 @@
 import os
 import csv
-import hmac
-import hashlib
 import json
 import logging
 import requests
@@ -28,14 +26,9 @@ from .quant.crypto_engine import CryptoQuantEngine
 from .backtest.backtest_engine import CryptoBacktestEngine
 from .services.marketdata_service import MarketService
 from .models import JournalEntry, UserProfile
-from .forms import UserUpdateForm, SignupForm
+from .services.gumroad_service import verify_gumroad_license
 
 log = logging.getLogger(__name__)
-
-# --- LEMON SQUEEZY CONFIG ---
-LS_API_KEY = os.getenv("LEMONSQUEEZY_API_KEY")
-LS_VARIANT_ID = os.getenv("LEMONSQUEEZY_VARIANT_ID")
-LS_SIGNING_SECRET = os.getenv("LEMONSQUEEZY_SIGNING_SECRET")
 
 
 # =========================================================
@@ -72,49 +65,65 @@ def generate_market_narrative(res):
     return "Liquidity is thin and direction is unclear. Expect stop-hunts."
 
 
+def verify_subscription_status(user):
+    """
+    Helper to check Gumroad status periodically.
+    Used in terminal_view and get_access_view.
+    """
+    if not hasattr(user, 'profile'): return
+
+    profile = user.profile
+
+    # Skip check for superusers
+    if user.is_superuser: return
+
+    # Only check if 24 hours passed since last check
+    if profile.needs_verification():
+        is_valid, msg = verify_gumroad_license(profile.gumroad_license_key)
+
+        if is_valid:
+            profile.is_premium = True
+            profile.last_verified_at = timezone.now()
+        else:
+            profile.is_premium = False  # Revoke access
+
+        profile.save()
+
+
 # =========================================================
-#  PUBLIC & AUTH
+#  AUTH (UNIFIED GUMROAD FLOW)
 # =========================================================
 
-def landing_view(request):
-    if request.user.is_authenticated: return redirect('terminal')
-    return render(request, 'core/landing.html')
+def get_access_view(request):
+    """
+    The Single Entry Point.
+    User enters Username + Key.
+    - If user exists -> Login.
+    - If new -> Create + Login.
+    """
+    if request.user.is_authenticated:
+        return redirect('terminal')
 
-
-def signup_view(request):
-    if request.user.is_authenticated: return redirect('terminal')
     if request.method == 'POST':
-        form = SignupForm(request.POST)
-        if form.is_valid():
-            user = form.save()
+        username = request.POST.get('username', '').strip()
+        key = request.POST.get('license_key', '').strip()
+
+        if not username or not key:
+            messages.error(request, "Username and License Key are required.")
+            return render(request, 'core/auth/get_access.html')
+
+        # This triggers LicenseKeyBackend.authenticate
+        user = authenticate(request, username=username, license_key=key)
+
+        if user:
             login(request, user)
-            # Welcome Email
-            try:
-                send_mail("Welcome to Reelioo", f"Protocol Initialized for {user.username}.",
-                          settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
-            except:
-                pass
-            return redirect('pricing')
-    else:
-        form = SignupForm()
-    return render(request, 'core/auth/signup.html', {'form': form})
+            # Check status immediately on fresh login
+            verify_subscription_status(user)
+            return redirect('terminal')
+        else:
+            messages.error(request, "Access Denied. Invalid Key or Username mismatch.")
 
-
-def login_view(request):
-    if request.user.is_authenticated: return redirect('terminal')
-    if request.method == 'POST':
-        try:
-            from django.contrib.auth.models import User
-            user_obj = User.objects.get(email__iexact=request.POST.get('email'))
-            user = authenticate(username=user_obj.username, password=request.POST.get('password'))
-            if user:
-                login(request, user)
-                return redirect('terminal')
-            else:
-                messages.error(request, "Invalid credentials.")
-        except:
-            messages.error(request, "User not found.")
-    return render(request, 'core/auth/login.html')
+    return render(request, 'core/auth/get_access.html')
 
 
 def logout_view(request):
@@ -122,100 +131,37 @@ def logout_view(request):
     return redirect('landing')
 
 
+def landing_view(request):
+    if request.user.is_authenticated: return redirect('terminal')
+    return render(request, 'core/landing.html')
+
+
 # =========================================================
-#  TERMINAL & SETTINGS
+#  TERMINAL
 # =========================================================
 
 @login_required
 def terminal_view(request):
+    # 1. Periodically verify license (e.g. daily)
+    verify_subscription_status(request.user)
+
     profile = request.user.profile
     if not profile.is_access_granted():
         messages.warning(request, "Access Expired. Please Renew.")
         return redirect('pricing')
+
     return render(request, 'core/terminal.html')
 
 
-@login_required
-def settings_view(request):
-    if request.method == 'POST':
-        form = UserUpdateForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            return render(request, 'core/auth/profile_saved.html')
-    else:
-        form = UserUpdateForm(instance=request.user)
-    return render(request, 'core/auth/settings.html', {'form': form})
-
-
 # =========================================================
-#  LEMON SQUEEZY PAYMENT
+#  PAYMENT (PRICING ONLY)
 # =========================================================
 
 @login_required
 def pricing_view(request):
-    url = f"https://reelioo.lemonsqueezy.com/checkout/buy/{LS_VARIANT_ID}?checkout[email]={request.user.email}&checkout[custom][user_id]={request.user.id}"
-    return render(request, 'core/pricing.html', {"checkout_url": url, "is_premium": request.user.profile.is_premium})
-
-
-@login_required
-def billing_portal_view(request):
-    sub_id = request.user.profile.lemon_squeezy_subscription_id
-    if not sub_id: return redirect('pricing')
-    try:
-        r = requests.get(f"https://api.lemonsqueezy.com/v1/subscriptions/{sub_id}",
-                         headers={"Authorization": f"Bearer {LS_API_KEY}", "Accept": "application/vnd.api+json"})
-        return redirect(r.json()['data']['attributes']['urls']['customer_portal'])
-    except:
-        return redirect('settings')
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def lemon_squeezy_webhook(request):
-    signature = request.headers.get("X-Signature")
-    if not signature or not LS_SIGNING_SECRET: return HttpResponse("No Sig", status=403)
-
-    digest = hmac.new(LS_SIGNING_SECRET.encode('utf-8'), request.body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(digest, signature): return HttpResponse("Bad Sig", status=403)
-
-    try:
-        data = json.loads(request.body)
-        meta = data.get('meta', {})
-        event = meta.get('event_name')
-        attrs = data.get('data', {}).get('attributes', {})
-
-        user_id = attrs.get('checkout_data', {}).get('custom', {}).get('user_id')
-        email = attrs.get('user_email')
-
-        from django.contrib.auth.models import User
-        user = None
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-            except:
-                pass
-        if not user and email:
-            try:
-                user = User.objects.get(email__iexact=email)
-            except:
-                pass
-
-        if user:
-            profile = user.profile
-            if event in ['subscription_created', 'subscription_updated', 'subscription_resumed']:
-                profile.is_premium = True
-                profile.subscription_status = attrs.get('status', 'active')
-                profile.lemon_squeezy_subscription_id = data.get('data', {}).get('id')
-                if attrs.get('renews_at'): profile.subscription_end_date = parser.parse(attrs.get('renews_at'))
-                profile.save()
-            elif event in ['subscription_cancelled', 'subscription_expired']:
-                profile.is_premium = False
-                profile.subscription_status = 'expired'
-                profile.save()
-
-        return HttpResponse("OK")
-    except:
-        return HttpResponse("Error", status=500)
+    # Just render the template with the Gumroad link
+    # No API logic needed here anymore
+    return render(request, 'core/pricing.html', {"is_premium": request.user.profile.is_premium})
 
 
 # =========================================================
@@ -290,7 +236,8 @@ def hx_alpha_scan(request):
     """VIP Alpha Scanner"""
     if not has_access(request.user): return HttpResponse("DENIED")
 
-    vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT", "WIFUSDT", "SUIUSDT", "MATICUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"]
+    vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT",
+                  "WIFUSDT", "SUIUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"]
     engine = CryptoQuantEngine()
     results = []
 
@@ -512,8 +459,8 @@ def ops_dashboard_view(request):
     # 2. METRICS
     users = User.objects.count()
 
-    # FIX: Count users where subscription_status is 'active' (instead of looking for is_premium)
-    subs = UserProfile.objects.filter(subscription_status='active').count()
+    # FIX: Count users where is_premium is True (Correct for Gumroad)
+    subs = UserProfile.objects.filter(is_premium=True).count()
 
     signals = JournalEntry.objects.count()
     wins = JournalEntry.objects.filter(status='WIN').count()
@@ -526,7 +473,7 @@ def ops_dashboard_view(request):
 
     return render(request, 'core/ops_dashboard.html', {
         'total_users': users,
-        'active_subs': subs,  # This now passes the correct count of active subs
+        'active_subs': subs,
         'total_signals': signals,
         'win_rate': win_rate,
         'recent_signals': feed
@@ -643,7 +590,7 @@ def cron_scan_trigger(request, secret_key=None):
 
     active_users = User.objects.filter(
         Q(is_superuser=True) |
-        Q(profile__subscription_status='active')
+        Q(profile__is_premium=True)  # CHANGED: Now uses is_premium for Gumroad
     ).distinct()
 
     engine = CryptoQuantEngine()
@@ -726,6 +673,7 @@ def global_symbols_view(request):
 def search_crypto_view(request):
     return JsonResponse(MarketService.search_assets(request.GET.get("q", "")), safe=False)
 
+
 # =========================================================
 #  STATIC
 # =========================================================
@@ -751,5 +699,3 @@ def robots_view(request): return HttpResponse("User-agent: *\nDisallow:", conten
 
 
 def sitemap_view(request): return HttpResponse("", content_type="application/xml")
-
-

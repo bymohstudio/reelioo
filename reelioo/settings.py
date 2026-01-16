@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 TAILWIND_APP_NAME = "theme"
 
 NPM_BIN_PATH = "/usr/bin/npm"
+#NPM_BIN_PATH= r"C:\Program Files\nodejs\npm.cmd"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -160,6 +161,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Add/Update this section
+AUTHENTICATION_BACKENDS = [
+    'core.backends.LicenseKeyBackend',          # <--- YOUR NEW AUTH
+    'django.contrib.auth.backends.ModelBackend', # <--- Keep this for Admin Panel login
+]
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -192,7 +199,7 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # --- REDIRECTS ---
-LOGIN_URL = 'login'
+LOGIN_URL = 'get_access'
 LOGIN_REDIRECT_URL = 'terminal'
 LOGOUT_REDIRECT_URL = 'landing'
 

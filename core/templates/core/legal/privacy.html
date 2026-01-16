@@ -2,16 +2,17 @@
 {% block title %}Privacy Policy | Reelioo Intelligence{% endblock %}
 {% block content %}
 <main class="relative max-w-4xl mx-auto px-6 py-20 text-slate-300 font-sans">
+
   <div class="absolute inset-0 -z-10 flex justify-center">
-    <div class="w-[800px] h-[800px] blur-[160px] rounded-full bg-blue-900/20 opacity-30"></div>
+    <div class="w-[800px] h-[800px] blur-[160px] rounded-full bg-violet-900/20 opacity-30"></div>
   </div>
 
   <header class="mb-12 border-b border-white/10 pb-8">
     <h1 class="text-4xl font-black text-white mb-4">Privacy Policy</h1>
-    <p class="text-sm text-slate-500 uppercase tracking-widest">Last Updated: December 14, 2025</p>
+    <p class="text-sm text-slate-500 uppercase tracking-widest">Last Updated: January 15, 2026</p>
   </header>
 
-  <div class="space-y-10 leading-relaxed text-sm">
+  <div class="space-y-10 leading-relaxed text-sm bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl">
 
     <section>
       <h3 class="text-lg font-bold text-white mb-3">1. Overview</h3>
@@ -20,15 +21,15 @@
 
     <section>
       <h3 class="text-lg font-bold text-white mb-3">2. Information We Collect</h3>
-      <p>We collect only the minimum data necessary to operate and improve the platform.</p>
+      <p>We collect only the minimum data necessary to operate the platform and validate licenses.</p>
 
       <div class="mt-4 space-y-4 pl-4 border-l border-white/10">
         <div>
             <strong class="block text-slate-200 mb-1">2.1 Identity & Account Data</strong>
             <ul class="list-disc pl-5 text-slate-400">
-                <li>Email address</li>
-                <li>Username</li>
-                <li>Encrypted password hash</li>
+                <li>Username / Handle</li>
+                <li>License Key (via Gumroad)</li>
+                <li>Email address (for account recovery and alerts)</li>
             </ul>
         </div>
         <div>
@@ -36,7 +37,7 @@
             <ul class="list-disc pl-5 text-slate-400">
                 <li>IP address</li>
                 <li>Device and session identifiers</li>
-                <li>Access logs for fraud prevention, security monitoring, and system integrity</li>
+                <li>Access logs for fraud prevention and system integrity</li>
             </ul>
         </div>
       </div>
@@ -46,18 +47,19 @@
       <h3 class="text-lg font-bold text-white mb-3">3. Purpose of Data Processing</h3>
       <p>We process your data to:</p>
       <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-400">
-        <li>Provide and maintain the Reelioo service</li>
-        <li>Secure user accounts and prevent abuse</li>
-        <li>Improve platform functionality and user experience</li>
+        <li>Provide access to the Terminal via License verification</li>
+        <li>Secure user accounts and prevent concurrent session abuse</li>
+        <li>Send requested alerts (e.g., Discord/Email notifications)</li>
       </ul>
     </section>
 
     <section>
-      <h3 class="text-lg font-bold text-white mb-3">4. AI & Data Processing</h3>
-      <p>Reelioo uses AI services (including OpenAI) to generate market analysis and insights.</p>
+      <h3 class="text-lg font-bold text-white mb-3">4. Algorithmic Data Processing</h3>
+      <p>Reelioo uses proprietary deterministic algorithms to process public market data.</p>
       <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-400">
-        <li>Market data sent for AI processing is anonymized and decoupled from user identity</li>
-        <li>Personal trading history, balances, or PnL are never shared with third-party AI providers</li>
+        <li>All market analysis is performed on our internal servers using mathematical physics models.</li>
+        <li>We do <strong>not</strong> share your personal data, trading history, or journal entries with third-party AI models, LLMs, or data aggregators.</li>
+        <li>Your trading journal data remains private to your account.</li>
       </ul>
     </section>
 
@@ -65,15 +67,15 @@
       <h3 class="text-lg font-bold text-white mb-3">5. Payments & Financial Information</h3>
       <p>Reelioo does not store credit card or banking details.</p>
       <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-400">
-        <li>All payments are processed via <strong>Razorpay</strong>, a PCI-DSS compliant payment gateway</li>
-        <li>We retain only transaction identifiers and subscription status linked to your account</li>
+        <li>All payments and subscriptions are processed securely via <strong>Gumroad</strong>.</li>
+        <li>We only retain the License Key and Subscription Status provided by Gumroad API to grant access.</li>
       </ul>
     </section>
 
     <section>
-      <h3 class="text-lg font-bold text-white mb-3">11. Contact</h3>
-      <p>For privacy-related questions or requests, contact us at:</p>
-      <a href="mailto:reeliooapp@gmail.com" class="block mt-2 text-xl font-mono text-emerald-400 hover:text-emerald-300 transition">📧 reeliooapp@gmail.com</a>
+      <h3 class="text-lg font-bold text-white mb-3">6. Contact</h3>
+      <p>For privacy-related questions or data deletion requests, contact us at:</p>
+      <a href="mailto:reeliooapp@gmail.com" class="block mt-2 text-xl font-mono text-violet-400 hover:text-violet-300 transition">📧 reeliooapp@gmail.com</a>
     </section>
 
   </div>

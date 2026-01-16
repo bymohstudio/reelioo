@@ -12,18 +12,20 @@
                 <span>Data Retention Policy: Signals older than 90 days are automatically overwritten.</span>
             </p>
         </div>
-        <div class="bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-blue-900/10">
+
+        <div class="bg-violet-500/10 border border-violet-500/20 px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg shadow-violet-900/10">
             <div class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
             </div>
-            <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Live Sync Active</span>
+            <span class="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Live Sync Active</span>
         </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
             <div class="flex justify-between items-start relative z-10">
                 <div>
                     <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Net Growth (ROI)</span>
@@ -42,9 +44,10 @@
                     <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Profit Factor</span>
                     <div class="flex items-baseline gap-2">
                         <span class="text-3xl font-black text-white tracking-tighter">{{ profit_factor }}</span>
+
                         <span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded border
                             {% if profit_factor >= 2.0 %}text-emerald-400 border-emerald-500/30 bg-emerald-500/10
-                            {% elif profit_factor >= 1.5 %}text-blue-400 border-blue-500/30 bg-blue-500/10
+                            {% elif profit_factor >= 1.5 %}text-violet-400 border-violet-500/30 bg-violet-500/10
                             {% elif profit_factor >= 1.0 %}text-yellow-400 border-yellow-500/30 bg-yellow-500/10
                             {% else %}text-red-400 border-red-500/30 bg-red-500/10{% endif %}">
                             {% if profit_factor >= 2.0 %}EXCELLENT
@@ -61,7 +64,10 @@
         <div class="bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
             <div class="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500"></div>
             <div class="flex justify-between items-start relative z-10">
-                <div><span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span><span class="text-3xl font-black text-blue-400 tracking-tighter">{{ active_pending }}</span></div>
+                <div>
+                    <span class="text-[10px] uppercase text-slate-500 font-bold tracking-widest block mb-1">Active Signals</span>
+                    <span class="text-3xl font-black text-violet-400 tracking-tighter">{{ active_pending }}</span>
+                </div>
                 <div class="p-2 bg-white/5 rounded-lg text-slate-400"><i data-lucide="activity" class="w-5 h-5"></i></div>
             </div>
         </div>
@@ -115,7 +121,8 @@
         const data = evt.detail;
 
         // Define colors based on type
-        let iconColor = '#3b82f6'; // info (blue)
+        // Info is now Violet (Purple)
+        let iconColor = '#8b5cf6'; // violet-500
         if(data.type === 'success') iconColor = '#4ade80'; // success (green)
         if(data.type === 'error') iconColor = '#f87171'; // error (red)
         if(data.type === 'warning') iconColor = '#fbbf24'; // warning (yellow)
