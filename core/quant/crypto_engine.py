@@ -9,13 +9,13 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO KINETIC ENGINE v28.2 – LOGIC VECTOR FIX
+    REELIOO KINETIC ENGINE v28.3 – CRITICAL HOTFIX
 
-    UPDATES:
-    --------
+    FIXES:
+    ------
+    ✓ TYPE ERROR FIX: Removed redundant .iloc calls on scalar values.
     ✓ ROBUST VECTORS: Ensures no signal (LONG/SHORT/WATCH/HOLD) ever has empty logic tags.
     ✓ STATE COVERAGE: Added explicit handling for 'WATCH' (Building) state.
-    ✓ DYNAMIC DATA: Tags now show the exact Sigma/Volume numbers driving the decision.
     """
 
     def __init__(self):
@@ -99,6 +99,8 @@ class CryptoQuantEngine:
             # ==================================================
             candle_range = high - low
             is_wide_range = candle_range.iloc[-1] > (2.5 * current_sigma)
+
+            # NOTE: mass_intensity is calculated as a scalar here (using .iloc[-1])
             mass_intensity = volume.iloc[-1] / (mass_mean.iloc[-1] + 1e-9)
 
             is_hollow = (is_wide_range and mass_intensity < 0.9)
@@ -139,7 +141,8 @@ class CryptoQuantEngine:
         lane = "⚫ HOLD"
         score = 50
 
-        is_high_quality = mass.iloc[-1] > 1.2
+        # Note: mass is the Series, mass_intensity is the scalar
+        is_high_quality = mass_intensity > 1.2
 
         # A. TREND
         if regime == "TREND":
@@ -232,7 +235,8 @@ class CryptoQuantEngine:
         # ==========================================================
         # 10. ROBUST LOGIC VECTORS (NEVER BLANK)
         # ==========================================================
-        whale_z = float(mass_intensity.iloc[-1] - 1.0)
+        # FIX: Removed .iloc[-1] because mass_intensity is already a scalar float from Step 4
+        whale_z = float(mass_intensity - 1.0)
         whale_state = "ACTIVE" if abs(whale_z) >= 2.0 else "BASELINE"
         whale_label = "Institutional" if whale_state == "ACTIVE" else "Standard"
 
@@ -255,9 +259,10 @@ class CryptoQuantEngine:
                 top_features.append({"desc": f"Trend Strength ({force_now:.1f}σ)", "importance": 90})
 
             # 2. Volume Context
-            vol_x = mass_intensity.iloc[-1]
+            # FIX: Removed .iloc[-1] here as well
+            vol_x = mass_intensity
             if whale_state == "ACTIVE":
-                top_features.append({"desc": f"Whale Volume ({vol_x:.1f}x Avg)", "importance": 85})
+                top_features.append({"desc": f"Whale Volume Detected ({vol_x:.1f}x Avg)", "importance": 85})
             elif is_high_quality:
                 top_features.append({"desc": f"Healthy Volume ({vol_x:.1f}x Avg)", "importance": 80})
 
