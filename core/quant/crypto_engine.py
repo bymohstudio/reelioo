@@ -9,31 +9,32 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO PHYSICS ENGINE v26 – PROFESSIONAL GRADE
+    REELIOO KINETIC ENGINE v28 – INSTITUTIONAL GRADE
 
-    UPDATES (v26)
-    -------------
-    ✓ MEAN REVERSION: Now trades the "Chop" (Buys Support / Sells Resistance) in Compression.
-    ✓ MARKET CONTEXT: Accepts BTC data to filter bad Altcoin Longs.
-    ✓ RETAIL NARRATIVE: Clear logic vectors for Range trades and BTC warnings.
+    ARCHITECTURAL CHANGES (v28):
+    ----------------------------
+    ✓ VECTOR HYSTERESIS: Regime detection uses a 3-period rolling smooth to dampen noise.
+    ✓ EQUILIBRIUM GOVERNOR: Added Dynamic Baseline. Longs require Positive Alignment.
+    ✓ VELOCITY GATING: Expansion threshold raised to 2.0 to filter late-stage exhaustion.
+    ✓ ANOMALY FILTERS: Enhanced Trap detection using Mass/Sigma divergence.
     """
 
     def __init__(self):
-        self.ATR_LEN = 14
-        self.MASS_LEN = 20
-        self.STRUCT_LEN = 20  # Lookback for Range Support/Resistance
+        self.SIGMA_WINDOW = 14  # Volatility Normalization Window
+        self.MASS_WINDOW = 20  # Volume Profile Window
+        self.STRUCT_WINDOW = 20  # Local Topography Lookback
         self.BASE_RISK = 0.01
 
     def analyze(self, df: pd.DataFrame, trade_style: str = "DAY", market_context: dict = None) -> SimpleNamespace:
         """
-        Analyze price data with Physics + Market Context.
-        :param market_context: Dict containing BTC state (e.g. {'bias': 'SHORT', 'regime': 'EXHAUSTION'})
+        Analyze price data with Smoothed Kinetic Vectors + Market Context.
         """
         price = 0.0
 
         try:
-            if len(df) < 50:
-                return self._neutral(0.0, "Insufficient Data")
+            # Need slightly more data for vector smoothing
+            if len(df) < 55:
+                return self._neutral(0.0, "Insufficient Data (Need 55+ Epochs)")
 
             df = df.copy()
             close = df["close"]
@@ -45,151 +46,162 @@ class CryptoQuantEngine:
             price = float(close.iloc[-1])
 
             # ==================================================
-            # 1. TRUE PHYSICS
+            # 1. KINETIC VECTOR CALCULATIONS
             # ==================================================
+            # Volatility Normalization (Sigma)
             tr = pd.concat([
                 high - low,
                 (high - close.shift()).abs(),
                 (low - close.shift()).abs()
             ], axis=1).max(axis=1)
 
-            atr = tr.rolling(self.ATR_LEN).mean()
-            current_atr = atr.iloc[-1]
+            sigma_series = tr.rolling(self.SIGMA_WINDOW).mean()
+            current_sigma = sigma_series.iloc[-1]
 
-            velocity = close.diff() / (atr + 1e-9)
+            # Velocity: Price delta normalized by local volatility
+            velocity = close.diff() / (sigma_series + 1e-9)
 
-            vol_mean = volume.rolling(self.MASS_LEN).mean()
-            mass = volume / (vol_mean + 1e-9)
+            # Mass: Volume relative to historical mean
+            mass_mean = volume.rolling(self.MASS_WINDOW).mean()
+            mass = volume / (mass_mean + 1e-9)
 
-            signed_ke = mass * velocity
-            ke_decay = signed_ke.diff(3)
+            # Kinetic Force = Mass * Velocity
+            raw_force = mass * velocity
+
+            # [HYSTERESIS] Smooth the Force Vector to fix regime flickering
+            smooth_force = raw_force.rolling(3).mean()
+            force_now = smooth_force.iloc[-1]  # Decision Vector
+            force_raw = raw_force.iloc[-1]  # Anomaly Vector
+
+            force_decay = smooth_force.diff(3)  # 3rd Derivative (Jerk)
 
             # ==================================================
-            # 2. STRUCTURE & WICKS
+            # 2. EQUILIBRIUM BASELINE (Trend Governor)
             # ==================================================
-            # Calculate Range Highs/Lows for Mean Reversion
-            roll_high = high.rolling(self.STRUCT_LEN).max().shift(1)
-            roll_low = low.rolling(self.STRUCT_LEN).min().shift(1)
+            # [GOVERNOR] Dynamic Equilibrium Line.
+            # If Price < Equilibrium, structure is bearish. Range Longs forbidden.
+            equilibrium = close.ewm(span=50, adjust=False).mean().iloc[-1]
+            is_positive_alignment = price > equilibrium
+            is_negative_alignment = price < equilibrium
 
-            range_high_val = float(roll_high.iloc[-1])
-            range_low_val = float(roll_low.iloc[-1])
+            # ==================================================
+            # 3. TOPOGRAPHY & REJECTIONS
+            # ==================================================
+            roll_high = high.rolling(self.STRUCT_WINDOW).max().shift(1)
+            roll_low = low.rolling(self.STRUCT_WINDOW).min().shift(1)
 
-            hh = high > roll_high
-            hl = low > roll_low
-            lh = high < roll_high
-            ll = low < roll_low
+            range_high = float(roll_high.iloc[-1])
+            range_low = float(roll_low.iloc[-1])
 
-            structure_up = hh.iloc[-1] and hl.iloc[-1]
-            structure_down = lh.iloc[-1] and ll.iloc[-1]
-
-            # Wick Rejection (SFP)
+            # Wick Rejection (Supply/Demand Imbalance)
             candle_body = abs(close.iloc[-1] - open_p.iloc[-1])
             upper_wick = high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])
             lower_wick = min(close.iloc[-1], open_p.iloc[-1]) - low.iloc[-1]
 
-            is_wick_rejection = False
-            if signed_ke.iloc[-1] > 0:
-                is_wick_rejection = upper_wick > (1.8 * candle_body)
-            elif signed_ke.iloc[-1] < 0:
-                is_wick_rejection = lower_wick > (1.8 * candle_body)
+            is_rejection = False
+            if force_raw > 0:  # Bullish energy but big upper wick?
+                is_rejection = upper_wick > (1.5 * candle_body)
+            elif force_raw < 0:  # Bearish energy but big lower wick?
+                is_rejection = lower_wick > (1.5 * candle_body)
 
             # ==================================================
-            # 3. FILTERS (SNIPER LOGIC)
+            # 4. ANOMALY FILTERS
             # ==================================================
             candle_range = high - low
-            is_wide_range = candle_range.iloc[-1] > (2.5 * current_atr)
-            vol_intensity = volume / (vol_mean + 1e-9)
+            is_wide_range = candle_range.iloc[-1] > (2.5 * current_sigma)
+            mass_intensity = volume.iloc[-1] / (mass_mean.iloc[-1] + 1e-9)
 
-            # Filter 1: Fakeouts
-            is_fake = (is_wide_range and vol_intensity.iloc[-1] < 0.8)
+            # Filter 1: Hollow Move (Big candle, tiny mass)
+            is_hollow = (is_wide_range and mass_intensity < 0.9)
 
-            # Filter 2: Over-Extension
-            is_overextended = abs(signed_ke.iloc[-1]) > 3.0
+            # Filter 2: Extension (Too fast, too soon)
+            is_overextended = abs(force_now) > 3.5
 
-            # Combined Trap Logic
-            is_trap = is_fake or is_wick_rejection or is_overextended
+            is_trap = is_hollow or is_rejection or is_overextended
 
             # ==================================================
-            # 4. RESONANCE
+            # 5. RESONANCE (Vector Alignment)
             # ==================================================
-            ht_velocity = close.diff(5) / (atr + 1e-9)
-            ht_ke = (mass * ht_velocity).rolling(5).mean()
-            resonance = np.sign(signed_ke.iloc[-1]) == np.sign(ht_ke.iloc[-1])
+            ht_velocity = close.diff(5) / (sigma_series + 1e-9)
+            ht_force = (mass * ht_velocity).rolling(5).mean()
+            resonance = np.sign(force_now) == np.sign(ht_force.iloc[-1])
 
         except Exception as e:
             log.error(f"Quant Engine Error: {e}")
-            return self._neutral(price, f"Engine Error: {e}")
+            return self._neutral(price, f"Compute Error: {e}")
 
         # ==========================================================
-        # 5. REGIME DETECTION
+        # 6. REGIME DETECTION (Strict & Smoothed)
         # ==========================================================
-        ke_now = signed_ke.iloc[-1]
-        decay = ke_decay.iloc[-1]
+        decay_val = force_decay.iloc[-1]
 
-        if abs(ke_now) < 0.5 and abs(decay) < 0.1:
+        # [STRICT] Force Thresholds
+        if abs(force_now) < 0.6:
             regime = "COMPRESSION"
-        elif abs(ke_now) > 1.5 and decay > 0:
+        elif abs(force_now) > 2.0 and decay_val > 0:
             regime = "EXPANSION"
-        elif abs(ke_now) > 0.8 and decay >= -0.2:
+        elif abs(force_now) > 0.8:
             regime = "TREND"
-        elif decay < -0.5:
+        elif decay_val < -0.5:
             regime = "EXHAUSTION"
         else:
             regime = "IDLE"
 
         # ==========================================================
-        # 6. DECISION ENGINE
+        # 7. DECISION ENGINE
         # ==========================================================
         bias = "HOLD"
         lane = "⚫ HOLD"
         score = 50
 
-        # Strict Volume Filter
-        is_high_quality = mass.iloc[-1] > 1.0
+        # Quality Check: Trade requires significant Mass participation
+        is_high_quality = mass.iloc[-1] > 1.2
 
-        # --- A. TREND LOGIC (Breakouts) ---
+        # --- A. TREND LOGIC ---
         if regime == "TREND":
-            if ke_now > 0 and (structure_up or resonance) and not is_trap and is_high_quality:
+            # [RULE] We NEVER Long if price is below Equilibrium.
+            if force_now > 0 and (is_positive_alignment) and resonance and not is_trap and is_high_quality:
                 bias = "LONG"
                 lane = "🟢 SNIPER"
                 score = 85
-            elif ke_now < 0 and (structure_down or resonance) and not is_trap and is_high_quality:
+            elif force_now < 0 and (is_negative_alignment) and resonance and not is_trap and is_high_quality:
                 bias = "SHORT"
                 lane = "🟢 SNIPER"
                 score = 85
 
+        # --- B. EXPANSION LOGIC ---
         elif regime == "EXPANSION":
-            if ke_now > 1.2 and not is_trap:
+            # Catching the volatility initialization
+            if force_now > 2.0 and not is_trap and is_positive_alignment:
                 bias = "LONG"
                 lane = "🚀 BREAKOUT"
                 score = 90
-            elif ke_now < -1.2 and not is_trap:
+            elif force_now < -2.0 and not is_trap and is_negative_alignment:
                 bias = "SHORT"
                 lane = "🚀 BREAKOUT"
                 score = 90
 
-        # --- B. MEAN REVERSION LOGIC (Trading the Chop) ---
+        # --- C. MEAN REVERSION (Range Mechanics) ---
         elif regime == "COMPRESSION":
             bias = "WATCH"
             lane = "🟠 BUILDING"
             score = 60
 
-            # Check if Range is wide enough to trade (>1.5%)
-            range_width = (range_high_val - range_low_val) / range_low_val
+            range_width = (range_high - range_low) / range_low
 
+            # Only trade ranges if width is statistically significant (>1.5%)
             if range_width > 0.015:
-                # Calc distance to support/resistance
-                dist_to_support = (price - range_low_val) / range_low_val
-                dist_to_resist = (range_high_val - price) / range_high_val
+                dist_to_support = (price - range_low) / range_low
+                dist_to_resist = (range_high - price) / range_high
 
-                # Buy Support: Price near low + Velocity turning UP
-                if dist_to_support < 0.01 and velocity.iloc[-1] > 0:
+                # [RULE] Do not buy Support if we are in Negative Alignment (Downtrend)
+                if dist_to_support < 0.01 and velocity.iloc[-1] > 0 and not is_negative_alignment:
                     bias = "LONG"
                     lane = "🔵 RANGE"
                     score = 75
 
-                # Sell Resistance: Price near high + Velocity turning DOWN
-                elif dist_to_resist < 0.01 and velocity.iloc[-1] < 0:
+                # [RULE] Do not sell Resistance if we are in Positive Alignment (Uptrend)
+                elif dist_to_resist < 0.01 and velocity.iloc[-1] < 0 and not is_positive_alignment:
                     bias = "SHORT"
                     lane = "🔵 RANGE"
                     score = 75
@@ -200,23 +212,23 @@ class CryptoQuantEngine:
             score = 45
 
         # ==========================================================
-        # 7. BTC CORRELATION FILTER (The King Factor)
+        # 8. EXTERNAL CORRELATION FILTER
         # ==========================================================
-        is_btc_drag = False
+        is_correlation_drag = False
 
         if market_context and bias == "LONG":
             btc_regime = market_context.get('regime', 'NEUTRAL')
             btc_bias = market_context.get('bias', 'HOLD')
 
-            # Rule: If BTC is Crashing or Exhausted, kill Altcoin Longs
+            # If Beta-1 Asset is failing, invalidate signal
             if btc_regime == "EXHAUSTION" or btc_bias == "SHORT":
                 bias = "HOLD"
-                lane = "⚫ BTC DRAG"
+                lane = "⚫ MACRO DRAG"
                 score = 50
-                is_btc_drag = True
+                is_correlation_drag = True
 
         # ==========================================================
-        # 8. ADAPTIVE SIZING
+        # 9. TARGETING & OUTPUT
         # ==========================================================
         stop = t1 = t2 = t3 = 0.0
         rr = 0.0
@@ -225,99 +237,47 @@ class CryptoQuantEngine:
         if bias in ["LONG", "SHORT"]:
             direction = 1 if bias == "LONG" else -1
 
-            # Tighter stops for Range trades, Looser for Trend
+            # Stops based on Sigma units
             stop_mult = 1.0 if lane == "🔵 RANGE" else 1.5
             if regime == "EXPANSION": stop_mult = 1.8
+            stop = price - (direction * current_sigma * stop_mult)
 
-            stop = price - (direction * current_atr * stop_mult)
-
-            # Targets based on Lane
+            # Targets
             if lane == "🔵 RANGE":
-                # Target is the other side of the range
-                t1 = range_high_val if bias == "LONG" else range_low_val
+                t1 = range_high if bias == "LONG" else range_low
                 t2 = t1
                 t3 = t1
             else:
-                # Trend Targets
-                target_mult = (1.5, 3.0, 6.0)
-                t1 = price + (direction * current_atr * target_mult[0])
-                t2 = price + (direction * current_atr * target_mult[1])
-                t3 = price + (direction * current_atr * target_mult[2])
+                t1 = price + (direction * current_sigma * 2.0)
+                t2 = price + (direction * current_sigma * 4.0)
+                t3 = price + (direction * current_sigma * 7.0)
 
             risk_dist = abs(price - stop)
             reward_dist = abs(t1 - price)
             if risk_dist > 0:
                 rr = reward_dist / risk_dist
 
-            conviction = min(1.5, abs(ke_now))
+            conviction = min(1.5, abs(force_now))
             risk_pct = self.BASE_RISK * conviction
 
-        # ==========================================================
-        # 9. OUTPUT & RETAIL NARRATIVE VECTORS
-        # ==========================================================
-        whale_z = float(vol_intensity.iloc[-1] - 1.0)
-        if abs(whale_z) >= 2.0:
-            whale_label = "Institutional"
-            whale_state = "ACTIVE"
-        elif abs(whale_z) >= 0.8:
-            whale_label = "Elevated"
-            whale_state = "BUILDING"
-        else:
-            whale_label = "Retail"
-            whale_state = "BASELINE"
+        # Narratives
+        whale_z = float(mass_intensity - 1.0)
+        whale_state = "ACTIVE" if abs(whale_z) >= 2.0 else "BASELINE"
+        whale_label = "Institutional" if whale_state == "ACTIVE" else "Standard"
 
+        # [NARRATIVE VECTORS]
         top_features = []
 
-        # --- BTC VETO ---
-        if is_btc_drag:
-            top_features.append({"desc": "WARNING: Bitcoin is Weak (Risk Off)", "importance": 100})
+        if is_correlation_drag:
+            top_features.append({"desc": "Macro Correlation Drag Detected", "importance": 100})
+        elif bias != "HOLD":
+            if resonance: top_features.append({"desc": "Vector Convergence Confirmed", "importance": 90})
+            if whale_state == "ACTIVE": top_features.append({"desc": "Institutional Mass Detected", "importance": 95})
+            if is_positive_alignment and bias == "LONG": top_features.append(
+                {"desc": "Positive Structural Alignment", "importance": 85})
+            if regime == "EXPANSION": top_features.append({"desc": "High Velocity Initialization", "importance": 85})
 
-        # --- SCENARIO A: HOLD ---
-        elif bias == "HOLD" or bias == "WATCH":
-            if is_trap:
-                if is_fake:
-                    top_features.append({"desc": "Fakeout Risk (Volume Mismatch)", "importance": 65})
-                elif is_wick_rejection:
-                    top_features.append({"desc": "Price Rejection Detected", "importance": 65})
-                elif is_overextended:
-                    top_features.append({"desc": "Market Overheated (Too Late)", "importance": 65})
-
-            elif regime == "COMPRESSION":
-                top_features.append({"desc": "Squeeze Building (Wait)", "importance": 50})
-            elif regime == "EXHAUSTION":
-                top_features.append({"desc": "Trend Fading", "importance": 45})
-            elif regime == "IDLE":
-                top_features.append({"desc": "Low Volatility", "importance": 30})
-
-            if not is_high_quality:
-                top_features.append({"desc": "Weak Participation", "importance": 25})
-
-        # --- SCENARIO B: ACTIVE TRADE ---
-        else:
-            # Range Logic
-            if lane == "🔵 RANGE":
-                top_features.append(
-                    {"desc": "Valid Support Bounce" if bias == "LONG" else "Resistance Rejection", "importance": 90})
-                top_features.append({"desc": "Trading the Range", "importance": 80})
-
-            # Trend Logic
-            else:
-                if whale_state == "ACTIVE":
-                    top_features.append(
-                        {"desc": "Smart Money Buying" if bias == "LONG" else "Smart Money Selling", "importance": 95})
-                elif is_high_quality:
-                    top_features.append({"desc": "Healthy Volume Support", "importance": 80})
-
-                if resonance:
-                    top_features.append({"desc": "Perfect Trend Alignment", "importance": 90})
-
-                if regime == "EXPANSION":
-                    top_features.append({"desc": "High Velocity Breakout", "importance": 85})
-
-        top_features.sort(key=lambda x: x['importance'], reverse=True)
-        top_features = top_features[:3]
-
-        narrative = self._narrative(regime, bias, resonance, whale_state)
+        narrative = self._narrative(regime, bias, resonance, whale_state, is_positive_alignment)
 
         return SimpleNamespace(
             bias=bias, lane=lane, score=score, price=price,
@@ -325,18 +285,21 @@ class CryptoQuantEngine:
             stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
             rr_ratio=round(rr, 2), risk_pct=round(risk_pct * 100, 2),
             regime=regime, regime_color="green" if bias != "HOLD" else "gray",
-            whale_zscore=round(whale_z, 2), whale_label=whale_label, whale_state=whale_state,
-            top_features=top_features, narrative=narrative,
+            whale_state=whale_state, whale_label=whale_label, narrative=narrative,
+            top_features=top_features,
             lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
         )
 
-    def _narrative(self, regime, bias, resonance, whale):
-        if bias == "HOLD" and regime == "COMPRESSION": return "Market is ranging. waiting for clear bounce or break."
-        if regime == "COMPRESSION": return "Volatility squeezing. Energy building."
-        if regime == "EXHAUSTION": return "Trend is tired. Avoid new entries."
-        if regime == "EXPANSION": return "High speed move. Stops are tight."
-        if whale == "ACTIVE": return "Institutions are active here."
-        return "Waiting for a clear setup."
+    def _narrative(self, regime, bias, resonance, whale, positive_structure):
+        if bias == "HOLD":
+            if regime == "COMPRESSION": return "Volatility Compression. Awaiting Energy."
+            if not positive_structure and regime == "TREND": return "Price below Equilibrium. Longs invalid."
+            return "No clear kinetic edge."
+
+        if regime == "EXPANSION": return "Velocity breakout initialized."
+        if regime == "TREND": return "Vector alignment confirmed."
+        if whale == "ACTIVE": return "Institutional mass detected."
+        return "Setup valid."
 
     def _neutral(self, price, reason):
         return SimpleNamespace(
@@ -344,7 +307,6 @@ class CryptoQuantEngine:
             entry=0.0, stop=0.0, target1=0.0, target2=0.0, target3=0.0,
             rr_ratio=0.0, risk_pct=0.0,
             regime="NEUTRAL", regime_color="gray",
-            whale_zscore=0.0, whale_label="Normal", whale_state="BASELINE",
-            top_features=[{"desc": "No Data", "importance": 20}],
-            narrative=reason, lifecycle="WAITING"
+            whale_state="BASELINE", whale_label="Normal",
+            narrative=reason, lifecycle="WAITING", top_features=[]
         )
