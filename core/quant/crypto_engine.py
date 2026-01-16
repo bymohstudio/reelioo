@@ -9,13 +9,13 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO KINETIC ENGINE v28.1 – RETAIL CLARITY UPDATE
+    REELIOO KINETIC ENGINE v28.2 – LOGIC VECTOR FIX
 
-    FIXES:
-    ------
-    ✓ DYNAMIC VECTORS: Logic tags now include real data (e.g., "3.5x Vol").
-    ✓ SHORT LOGIC FIXED: Added specific vectors for Short signals (previously missing).
-    ✓ RETAIL LANGUAGE: Converted "Vector Alignment" -> "Momentum Aligned".
+    UPDATES:
+    --------
+    ✓ ROBUST VECTORS: Ensures no signal (LONG/SHORT/WATCH/HOLD) ever has empty logic tags.
+    ✓ STATE COVERAGE: Added explicit handling for 'WATCH' (Building) state.
+    ✓ DYNAMIC DATA: Tags now show the exact Sigma/Volume numbers driving the decision.
     """
 
     def __init__(self):
@@ -230,9 +230,9 @@ class CryptoQuantEngine:
             risk_pct = self.BASE_RISK * conviction
 
         # ==========================================================
-        # 10. DYNAMIC LOGIC VECTORS (RETAIL FRIENDLY)
+        # 10. ROBUST LOGIC VECTORS (NEVER BLANK)
         # ==========================================================
-        whale_z = float(mass_intensity - 1.0)
+        whale_z = float(mass_intensity.iloc[-1] - 1.0)
         whale_state = "ACTIVE" if abs(whale_z) >= 2.0 else "BASELINE"
         whale_label = "Institutional" if whale_state == "ACTIVE" else "Standard"
 
@@ -243,47 +243,60 @@ class CryptoQuantEngine:
             top_features.append({"desc": "WARNING: Bitcoin is Dumping", "importance": 100})
 
         # B. Active Trade Vectors
-        elif bias != "HOLD":
+        elif bias in ["LONG", "SHORT"]:
 
-            # 1. Volume Logic (Dynamic)
+            # 1. Primary Driver
+            if regime == "EXPANSION":
+                top_features.append({"desc": f"Explosive Velocity ({force_now:.1f}σ)", "importance": 95})
+            elif lane == "🔵 RANGE":
+                target_desc = "Support" if bias == "LONG" else "Resistance"
+                top_features.append({"desc": f"Valid {target_desc} Bounce", "importance": 90})
+            elif regime == "TREND":
+                top_features.append({"desc": f"Trend Strength ({force_now:.1f}σ)", "importance": 90})
+
+            # 2. Volume Context
             vol_x = mass_intensity.iloc[-1]
             if whale_state == "ACTIVE":
-                top_features.append({"desc": f"Whale Volume Detected ({vol_x:.1f}x Avg)", "importance": 95})
+                top_features.append({"desc": f"Whale Volume ({vol_x:.1f}x Avg)", "importance": 85})
             elif is_high_quality:
                 top_features.append({"desc": f"Healthy Volume ({vol_x:.1f}x Avg)", "importance": 80})
 
-            # 2. Structural Alignment (Dynamic)
+            # 3. Structural Alignment
             if bias == "LONG" and is_positive_alignment:
-                top_features.append({"desc": "Uptrend Confirmed (Above 50 EMA)", "importance": 85})
+                top_features.append({"desc": "Uptrend Confirmed (> Baseline)", "importance": 85})
             elif bias == "SHORT" and is_negative_alignment:
-                top_features.append({"desc": "Downtrend Confirmed (Below 50 EMA)", "importance": 85})
-
-            # 3. Regime Specific Logic
-            if regime == "EXPANSION":
-                top_features.append({"desc": f"Explosive Velocity ({force_now:.1f}σ)", "importance": 90})
-
-            elif lane == "🔵 RANGE":
-                if bias == "LONG":
-                    top_features.append({"desc": "Bouncing off Range Support", "importance": 85})
-                else:
-                    top_features.append({"desc": "Rejecting Range Resistance", "importance": 85})
+                top_features.append({"desc": "Downtrend Confirmed (< Baseline)", "importance": 85})
 
             # 4. Resonance
             if resonance:
                 top_features.append({"desc": "Momentum Aligned (15m + 1H)", "importance": 80})
 
-        # C. Hold/Watch Vectors (Why are we waiting?)
-        elif bias == "HOLD":
-            if is_trap:
-                top_features.append({"desc": "Trap Detected: Fakeout/Wick", "importance": 70})
-            elif regime == "COMPRESSION":
-                top_features.append({"desc": "Market Squeezing (Wait for Break)", "importance": 50})
-            elif regime == "IDLE":
-                top_features.append({"desc": "Low Volatility / No Edge", "importance": 30})
-            elif not is_high_quality:
-                top_features.append({"desc": "Volume Too Low", "importance": 40})
+        # C. Watch/Building Vectors (Fixes the blank issue for 'WATCH')
+        elif bias == "WATCH":
+            top_features.append({"desc": "Volatility Compression", "importance": 80})
+            if lane == "🔵 RANGE":
+                top_features.append({"desc": "Approaching Key Level", "importance": 70})
+            else:
+                top_features.append({"desc": "Awaiting Momentum Impulse", "importance": 60})
 
-        # Sort by importance
+        # D. Hold Vectors
+        else:  # HOLD
+            if is_trap:
+                top_features.append({"desc": "Trap Detected (Wick/Fakeout)", "importance": 70})
+            elif regime == "EXHAUSTION":
+                top_features.append({"desc": "Trend Exhaustion Detected", "importance": 60})
+            elif not is_high_quality:
+                top_features.append({"desc": "Low Volume / Retail Noise", "importance": 50})
+            elif not is_positive_alignment and not is_negative_alignment:
+                top_features.append({"desc": "Price at Equilibrium (Choppy)", "importance": 40})
+            else:
+                top_features.append({"desc": "No Clear Kinetic Edge", "importance": 30})
+
+        # FAILSAFE: If vector list is still empty for some reason, add a default.
+        if not top_features:
+            top_features.append({"desc": "Market Noise / Neutral", "importance": 10})
+
+        # Sort and Trim
         top_features.sort(key=lambda x: x['importance'], reverse=True)
         top_features = top_features[:3]
 
@@ -304,7 +317,7 @@ class CryptoQuantEngine:
         if bias == "HOLD":
             if regime == "COMPRESSION": return "Market is squeezing. Waiting for energy."
             if not positive_structure and regime == "TREND": return "Price below Baseline. Longs invalid."
-            return "No clear edge detected."
+            return "No clear kinetic edge."
 
         if regime == "EXPANSION": return "Velocity breakout initialized."
         if regime == "TREND": return "Trend alignment confirmed."
@@ -318,5 +331,5 @@ class CryptoQuantEngine:
             rr_ratio=0.0, risk_pct=0.0,
             regime="NEUTRAL", regime_color="gray",
             whale_state="BASELINE", whale_label="Normal",
-            narrative=reason, lifecycle="WAITING", top_features=[]
+            narrative=reason, lifecycle="WAITING", top_features=[{"desc": "Initializing Data...", "importance": 10}]
         )
