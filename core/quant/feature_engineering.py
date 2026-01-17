@@ -1,35 +1,28 @@
 import pandas as pd
 import numpy as np
 
-# These features are DESCRIPTIVE ONLY
-# They do NOT decide trades (The Engine calculates its own decision logic)
-
+# These features match v31 TITANIUM logic
 PHYSICS_FEATURES = [
-    "signed_ke",
-    "ke_decay",
+    "force",
+    "acceleration",
     "mass",
     "velocity",
-    "atr_14",
-    "atr_pct",
-    "structure_state",
-    "liquidity_state",
-    "event_risk",
-    "volatility_compression"
+    "energy_reserve",  # Hidden RSI
+    "stretch_pct",  # Elasticity
+    "structure_state",  # EMA 50 Alignment
+    "is_trap"
 ]
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Physics-aligned feature generator (v21).
-    Matches CryptoQuantEngine & CryptoBacktestEngine logic.
-
-    PURPOSE:
-    - Pre-calculation for Backtesting
-    - Visuals for UI
+    v31 TITANIUM Feature Generator.
+    Aligned with Anti-Lag, Elasticity, and Acceleration logic.
     """
     if df.empty:
         return df
 
+    # Optimization: Avoid deep copy if not needed, but safe to keep for data integrity
     df = df.copy()
 
     close = df["close"]
@@ -38,83 +31,71 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     volume = df["volume"]
 
     # -------------------------
-    # 1. TRUE RANGE / ATR (Match v21)
+    # 1. PHYSICS VECTORS (v31 Anti-Lag)
     # -------------------------
+    # True Range & Sigma
     tr = pd.concat([
         high - low,
         (high - close.shift()).abs(),
         (low - close.shift()).abs()
     ], axis=1).max(axis=1)
 
-    df["atr_14"] = tr.rolling(14).mean()
-    df["atr_pct"] = df["atr_14"] / close
+    # ATR 14 (Sigma)
+    sigma = tr.rolling(14).mean()
+    df["atr_14"] = sigma
+
+    # Velocity (Normalized Speed)
+    df["velocity"] = close.diff() / (sigma + 1e-9)
+
+    # Mass (Relative Volume)
+    vol_mean = volume.rolling(20).mean()
+    df["mass"] = volume / (vol_mean + 1e-9)
+
+    # Force (Smoothed 2-period for Anti-Lag)
+    raw_force = df["mass"] * df["velocity"]
+    df["force"] = raw_force.rolling(2).mean()
+
+    # Acceleration (Jerk) - The Derivative of Force
+    df["acceleration"] = df["force"].diff(2)
 
     # -------------------------
-    # 2. MASS (Participation)
+    # 2. ENERGY GAUGE (Hidden RSI)
     # -------------------------
-    vol_avg = volume.rolling(20).mean()
-    df["mass"] = volume / (vol_avg + 1e-9)
+    delta = close.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rs = gain / (loss + 1e-9)
+    # 0-100 Scale
+    df["energy_reserve"] = 100 - (100 / (1 + rs))
 
     # -------------------------
-    # 3. VELOCITY (Directional)
+    # 3. STRUCTURE & ELASTICITY
     # -------------------------
-    # Normalized by ATR to be asset-agnostic
-    df["velocity"] = close.diff() / (df["atr_14"] + 1e-9)
+    # Equilibrium (EMA 50)
+    eq = close.ewm(span=50, adjust=False).mean()
 
-    # -------------------------
-    # 4. SIGNED KINETIC ENERGY (v21 Logic)
-    # -------------------------
-    # Removed the 0.5 scalar to match Engine logic exactly
-    df["signed_ke"] = df["mass"] * df["velocity"]
+    # Elasticity (Stretch from Mean)
+    df["stretch_pct"] = (close - eq) / eq
 
-    # -------------------------
-    # 5. ENERGY DECAY (Slope)
-    # -------------------------
-    # CHANGED: Now returns a slope (float), not a boolean
-    df["ke_decay"] = df["signed_ke"].diff(3)
-
-    # -------------------------
-    # 6. STRUCTURE STATE (20-Period Lookback)
-    # -------------------------
-    # CHANGED: Matches Engine's 20-candle structure check
-    roll_high = high.rolling(20).max().shift(1)
-    roll_low = low.rolling(20).min().shift(1)
-
-    hh = high > roll_high
-    hl = low > roll_low
-    lh = high < roll_high
-    ll = low < roll_low
-
-    df["structure_state"] = np.select(
-        [hh & hl, lh & ll],
-        ["UPTREND", "DOWNTREND"],
-        default="RANGE"
+    # Structure State (Bullish/Bearish based on EMA)
+    df["structure_state"] = np.where(
+        close > eq,
+        "BULLISH_STRUCT",
+        "BEARISH_STRUCT"
     )
 
     # -------------------------
-    # 7. LIQUIDITY STATE (Fakeout Detection)
+    # 4. TRAP DETECTION (Wicks)
     # -------------------------
-    # Using dynamic ATR threshold from v21 (2.5x ATR)
-    candle_range = high - low
-    is_wide = candle_range > (2.5 * df["atr_14"])
-    vol_intensity = df["mass"]
+    open_p = df["open"]
+    body = (close - open_p).abs()
+    upper_wick = high - pd.concat([close, open_p], axis=1).max(axis=1)
+    lower_wick = pd.concat([close, open_p], axis=1).min(axis=1) - low
 
-    df["liquidity_state"] = np.where(
-        is_wide & (vol_intensity < 0.8),
-        "FAKEOUT",
-        "CLEAN"
-    )
+    # Trap Logic: High Force vs Big Wick
+    bull_trap = (df["force"] > 0) & (upper_wick > (body * 1.2))
+    bear_trap = (df["force"] < 0) & (lower_wick > (body * 1.2))
 
-    # -------------------------
-    # 8. EVENT RISK (Descriptive)
-    # -------------------------
-    velocity_spike = df["velocity"].abs() > 2.5
-    df["event_risk"] = velocity_spike
-
-    # -------------------------
-    # 9. VOLATILITY COMPRESSION
-    # -------------------------
-    long_vol = tr.rolling(100).mean()
-    df["volatility_compression"] = df["atr_14"] / (long_vol + 1e-9)
+    df["is_trap"] = bull_trap | bear_trap
 
     return df.fillna(0)

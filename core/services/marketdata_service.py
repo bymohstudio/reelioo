@@ -13,111 +13,89 @@ class MarketService:
     BASE_FUT = "https://fapi.binance.com/fapi/v1"
 
     # =====================================================================
-    # 1. EXCHANGE INFO (SYMBOL DISCOVERY) — v30 UPGRADED
+    # 1. EXCHANGE INFO (OPTIMIZED SYMBOL LOADER)
     # =====================================================================
     @staticmethod
     def _load_exchange_info():
-        cache_key = "exchange_info_v10"
+        cache_key = "exchange_info_v30"
         cached = cache.get(cache_key)
         if cached:
             log.info("🧠 [EXCHANGE] Loaded symbols from cache")
             return cached
 
         results = []
-        csv_path = os.path.join(settings.BASE_DIR, "global_symbols.csv")
 
-        # ----- CSV FIRST (FAST) -----
-        if os.path.exists(csv_path):
-            try:
-                df = pd.read_csv(csv_path)
-                results = df.to_dict("records")
-                log.info(f"✅ [EXCHANGE] Loaded {len(results)} symbols from CSV")
-            except Exception as e:
-                log.error(f"❌ [EXCHANGE] CSV read failed: {e}")
+        # 1. Fetch Exchange Info (The List)
+        try:
+            info_resp = requests.get(f"{MarketService.BASE_FUT}/exchangeInfo", timeout=5)
+            info_data = info_resp.json()
+            symbols_raw = info_data.get("symbols", [])
+        except Exception as e:
+            log.error(f"❌ [EXCHANGE] Info fetch failed: {e}")
+            return []
 
-        # ----- BINANCE FUTURES FALLBACK -----
-        if not results:
-            try:
-                r = requests.get(
-                    f"{MarketService.BASE_FUT}/exchangeInfo",
-                    timeout=5
-                )
-                data = r.json()
+        # 2. Fetch 24hr Ticker Stats (The Volume) - SINGLE REQUEST
+        # This prevents the "Death Loop" of 300+ requests
+        ticker_map = {}
+        try:
+            ticker_resp = requests.get(f"{MarketService.BASE_FUT}/ticker/24hr", timeout=5)
+            ticker_data = ticker_resp.json()
+            # Map symbol -> quoteVolume (USDT Value)
+            for t in ticker_data:
+                ticker_map[t['symbol']] = float(t.get('quoteVolume', 0))
+        except Exception as e:
+            log.error(f"❌ [EXCHANGE] Ticker fetch failed: {e}")
 
-                for s in data.get("symbols", []):
-                    if s["status"] != "TRADING":
-                        continue
-                    if s["quoteAsset"] != "USDT":
-                        continue
+        # 3. Filter & Merge
+        # Minimum 5 Million USDT daily volume to ensure liquidity
+        MIN_USDT_VOL = 5_000_000
 
-                    # VOLUME FILTER (PREVENT DEAD SYMBOLS)
-                    # If 'volume' not available here, fetch from ticker
-                    vol = 0
-                    try:
-                        vol_resp = requests.get(
-                            f"{MarketService.BASE_FUT}/ticker/24hr",
-                            params={"symbol": s["symbol"]},
-                            timeout=4
-                        )
-                        vol_data = vol_resp.json()
-                        vol = float(vol_data.get("volume", 0))
-                    except:
-                        pass
+        for s in symbols_raw:
+            if s["status"] != "TRADING": continue
+            if s["quoteAsset"] != "USDT": continue
 
-                    if vol < 500000:
-                        continue  # Ignore dead markets
+            # Use mapped volume (Fast)
+            vol_usdt = ticker_map.get(s["symbol"], 0)
 
-                    results.append({
-                        "symbol": s["symbol"],
-                        "name": s["baseAsset"],
-                        "type": "PERP"
-                    })
+            if vol_usdt < MIN_USDT_VOL:
+                continue
 
-                log.info(f"🌐 [EXCHANGE] Loaded {len(results)} valid symbols from Binance")
+            results.append({
+                "symbol": s["symbol"],
+                "name": s["baseAsset"],
+                "type": "PERP",
+                "vol_24h": vol_usdt
+            })
 
-            except Exception as e:
-                log.error(f"❌ [EXCHANGE] Binance fallback failed: {e}")
+        # Sort by Volume (Highest first) -> Prioritizes Liquid Markets
+        results.sort(key=lambda x: x['vol_24h'], reverse=True)
 
-        # ----- ABSOLUTE SAFETY NET -----
-        if not results:
-            results = [
-                {"symbol": "BTCUSDT", "name": "BTC", "type": "PERP"},
-                {"symbol": "ETHUSDT", "name": "ETH", "type": "PERP"},
-                {"symbol": "SOLUSDT", "name": "SOL", "type": "PERP"},
-            ]
-            log.warning("⚠️ [EXCHANGE] Using static fallback symbols")
+        log.info(f"🌐 [EXCHANGE] Loaded {len(results)} valid symbols (Top Vol: {results[0]['symbol']})")
 
-        # Cache for 24 hours
-        cache.set(cache_key, results, timeout=86400)
+        # Cache for 6 hours
+        cache.set(cache_key, results, timeout=21600)
         return results
 
     @staticmethod
     def search_assets(query: str):
         query = (query or "").upper().strip()
-        if not query:
-            return []
+        if not query: return []
         symbols = MarketService._load_exchange_info()
         return [s for s in symbols if query in s["symbol"] or query in s["name"]][:10]
 
     # =====================================================================
-    # 2. HISTORICAL DATA (PHYSICS-GRADE) — v30 HARDENED
+    # 2. HISTORICAL DATA (ROBUST FETCH)
     # =====================================================================
     @staticmethod
     def get_historical_data(symbol_input, market_type="PERP", trade_style="INTRADAY"):
-        # -------------------------------------------------
-        # 0. SYMBOL NORMALIZATION
-        # -------------------------------------------------
+        # Normalize Symbol
         if isinstance(symbol_input, dict):
             symbol = symbol_input.get("symbol")
         else:
             raw = str(symbol_input).upper().replace("/", "").replace("-", "")
             symbol = raw if raw.endswith("USDT") else f"{raw}USDT"
 
-        log.info(f"📊 [DATA] Fetching for {symbol}")
-
-        # -------------------------------------------------
-        # 1. INTERVAL SELECTION
-        # -------------------------------------------------
+        # Interval Map
         interval_map = {
             "SCALP": "5m",
             "INTRADAY": "15m",
@@ -126,125 +104,98 @@ class MarketService:
         }
         interval = interval_map.get(trade_style, "15m")
 
-        # -------------------------------------------------
-        # 2. CACHE LOOKUP
-        # -------------------------------------------------
-        cache_key = f"kline_phys_v10:{symbol}:{interval}:{market_type}"
-        MIN_ROWS = 2000
+        # Cache Check
+        cache_key = f"kline_v30:{symbol}:{interval}:{market_type}"
+        MIN_ROWS = 2000  # Need deeper history for EMA 50 / Mass Index
 
         df = cache.get(cache_key)
-        if df is not None and isinstance(df, pd.DataFrame) and len(df) >= MIN_ROWS:
-            # HARD FAIL CHECK — protect from corrupted cache
-            if df["close"].std() == 0 or df["high"].max() == df["low"].min():
-                log.error("❌ [CACHE] Corrupted dataframe — invalidating")
-                df = None
-            else:
-                log.info(f"🧠 [CACHE] HIT {symbol} ({len(df)} candles)")
+        if df is not None and len(df) >= MIN_ROWS:
+            return df
 
-        else:
-            df = None
+        # API Setup
+        base_url = MarketService.BASE_FUT if market_type in ["PERP", "FUTURES"] else MarketService.BASE_SPOT
 
-        # -------------------------------------------------
-        # 3. MULTI-PAGE HISTORICAL FETCH
-        # -------------------------------------------------
-        if df is None:
-            klines = []
-            base_url = (
-                MarketService.BASE_FUT
-                if market_type in ["PERP", "FUTURES"]
-                else MarketService.BASE_SPOT
-            )
+        # [FIX] Spot limit is 1000, Futures is 1500
+        limit = 1500 if "fapi" in base_url else 1000
 
-            limit = 1500
-            start_ts = None
-            max_rows = 5000
+        klines = []
+        start_ts = None
+        max_rows = 4500  # Optimized for Railway RAM
 
-            try:
-                while len(klines) < max_rows:
-                    params = {
-                        "symbol": symbol,
-                        "interval": interval,
-                        "limit": limit
-                    }
-                    if start_ts:
-                        params["endTime"] = start_ts
+        try:
+            while len(klines) < max_rows:
+                params = {"symbol": symbol, "interval": interval, "limit": limit}
+                if start_ts: params["endTime"] = start_ts
 
-                    r = requests.get(
-                        f"{base_url}/klines",
-                        params=params,
-                        timeout=10
-                    )
+                r = requests.get(f"{base_url}/klines", params=params, timeout=5)
 
-                    if r.status_code != 200:
-                        log.error(f"❌ [BINANCE] Kline Error {r.status_code}")
-                        break
+                if r.status_code == 429:  # Rate Limit Hit
+                    log.critical("🔥 [DATA] BINANCE RATE LIMIT HIT! COOLING DOWN.")
+                    break
 
-                    batch = r.json()
-                    if not isinstance(batch, list) or not batch:
-                        break
+                if r.status_code != 200: break
 
-                    klines = batch + klines
-                    start_ts = batch[0][0] - 1
+                batch = r.json()
+                if not batch: break
 
-                    if len(batch) < limit:
-                        break
+                klines = batch + klines  # Prepend older data
+                start_ts = batch[0][0] - 1  # Move cursor back
 
-                if not klines:
-                    log.error(f"❌ [DATA] No candles for {symbol}")
-                    return pd.DataFrame()
+                if len(batch) < limit: break  # Reached beginning of time
 
-                df = pd.DataFrame(
-                    klines,
-                    columns=[
-                        "open_time", "open", "high", "low", "close", "volume",
-                        "close_time", "quote_volume", "trades",
-                        "taker_base", "taker_quote", "ignore"
-                    ]
-                )
+            if not klines: return pd.DataFrame()
 
-                df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
-                df.set_index("timestamp", inplace=True)
+            # DataFrame Construction
+            df = pd.DataFrame(klines, columns=[
+                "open_time", "open", "high", "low", "close", "volume",
+                "close_time", "quote_volume", "trades", "taker_base", "taker_quote", "ignore"
+            ])
 
-                df = df[
-                    ["open", "high", "low", "close",
-                     "volume", "quote_volume", "trades", "taker_base"]
-                ].astype(float)
+            df["timestamp"] = pd.to_datetime(df["open_time"], unit="ms")
+            df.set_index("timestamp", inplace=True)
 
-                # HARD FAIL CHECK — BINANCE SOMETIMES RETURNS FLAT CANDLES
-                if df["close"].std() == 0:
-                    log.error(f"❌ [DATA] Binance returned invalid data for {symbol}")
-                    return pd.DataFrame()
+            cols = ["open", "high", "low", "close", "volume", "quote_volume"]
+            df = df[cols].astype(float)
 
-                log.info(f"✅ [DATA] Loaded {len(df)} candles")
-
-                if len(df) >= MIN_ROWS:
-                    cache.set(cache_key, df, timeout=300)
-                    log.info(f"💾 [CACHE] Stored for {symbol}")
-                else:
-                    log.warning(
-                        f"⚠️ [DATA] Only {len(df)} rows — not caching"
-                    )
-
-            except Exception as e:
-                log.exception(f"🔥 [DATA] Fetch failed: {e}")
+            # [FIX] Data Validation (Flat Candle Check)
+            if df["close"].std() == 0 or len(df) < 200:
+                log.warning(f"⚠️ [DATA] Bad data for {symbol}")
                 return pd.DataFrame()
 
-        # -------------------------------------------------
-        # 4. LIVE PRICE INJECTION
-        # -------------------------------------------------
-        try:
-            r = requests.get(
-                f"{MarketService.BASE_FUT}/ticker/price",
-                params={"symbol": symbol},
-                timeout=3
-            )
-            live_price = float(r.json().get("price"))
-            df = df.copy()
-            df["live_close"] = df["close"]
-            df.iloc[-1, df.columns.get_loc("live_close")] = live_price
-            log.info(f"💰 [PRICE] Live injected: {live_price}")
-        except:
-            df["live_close"] = df["close"]
-            log.warning("⚠️ [PRICE] Live price fallback")
+            # Cache good data
+            if len(df) >= MIN_ROWS:
+                cache.set(cache_key, df, timeout=300)
 
-        return df
+            # Live Injection (Optional but recommended)
+            try:
+                ticker_url = f"{base_url}/ticker/price"
+                r = requests.get(ticker_url, params={"symbol": symbol}, timeout=2)
+                live_price = float(r.json().get("price"))
+                # Update last close to live price for real-time signal
+                df.iloc[-1, df.columns.get_loc("close")] = live_price
+            except:
+                pass
+
+            return df
+
+        except Exception as e:
+            log.error(f"❌ [DATA] Fetch failed for {symbol}: {e}")
+            return pd.DataFrame()
+
+    # =====================================================================
+    # 3. ORDER FLOW SNAPSHOT (NEW FOR v32 ENGINE)
+    # =====================================================================
+    @staticmethod
+    def get_order_book_snapshot(symbol):
+        """
+        Fetches Level 2 Depth for OBI (Order Book Imbalance) Calculation.
+        Used by v32 Engine to block trades into walls.
+        """
+        try:
+            url = f"{MarketService.BASE_FUT}/depth"
+            # Limit 50 is enough for "Immediate Walls" and is lighter on API
+            r = requests.get(url, params={"symbol": symbol, "limit": 50}, timeout=2)
+            if r.status_code != 200: return None
+            return r.json()
+        except Exception:
+            return None
