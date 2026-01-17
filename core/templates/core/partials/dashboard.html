@@ -4,18 +4,31 @@
         <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
             <div class="flex-grow w-full md:w-auto">
                 <div class="flex items-center gap-3 mb-4">
-                    <span class="text-[10px] font-black bg-slate-800/80 px-3 py-1 rounded text-slate-300 uppercase tracking-widest border border-white/5">{{ mode }}</span>
+                    <span class="text-[10px] font-black bg-slate-800/80 px-3 py-1 rounded text-slate-300 uppercase tracking-widest border border-white/5">
+                        {{ mode }}
+                    </span>
 
-                    <span class="text-[10px] px-3 py-1 border rounded uppercase tracking-widest font-black transition-all flex items-center gap-2 {% if res.regime_color == 'green' %}text-emerald-400 border-emerald-500/20 bg-emerald-500/10{% elif res.regime_color == 'red' %}text-red-400 border-red-500/20 bg-red-500/10{% else %}text-violet-400 border-violet-500/20 bg-violet-500/10 animate-pulse{% endif %}">
+                    <span class="text-[10px] px-3 py-1 border rounded uppercase tracking-widest font-black transition-all flex items-center gap-2
+                        {% if res.regime_color == 'green' %}text-emerald-400 border-emerald-500/20 bg-emerald-500/10
+                        {% elif res.regime_color == 'red' %}text-red-400 border-red-500/20 bg-red-500/10
+                        {% else %}text-violet-400 border-violet-500/20 bg-violet-500/10 animate-pulse{% endif %}">
                         <i data-lucide="activity" class="w-3 h-3"></i> {{ res.regime }}
                     </span>
                 </div>
+
                 <div class="flex items-baseline gap-4">
-                    <h2 class="text-6xl md:text-7xl font-black tracking-tighter leading-none {% if 'LONG' in res.bias %}text-emerald-400{% elif 'SHORT' in res.bias %}text-red-500{% else %}text-slate-500{% endif %}">
+                    <h2 class="text-6xl md:text-7xl font-black tracking-tighter leading-none
+                        {% if 'LONG' in res.bias %}text-emerald-400
+                        {% elif 'SHORT' in res.bias %}text-red-500
+                        {% else %}text-slate-500{% endif %}">
                         {% if 'LONG' in res.bias %}BUY{% elif 'SHORT' in res.bias %}SELL{% else %}HOLD{% endif %}
                     </h2>
-                    <span class="text-2xl font-black tracking-widest text-slate-600 select-none">{{ symbol }}</span>
+
+                    <span class="text-2xl font-black tracking-widest text-slate-600 select-none">
+                        {{ symbol }}<span class="text-slate-600">.P</span>
+                    </span>
                 </div>
+
                 <p class="text-xs font-bold uppercase tracking-[0.2em] mt-4 pl-3 border-l-2 text-slate-600 border-slate-700">
                     {{ res.narrative|truncatewords:10 }}
                 </p>
@@ -24,7 +37,12 @@
             <div class="relative flex-shrink-0 w-[140px] h-[140px] flex items-center justify-center">
                 <svg class="w-full h-full transform -rotate-90 relative z-10" viewBox="0 0 140 140">
                     <circle cx="70" cy="70" r="60" fill="none" stroke="#1e293b" stroke-width="8" />
-                    <circle cx="70" cy="70" r="60" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="calc(377 - (377 * {{ res.score }} / 100))" class="transition-all duration-1000 ease-out {% if 'LONG' in res.bias %}stroke-emerald-400{% elif 'SHORT' in res.bias %}stroke-red-500{% else %}stroke-slate-600{% endif %}" />
+                    <circle cx="70" cy="70" r="60" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="377"
+                            stroke-dashoffset="calc(377 - (377 * {{ res.score }} / 100))"
+                            class="transition-all duration-1000 ease-out
+                            {% if 'LONG' in res.bias %}stroke-emerald-400
+                            {% elif 'SHORT' in res.bias %}stroke-red-500
+                            {% else %}stroke-slate-600{% endif %}" />
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center z-20">
                     <span class="text-4xl font-black leading-none tracking-wide text-white">{{ res.score }}<span class="text-lg opacity-60 text-slate-500"> %</span></span>
@@ -35,10 +53,22 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 border-b border-white/5 divide-y md:divide-y-0 divide-x divide-white/5 bg-[#050a14]">
-        <div class="p-6"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Entry</p><p class="text-xl font-mono font-black text-violet-400">{{ res.entry }}</p></div>
-        <div class="p-6"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Target</p><p class="text-xl font-mono font-black text-emerald-400">{{ res.target2 }}</p></div>
-        <div class="p-6"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Stop</p><p class="text-xl font-mono font-black text-red-400">{{ res.stop }}</p></div>
-        <div class="p-6"><p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Whale Activity</p><p class="text-lg font-black text-white">{{ res.whale_label }}</p></div>
+        <div class="p-6">
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Entry</p>
+            <p class="text-xl font-mono font-black text-violet-400">${{ res.entry }}</p>
+        </div>
+        <div class="p-6">
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Target</p>
+            <p class="text-xl font-mono font-black text-emerald-400">${{ res.target2 }}</p>
+        </div>
+        <div class="p-6">
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Stop</p>
+            <p class="text-xl font-mono font-black text-red-400">${{ res.stop }}</p>
+        </div>
+        <div class="p-6">
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Whale Activity</p>
+            <p class="text-lg font-black text-white">{{ res.whale_label }}</p>
+        </div>
     </div>
 
     <div class="flex-grow grid grid-cols-1 md:grid-cols-2 bg-[#020617] divide-y divide-white/5 md:divide-y-0 md:divide-x md:divide-white/5">
@@ -59,9 +89,12 @@
 
             <form hx-post="{% url 'hx_journal_add' %}" hx-swap="outerHTML" class="mt-8">
                 {% csrf_token %}
-                <input type="hidden" name="symbol" value="{{ symbol }}"><input type="hidden" name="bias" value="{{ res.bias }}">
-                <input type="hidden" name="entry" value="{{ res.entry }}"><input type="hidden" name="stop" value="{{ res.stop }}">
-                <input type="hidden" name="target" value="{{ res.target2 }}"><input type="hidden" name="score" value="{{ res.score }}">
+                <input type="hidden" name="symbol" value="{{ symbol }}">
+                <input type="hidden" name="bias" value="{{ res.bias }}">
+                <input type="hidden" name="entry" value="{{ res.entry }}">
+                <input type="hidden" name="stop" value="{{ res.stop }}">
+                <input type="hidden" name="target" value="{{ res.target2 }}">
+                <input type="hidden" name="score" value="{{ res.score }}">
                 <button type="submit" class="w-full px-6 py-4 bg-[#1e293b] hover:bg-[#334155] text-white font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-white/10 transition shadow-lg flex items-center justify-center gap-2 group">
                     <i data-lucide="bookmark" class="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition"></i> Save to Journal
                 </button>
@@ -78,7 +111,11 @@
                         <span class="font-mono font-black text-white">{{ item.importance }}%</span>
                     </div>
                     <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                        <div class="h-full bg-violet-600" style="width:{{ item.importance }}%"></div>
+                        <div class="h-full
+                            {% if item.importance >= 90 %} bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]
+                            {% elif item.importance >= 80 %} bg-violet-600
+                            {% else %} bg-slate-600 {% endif %}"
+                            style="width:{{ item.importance }}%"></div>
                     </div>
                 </div>
                 {% empty %}

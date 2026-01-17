@@ -50,12 +50,12 @@
                             <button @click="mode='INTRADAY'; $dispatch('mode-change', 'INTRADAY')"
                                     :class="mode==='INTRADAY' ? 'bg-[#1e293b] text-white shadow-lg' : 'text-slate-500 hover:text-white'"
                                     class="flex-1 md:flex-none px-5 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all duration-200">
-                                Intraday
+                                PERP INTRADAY
                             </button>
                             <button @click="mode='SCALP'; $dispatch('mode-change', 'SCALP')"
                                     :class="mode==='SCALP' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/30' : 'text-slate-500 hover:text-white'"
                                     class="flex-1 md:flex-none px-5 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all duration-200">
-                                Scalp
+                                PERP SCALP
                             </button>
                         </div>
 
@@ -112,7 +112,7 @@
                                     <template x-for="s in suggestions">
                                         <div @click="symbol = s; suggestions = []; $nextTick(() => validateSearch())"
                                              class="px-5 py-4 hover:bg-slate-800 cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center transition">
-                                            <span class="text-sm font-bold text-white" x-text="s"></span>
+                                            <span class="text-sm font-bold text-white" x-text="s + '.P'"></span>
                                             <span class="text-[9px] text-slate-500 font-mono font-bold">PERP</span>
                                         </div>
                                     </template>
