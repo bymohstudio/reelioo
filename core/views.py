@@ -204,7 +204,10 @@ def hx_analyze(request):
         if df is None or df.empty: return HttpResponse('<div class="text-red-500">DATA ERROR</div>')
 
         engine = CryptoQuantEngine()
-        res = engine.analyze(df, mode)
+
+        # [CRITICAL UPDATE] You MUST pass 'symbol=symbol' here!
+        # Without this, the engine cannot fetch the Order Book / Order Flow.
+        res = engine.analyze(df, mode, symbol=symbol)
 
         note_tag = "TRENDING" if res.score >= 60 else "CHOPPY"
         note_msg = generate_market_narrative(res)
