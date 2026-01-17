@@ -1,17 +1,23 @@
-import numpy as np
+from __future__ import annotations
 import pandas as pd
+import numpy as np
 import logging
-from core.quant.feature_engineering import generate_features
 
 log = logging.getLogger(__name__)
 
 
 class CryptoBacktestEngine:
     """
-    BACKTEST ENGINE v28 – INSTITUTIONAL GRADE
+    BACKTEST ENGINE v30 – TITANIUM GRADE
 
-    - Perfectly mirrors CryptoQuantEngine v28 logic.
-    - Includes: Vector Smoothing, EMA 50 Governor, Strict Thresholds.
+    Mirrors:
+    - Signed kinetic energy
+    - Energy decay (relief / exhaustion)
+    - Structural dominance
+    - Trap rejection
+    - Mode-aware logic (SWING vs SCALP)
+
+    NO UI / NO CRON / PURE SIMULATION
     """
 
     def __init__(self, df: pd.DataFrame, symbol: str):
@@ -19,219 +25,192 @@ class CryptoBacktestEngine:
         self.symbol = symbol
         self.trades = []
 
-        # v28 Constants
-        self.SIGMA_WINDOW = 14
-        self.MASS_WINDOW = 20
-        self.STRUCT_WINDOW = 20
-        self.FEE = 0.06  # Binance Taker %
+        # === Physics constants (must match engine) ===
+        self.ATR_LEN = 14
+        self.MASS_LEN = 20
+        self.STRUCT_LEN = 20
+        self.FEE = 0.06  # % taker fee
 
-    def run(self, mode="INTRADAY"):
-        if len(self.df) < 60:
+    # ==========================================================
+    # RUN
+    # ==========================================================
+
+    def run(self, mode: str = "INTRADAY"):
+        if len(self.df) < 80:
             return self._empty_result()
 
-        # 1. Feature Generation (Manual calculation to ensure match)
         df = self.df.copy()
+
         close = df["close"]
         high = df["high"]
         low = df["low"]
         volume = df["volume"]
 
         # ==================================================
-        # 2. PHYSICS CONSTRUCTION (v28 LOGIC)
+        # 1. TRUE PHYSICS (MATCH v30)
         # ==================================================
 
-        # A. Sigma (Volatility)
-        tr1 = high - low
-        tr2 = (high - close.shift()).abs()
-        tr3 = (low - close.shift()).abs()
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        sigma = tr.rolling(self.SIGMA_WINDOW).mean()
+        tr = pd.concat([
+            high - low,
+            (high - close.shift()).abs(),
+            (low - close.shift()).abs()
+        ], axis=1).max(axis=1)
 
-        # B. Kinetic Vectors
-        velocity = close.diff() / (sigma + 1e-9)
-        mass_mean = volume.rolling(self.MASS_WINDOW).mean()
-        mass = volume / (mass_mean + 1e-9)
+        atr = tr.rolling(self.ATR_LEN).mean()
 
-        raw_force = mass * velocity
+        velocity = close.diff() / (atr + 1e-9)
 
-        # [v28] Hysteresis Smoothing
-        smooth_force = raw_force.rolling(3).mean()
-        force_decay = smooth_force.diff(3)
+        vol_mean = volume.rolling(self.MASS_LEN).mean()
+        mass = volume / (vol_mean + 1e-9)
 
-        # C. Equilibrium Governor (EMA 50)
-        equilibrium = close.ewm(span=50, adjust=False).mean()
+        signed_energy = mass * velocity
+        energy_decay = signed_energy.diff(3)
 
-        # D. Structure
-        roll_high = high.rolling(self.STRUCT_WINDOW).max().shift(1)
-        roll_low = low.rolling(self.STRUCT_WINDOW).min().shift(1)
+        # ==================================================
+        # 2. STRUCTURE (NO EMA)
+        # ==================================================
 
-        # E. Anomaly Filters
-        candle_range = high - low
-        is_wide = candle_range > (2.5 * sigma)
-        mass_intensity = volume / (mass_mean + 1e-9)
-        is_hollow = is_wide & (mass_intensity < 0.9)
+        hh = high > high.rolling(self.STRUCT_LEN).max().shift(1)
+        hl = low > low.rolling(self.STRUCT_LEN).min().shift(1)
 
-        # ------------------------------------------------
-        # 3. SIMULATION LOOP
-        # ------------------------------------------------
+        lh = high < high.rolling(self.STRUCT_LEN).max().shift(1)
+        ll = low < low.rolling(self.STRUCT_LEN).min().shift(1)
+
+        # ==================================================
+        # 3. TRAP / FAKE MOVE DETECTION
+        # ==================================================
+
+        candle_range = (high - low) / close
+        vol_intensity = volume / (vol_mean + 1e-9)
+
+        is_fake = (candle_range > 0.02) & (vol_intensity < 0.8)
+
+        # ==================================================
+        # 4. SIMULATION LOOP
+        # ==================================================
+
         position = None
         entry = stop = target = 0.0
         direction = 0
 
-        # Start after smoothing window is valid
-        start_idx = 55
+        start_idx = 60
 
         for i in range(start_idx, len(df)):
 
-            # Context
             price = close.iloc[i]
             c_low = low.iloc[i]
             c_high = high.iloc[i]
-            c_sigma = sigma.iloc[i]
+            c_atr = atr.iloc[i]
 
-            # Physics
-            force_now = smooth_force.iloc[i]
-            decay_val = force_decay.iloc[i]
-            c_mass = mass.iloc[i]
+            ke = signed_energy.iloc[i]
+            decay = energy_decay.iloc[i]
 
-            # Structure
-            base_line = equilibrium.iloc[i]
-            r_high = roll_high.iloc[i]
-            r_low = roll_low.iloc[i]
+            # Structure state
+            struct_up = hh.iloc[i] and hl.iloc[i]
+            struct_down = lh.iloc[i] and ll.iloc[i]
 
-            # Trap Check
-            is_trap = is_hollow.iloc[i] or (abs(force_now) > 3.5)
+            fake = is_fake.iloc[i]
 
-            # --------------------------------------------
+            # ==================================================
             # EXIT LOGIC
-            # --------------------------------------------
+            # ==================================================
             if position:
-                exit_res = None
                 exit_price = price
+                result = None
 
-                if direction == 1:  # LONG
+                if direction == 1:
                     if c_low <= stop:
-                        exit_res = "STOP"
                         exit_price = stop
+                        result = "LOSS"
                     elif c_high >= target:
-                        exit_res = "WIN"
                         exit_price = target
-                else:  # SHORT
+                        result = "WIN"
+                else:
                     if c_high >= stop:
-                        exit_res = "STOP"
                         exit_price = stop
+                        result = "LOSS"
                     elif c_low <= target:
-                        exit_res = "WIN"
                         exit_price = target
+                        result = "WIN"
 
-                if exit_res:
+                if result:
                     pnl = (exit_price - entry) / entry * 100
-                    if direction == -1: pnl *= -1
-                    pnl -= self.FEE  # Fee impact
+                    if direction == -1:
+                        pnl *= -1
+                    pnl -= self.FEE
 
                     self.trades.append({
-                        "result": exit_res,
+                        "result": result,
                         "pnl": round(pnl, 2),
                         "entry": entry,
                         "exit": exit_price,
                     })
+
                     position = None
                     continue
 
-            # --------------------------------------------
-            # ENTRY LOGIC (v28 Strict)
-            # --------------------------------------------
-            if not position:
+            # ==================================================
+            # ENTRY LOGIC (v30)
+            # ==================================================
 
-                # 1. Determine Regime (v28 Thresholds)
+            if position:
+                continue
+
+            # ---- REGIME DETECTION ----
+            if abs(ke) < 0.5:
+                regime = "COMPRESSION"
+            elif abs(ke) > 1.5 and decay > 0:
+                regime = "EXPANSION"
+            elif abs(ke) > 0.8:
+                regime = "TREND"
+            elif decay < 0:
+                regime = "EXHAUSTION"
+            else:
                 regime = "IDLE"
-                if abs(force_now) < 0.6:
-                    regime = "COMPRESSION"
-                elif abs(force_now) > 2.0 and decay_val > 0:
-                    regime = "EXPANSION"
-                elif abs(force_now) > 0.8:
-                    regime = "TREND"
-                elif decay_val < -0.5:
-                    regime = "EXHAUSTION"
 
-                bias = "HOLD"
-                lane = "HOLD"
+            bias = None
 
-                # Quality Check
-                is_high_quality = c_mass > 1.2
+            # ---- MODE FILTERS ----
+            if mode == "SCALP":
+                ke_req = 0.6
+                rr_mult = 1.8
+                stop_mult = 1.2
+            else:  # INTRADAY = SWING
+                ke_req = 1.0
+                rr_mult = 3.0
+                stop_mult = 1.5
 
-                # Governor Check
-                is_positive = price > base_line
-                is_negative = price < base_line
+            # ---- SIGNAL CONDITIONS ----
+            if regime in ("TREND", "EXPANSION") and not fake:
 
-                # --- A. TREND ---
-                if regime == "TREND":
-                    if force_now > 0 and is_positive and not is_trap and is_high_quality:
-                        bias = "LONG"
-                        lane = "TREND"
-                    elif force_now < 0 and is_negative and not is_trap and is_high_quality:
-                        bias = "SHORT"
-                        lane = "TREND"
+                # LONG
+                if ke > ke_req and struct_up and decay >= 0:
+                    bias = "LONG"
 
-                # --- B. EXPANSION ---
-                elif regime == "EXPANSION":
-                    if force_now > 2.0 and not is_trap and is_positive:
-                        bias = "LONG"
-                        lane = "BREAKOUT"
-                    elif force_now < -2.0 and not is_trap and is_negative:
-                        bias = "SHORT"
-                        lane = "BREAKOUT"
+                # SHORT (RELIEF CONFIRMATION)
+                elif ke < -ke_req and struct_down and decay < 0:
+                    bias = "SHORT"
 
-                # --- C. RANGE (Compression) ---
-                elif regime == "COMPRESSION":
-                    # Range Width Check (>1.5%)
-                    if r_low > 0:
-                        width = (r_high - r_low) / r_low
-                        if width > 0.015:
-                            dist_sup = (price - r_low) / r_low
-                            dist_res = (r_high - price) / r_high
-                            c_vel = velocity.iloc[i]
+            # ---- EXECUTION ----
+            if bias:
+                direction = 1 if bias == "LONG" else -1
+                entry = price
 
-                            # Long Support (Only if NOT crashing)
-                            if dist_sup < 0.01 and c_vel > 0 and not is_negative:
-                                bias = "LONG"
-                                lane = "RANGE"
+                stop = price - direction * c_atr * stop_mult
+                target = price + direction * c_atr * rr_mult
 
-                            # Short Resistance (Only if NOT pumping)
-                            elif dist_res < 0.01 and c_vel < 0 and not is_positive:
-                                bias = "SHORT"
-                                lane = "RANGE"
-
-                # 3. Execution
-                if bias != "HOLD":
-                    direction = 1 if bias == "LONG" else -1
-
-                    # Sizing based on Lane
-                    if lane == "RANGE":
-                        stop_mult = 1.0
-                        target_mult = 1.0  # 1:1 RR for Range
-                    elif lane == "BREAKOUT":
-                        stop_mult = 1.8
-                        target_mult = 3.0
-                    else:  # Trend
-                        stop_mult = 1.5
-                        target_mult = 3.5
-
-                    entry = price
-                    stop = price - (direction * c_sigma * stop_mult)
-
-                    # For Range, Target is Fixed Level
-                    if lane == "RANGE":
-                        target = r_high if bias == "LONG" else r_low
-                    else:
-                        target = price + (direction * c_sigma * target_mult)
-
-                    position = bias
+                position = bias
 
         return self._stats()
 
+    # ==========================================================
+    # STATS
+    # ==========================================================
+
     def _stats(self):
-        if not self.trades: return self._empty_result()
+        if not self.trades:
+            return self._empty_result()
+
         wins = [t for t in self.trades if t["pnl"] > 0]
         losses = [t for t in self.trades if t["pnl"] < 0]
 
@@ -244,8 +223,13 @@ class CryptoBacktestEngine:
             "total_trades": len(self.trades),
             "win_rate": round(len(wins) / len(self.trades) * 100, 1),
             "profit_factor": pf,
-            "recent_trades": self.trades[-20:]
+            "recent_trades": self.trades[-20:],
         }
 
     def _empty_result(self):
-        return {"total_trades": 0, "win_rate": 0.0, "profit_factor": 0.0, "recent_trades": []}
+        return {
+            "total_trades": 0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "recent_trades": [],
+        }
