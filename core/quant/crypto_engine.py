@@ -12,11 +12,12 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v32 – TITANIUM HYBRID
+    REELIOO ENGINE v32.1 – STRICT IMPULSE EDITION
 
     LOGIC:
       1. Anti-Lag Momentum (v31)
       2. Level 2 Order Flow Gatekeeper (v32)
+      3. Strict Impulse Gating (v32.1) -> Kills "Zombie Trades"
 
     OUTPUT:
       Clean Retail Terms (No Brackets, No Jargon)
@@ -105,17 +106,18 @@ class CryptoQuantEngine:
             # ===================================================================
             # 5. REGIME DETECTION
             # ===================================================================
-            if abs(force_now) < 0.6:
+            # [TWEAK] Raised idle threshold to clean up noise
+            if abs(force_now) < 0.8:
                 regime = "COMPRESSION"
             elif abs(force_now) > 2.0 and acceleration > 0:
                 regime = "EXPANSION"
-            elif abs(force_now) > 0.8:
+            elif abs(force_now) > 1.0:
                 regime = "TREND"
             else:
                 regime = "IDLE"
 
             # ===================================================================
-            # 6. INITIAL SIGNAL GENERATION
+            # 6. INITIAL SIGNAL GENERATION (STRICT IMPULSE MODE)
             # ===================================================================
             bias = "HOLD"
             lane = "⚫ HOLD"
@@ -126,16 +128,36 @@ class CryptoQuantEngine:
             valid_short_energy = current_energy > 25
             valid_vol = vol_scalar > 1.0
 
-            if (regime in ["TREND", "EXPANSION"] and force_now > 0.8 and acceleration > -0.1 and
-                    bull_struct and not is_overstretched_long and valid_long_energy and valid_vol and
-                    not is_wick_trap and not is_exhaustion):
+            # --- [CRITICAL v32.1 UPDATES START HERE] ---
+            MIN_FORCE = 1.2  # Was 0.8
+            MIN_ACCEL = 0.05  # Was -0.1 (Now requires POSITIVE speed up)
+
+            # LONG ENTRY
+            if (regime in ["TREND", "EXPANSION"] and
+                    force_now > MIN_FORCE and
+                    acceleration > MIN_ACCEL and
+                    bull_struct and
+                    not is_overstretched_long and
+                    valid_long_energy and
+                    valid_vol and
+                    not is_wick_trap and
+                    not is_exhaustion):
+
                 bias = "LONG"
                 score = 85
                 lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
 
-            elif (regime in ["TREND", "EXPANSION"] and force_now < -0.8 and acceleration < 0.1 and
-                  bear_struct and not is_overstretched_short and valid_short_energy and valid_vol and
-                  not is_wick_trap and not is_exhaustion):
+            # SHORT ENTRY
+            elif (regime in ["TREND", "EXPANSION"] and
+                  force_now < -MIN_FORCE and
+                  acceleration < -MIN_ACCEL and
+                  bear_struct and
+                  not is_overstretched_short and
+                  valid_short_energy and
+                  valid_vol and
+                  not is_wick_trap and
+                  not is_exhaustion):
+
                 bias = "SHORT"
                 score = 85
                 lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
@@ -191,7 +213,10 @@ class CryptoQuantEngine:
 
         if bias in ["LONG", "SHORT"]:
             direction = 1 if bias == "LONG" else -1
-            stop_dist = current_sigma * 1.5
+
+            # [TWEAK] Tighter stops for strict impulse (1.2 instead of 1.5)
+            stop_dist = current_sigma * 1.2
+
             stop = price - (direction * stop_dist)
             t1 = price + (direction * stop_dist * 2.0)
             t2 = price + (direction * stop_dist * 4.0)

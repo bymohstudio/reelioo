@@ -174,7 +174,7 @@ class CryptoBacktestEngine:
                     continue
 
             # ----------------------------------------------
-            # ENTRY LOGIC (v31 TITANIUM)
+            # ENTRY LOGIC (UPDATED TO MATCH v32.1 STRICT MODE)
             # ----------------------------------------------
             if not position and regime in ["TREND", "EXPANSION"]:
 
@@ -185,9 +185,14 @@ class CryptoBacktestEngine:
                 valid_short_energy = en_now > 25
                 vol_ok = float(mass.iloc[i]) > 1.0
 
+                # --- v32.1 CONSTANTS ---
+                MIN_FORCE = 1.2  # Was 0.8
+                MIN_ACCEL = 0.05  # Was -0.1
+                STOP_MULT = 1.2  # Was 1.5 (Tighter stops for impulse)
+
                 # LONG
-                if (f_now > 0.8 and
-                        acc_now > -0.1 and
+                if (f_now > MIN_FORCE and
+                        acc_now > MIN_ACCEL and
                         bull_struct.iloc[i] and
                         not is_overstretched_long.iloc[i] and
                         valid_long_energy and
@@ -197,8 +202,8 @@ class CryptoBacktestEngine:
                     bias = "LONG"
 
                 # SHORT
-                elif (f_now < -0.8 and
-                      acc_now < 0.1 and
+                elif (f_now < -MIN_FORCE and
+                      acc_now < -MIN_ACCEL and
                       bear_struct.iloc[i] and
                       not is_overstretched_short.iloc[i] and
                       valid_short_energy and
@@ -212,10 +217,11 @@ class CryptoBacktestEngine:
                     direction = 1 if bias == "LONG" else -1
                     entry = price
 
-                    stop_dist = c_sigma * 1.5
+                    # Updated Stop Distance for v32.1
+                    stop_dist = c_sigma * STOP_MULT
                     stop = price - (direction * stop_dist)
 
-                    # Target 2.0 (Conservative Backtest Target)
+                    # Target 2.0
                     target = price + (direction * stop_dist * 2.0)
 
                     position = bias
