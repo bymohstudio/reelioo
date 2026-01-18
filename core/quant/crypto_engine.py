@@ -3,8 +3,6 @@ from types import SimpleNamespace
 import pandas as pd
 import numpy as np
 import logging
-
-# [REQUIRED] Import MarketService for Level 2 Data
 from core.services.marketdata_service import MarketService
 
 log = logging.getLogger(__name__)
@@ -12,15 +10,14 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v32.1 – STRICT IMPULSE EDITION
+    REELIOO ENGINE v32.2 – DYNAMIC VECTORS EDITION
 
-    LOGIC:
-      1. Anti-Lag Momentum (v31)
-      2. Level 2 Order Flow Gatekeeper (v32)
-      3. Strict Impulse Gating (v32.1) -> Kills "Zombie Trades"
-
-    OUTPUT:
-      Clean Retail Terms (No Brackets, No Jargon)
+    UPGRADE:
+    --------
+    Logic Vectors are now MATHEMATICALLY CALCULATED integers, not hardcoded.
+    - Compression % based on inverse Force.
+    - Impulse % based on Volume Scalar.
+    - Wall % based on exact Order Book Imbalance.
     """
 
     def __init__(self):
@@ -31,14 +28,10 @@ class CryptoQuantEngine:
         self.MAX_STRETCH = 0.03
 
     def analyze(self, df: pd.DataFrame, trade_style="INTRADAY", market_context=None, symbol=None):
-        """
-        [NOTE] 'symbol' is required for Order Flow checks.
-        """
         price = 0.0
 
         try:
-            if len(df) < 60:
-                return self._neutral(0, "Insufficient History")
+            if len(df) < 60: return self._neutral(0, "Insufficient History")
 
             df = df.copy()
             close = df["close"]
@@ -49,13 +42,9 @@ class CryptoQuantEngine:
             price = float(close.iloc[-1])
 
             # ===================================================================
-            # 1. CORE MOMENTUM (Anti-Lag Force)
+            # 1. PHYSICS VECTORS
             # ===================================================================
-            tr = pd.concat([
-                high - low,
-                (high - close.shift()).abs(),
-                (low - close.shift()).abs()
-            ], axis=1).max(axis=1)
+            tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
             sigma = tr.rolling(self.ATR_LEN).mean()
             current_sigma = float(sigma.iloc[-1])
 
@@ -63,13 +52,12 @@ class CryptoQuantEngine:
             vol_mean = volume.rolling(self.MASS_LEN).mean()
             mass = volume / (vol_mean + 1e-9)
 
-            # Fast Smoothing (2-period)
             force = (mass * velocity).rolling(2).mean()
             force_now = float(force.iloc[-1])
             acceleration = force.diff(2).iloc[-1]
 
             # ===================================================================
-            # 2. ENERGY GAUGE (Hidden RSI)
+            # 2. ENERGY & ELASTICITY
             # ===================================================================
             delta = close.diff()
             gain = (delta.where(delta > 0, 0)).rolling(14).mean()
@@ -78,20 +66,16 @@ class CryptoQuantEngine:
             energy_reserve = 100 - (100 / (1 + rs))
             current_energy = float(energy_reserve.iloc[-1])
 
-            # ===================================================================
-            # 3. STRUCTURE & ELASTICITY
-            # ===================================================================
             eq = close.ewm(span=self.STRUCT_LEN).mean().iloc[-1]
             stretch_pct = (price - eq) / eq
 
             is_overstretched_long = stretch_pct > self.MAX_STRETCH
             is_overstretched_short = stretch_pct < -self.MAX_STRETCH
-
             bull_struct = price > eq
             bear_struct = price < eq
 
             # ===================================================================
-            # 4. TRAP DETECTION
+            # 3. TRAP DETECTION
             # ===================================================================
             body = abs(close.iloc[-1] - open_p.iloc[-1])
             wick_upper = high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])
@@ -104,9 +88,8 @@ class CryptoQuantEngine:
             is_exhaustion = (abs(force_now) > 1.5 and acceleration < 0)
 
             # ===================================================================
-            # 5. REGIME DETECTION
+            # 4. REGIME
             # ===================================================================
-            # [TWEAK] Raised idle threshold to clean up noise
             if abs(force_now) < 0.8:
                 regime = "COMPRESSION"
             elif abs(force_now) > 2.0 and acceleration > 0:
@@ -117,7 +100,7 @@ class CryptoQuantEngine:
                 regime = "IDLE"
 
             # ===================================================================
-            # 6. INITIAL SIGNAL GENERATION (STRICT IMPULSE MODE)
+            # 5. SIGNAL GENERATION (STRICT IMPULSE)
             # ===================================================================
             bias = "HOLD"
             lane = "⚫ HOLD"
@@ -128,52 +111,36 @@ class CryptoQuantEngine:
             valid_short_energy = current_energy > 25
             valid_vol = vol_scalar > 1.0
 
-            # --- [CRITICAL v32.1 UPDATES START HERE] ---
-            MIN_FORCE = 1.2  # Was 0.8
-            MIN_ACCEL = 0.05  # Was -0.1 (Now requires POSITIVE speed up)
+            MIN_FORCE = 1.2
+            MIN_ACCEL = 0.05
 
-            # LONG ENTRY
-            if (regime in ["TREND", "EXPANSION"] and
-                    force_now > MIN_FORCE and
-                    acceleration > MIN_ACCEL and
-                    bull_struct and
-                    not is_overstretched_long and
-                    valid_long_energy and
-                    valid_vol and
-                    not is_wick_trap and
-                    not is_exhaustion):
-
-                bias = "LONG"
+            # LONG
+            if (regime in ["TREND", "EXPANSION"] and force_now > MIN_FORCE and acceleration > MIN_ACCEL and
+                    bull_struct and not is_overstretched_long and valid_long_energy and valid_vol and
+                    not is_wick_trap and not is_exhaustion):
+                bias = "LONG";
                 score = 85
                 lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
 
-            # SHORT ENTRY
-            elif (regime in ["TREND", "EXPANSION"] and
-                  force_now < -MIN_FORCE and
-                  acceleration < -MIN_ACCEL and
-                  bear_struct and
-                  not is_overstretched_short and
-                  valid_short_energy and
-                  valid_vol and
-                  not is_wick_trap and
-                  not is_exhaustion):
-
-                bias = "SHORT"
+            # SHORT
+            elif (regime in ["TREND", "EXPANSION"] and force_now < -MIN_FORCE and acceleration < -MIN_ACCEL and
+                  bear_struct and not is_overstretched_short and valid_short_energy and valid_vol and
+                  not is_wick_trap and not is_exhaustion):
+                bias = "SHORT";
                 score = 85
                 lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
 
             elif regime == "COMPRESSION":
-                bias = "WATCH"
+                bias = "WATCH";
                 score = 60
                 lane = "🟠 BUILDING"
 
             # ===================================================================
-            # 7. LEVEL 2 ORDER FLOW GATEKEEPER (v32)
+            # 6. ORDER FLOW CHECK
             # ===================================================================
             obi_score = 0.0
             blocked_by_of = False
 
-            # Only check if we have a valid signal and a symbol
             if bias in ["LONG", "SHORT"] and symbol:
                 try:
                     data = MarketService.get_order_book_snapshot(symbol)
@@ -182,30 +149,27 @@ class CryptoQuantEngine:
                         asks = np.array(data['asks'], dtype=float)
                         bid_vol = np.sum(bids[:, 1])
                         ask_vol = np.sum(asks[:, 1])
-
-                        # OBI: +1.0 (All Bids) to -1.0 (All Asks)
                         obi_score = (bid_vol - ask_vol) / (bid_vol + ask_vol)
 
-                        # BLOCK if trading into a wall
                         if bias == "LONG" and obi_score < -0.25:
-                            bias = "HOLD"
-                            lane = "⚫ BLOCKED"
-                            blocked_by_of = True
+                            bias = "HOLD";
+                            lane = "⚫ BLOCKED";
+                            blocked_by_of = True;
                             score = 50
                         elif bias == "SHORT" and obi_score > 0.25:
-                            bias = "HOLD"
-                            lane = "⚫ BLOCKED"
-                            blocked_by_of = True
+                            bias = "HOLD";
+                            lane = "⚫ BLOCKED";
+                            blocked_by_of = True;
                             score = 50
-                except Exception:
-                    pass  # Fail safe, don't crash if OF fails
+                except:
+                    pass
 
         except Exception as e:
             log.error(f"Engine Crash: {e}")
             return self._neutral(price, "System Error")
 
         # =======================================================================
-        # 8. OUTPUTS
+        # 7. OUTPUTS
         # =======================================================================
         stop = t1 = t2 = t3 = 0.0
         rr = 0.0
@@ -213,10 +177,7 @@ class CryptoQuantEngine:
 
         if bias in ["LONG", "SHORT"]:
             direction = 1 if bias == "LONG" else -1
-
-            # [TWEAK] Tighter stops for strict impulse (1.2 instead of 1.5)
             stop_dist = current_sigma * 1.2
-
             stop = price - (direction * stop_dist)
             t1 = price + (direction * stop_dist * 2.0)
             t2 = price + (direction * stop_dist * 4.0)
@@ -225,50 +186,74 @@ class CryptoQuantEngine:
             rr = 2.0
 
         # =======================================================================
-        # 9. LOGIC VECTORS (CLEAN & RETAIL FRIENDLY)
+        # 8. DYNAMIC LOGIC VECTORS (REAL MATH)
         # =======================================================================
         top_features = []
+        whale_active = abs(vol_scalar - 1.0) > 1.5
 
-        whale_z = float(vol_scalar - 1.0)
-        whale_active = abs(whale_z) > 1.5
+        # --- Helper for mapping ranges to percentages ---
+        def calc_pct(val, min_v, max_v, target_min=60, target_max=99):
+            norm = (abs(val) - min_v) / (max_v - min_v)
+            norm = max(0.0, min(1.0, norm))  # Clamp 0-1
+            return int(target_min + (norm * (target_max - target_min)))
 
-        # A. Order Flow Vectors (Clean Style)
         if blocked_by_of:
+            # Wall strength based on OBI score (-1.0 to 1.0)
+            wall_strength = calc_pct(obi_score, 0.25, 0.8, 80, 100)
             desc = "Order Book Sell Wall" if obi_score < 0 else "Order Book Buy Wall"
-            top_features.append({"desc": desc, "importance": 100})
+            top_features.append({"desc": desc, "importance": wall_strength})
 
         elif bias in ["LONG", "SHORT"]:
-            # 1. Momentum
-            desc = "Accelerating Bullish Momentum" if bias == "LONG" else "Accelerating Bearish Momentum"
-            top_features.append({"desc": desc, "importance": 95})
+            # Momentum Importance based on Force (1.2 to 3.0)
+            mom_imp = calc_pct(force_now, 1.2, 3.0, 85, 99)
+            desc = "High Velocity Impulse" if bias == "LONG" else "High Velocity Dump"
+            top_features.append({"desc": desc, "importance": mom_imp})
 
-            # 2. Order Flow Confirmation (Clean)
+            # Order Flow Support based on OBI (0.1 to 0.5)
+            of_imp = calc_pct(obi_score, 0.1, 0.5, 75, 95)
             if bias == "LONG" and obi_score > 0.1:
-                top_features.append({"desc": "Strong Bid Support", "importance": 90})
+                top_features.append({"desc": "Strong Bid Support", "importance": of_imp})
             elif bias == "SHORT" and obi_score < -0.1:
-                top_features.append({"desc": "Strong Ask Pressure", "importance": 90})
+                top_features.append({"desc": "Strong Ask Pressure", "importance": of_imp})
             else:
-                top_features.append({"desc": "Clean Market Structure", "importance": 85})
+                top_features.append({"desc": "Clean Market Structure", "importance": 85})  # Baseline
 
-            # 3. Volume
+            # Volume Importance based on Scalar (1.0 to 4.0)
+            vol_imp = calc_pct(vol_scalar, 1.0, 4.0, 70, 95)
             if whale_active:
-                top_features.append({"desc": "Heavy Institutional Volume", "importance": 85})
+                top_features.append({"desc": "Heavy Institutional Volume", "importance": vol_imp})
             else:
-                top_features.append({"desc": "Healthy Volume Inflow", "importance": 80})
+                top_features.append({"desc": "Volume Confirmation", "importance": vol_imp})
 
         elif bias == "WATCH":
-            top_features.append({"desc": "Volatility Compression", "importance": 80})
-            top_features.append({"desc": "Awaiting Kinetic Impulse", "importance": 70})
+            # Compression: Higher if force is closer to 0
+            comp_imp = 100 - calc_pct(force_now, 0.0, 0.8, 0, 40)  # 100 - (0 to 40) = 100 to 60
+            top_features.append({"desc": "Volatility Compression", "importance": comp_imp})
 
-        else:  # HOLD
+            # Kinetic Impulse Waiting: Higher if volume is building
+            wait_imp = calc_pct(vol_scalar, 0.5, 2.0, 60, 90)
+            top_features.append({"desc": "Awaiting Kinetic Impulse", "importance": wait_imp})
+
+        else:  # HOLD REASONS
             if is_overstretched_long or is_overstretched_short:
-                top_features.append({"desc": "Price Overextended", "importance": 90})
+                # Stretch severity (3% to 6%)
+                stretch_imp = calc_pct(stretch_pct, 0.03, 0.06, 80, 100)
+                top_features.append({"desc": "Price Overextended", "importance": stretch_imp})
+
             elif not valid_long_energy or not valid_short_energy:
-                top_features.append({"desc": "Momentum Exhausted", "importance": 90})
+                # Energy exhaustion (75 to 90 RSI)
+                exh_imp = calc_pct(current_energy, 75, 90, 80, 99)
+                top_features.append({"desc": "Momentum Exhausted", "importance": exh_imp})
+
             elif is_wick_trap:
-                top_features.append({"desc": "Wick Rejection Detected", "importance": 80})
+                top_features.append(
+                    {"desc": "Wick Rejection Detected", "importance": 85})  # Wicks are usually significant
+
             elif is_exhaustion:
-                top_features.append({"desc": "Momentum Deceleration", "importance": 80})
+                # Decel severity
+                decel_imp = calc_pct(acceleration, 0.0, 0.5, 75, 95)
+                top_features.append({"desc": "Momentum Deceleration", "importance": decel_imp})
+
             else:
                 top_features.append({"desc": "Market Noise", "importance": 50})
 
