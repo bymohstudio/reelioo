@@ -10,13 +10,12 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v32.3 – VISIBILITY UPDATE
+    REELIOO ENGINE v32.4 – COLOR LOGIC FIX
 
     FIXES:
     ------
-    1. WHALE LABEL: Added 'whale_label' so UI shows volume status during HOLD.
-    2. REGIME SENSITIVITY: Lowered 'Compression' threshold to 0.5 to prevent
-       it from showing up constantly. Added 'RANGE' for normal activity.
+    1. REGIME COLOR BUG: Fixed issue where "WATCH" (Compression) was showing as
+       Green because it wasn't "HOLD". Now explicitly maps Long->Green, Short->Red.
     """
 
     def __init__(self):
@@ -87,13 +86,13 @@ class CryptoQuantEngine:
             is_exhaustion = (abs(force_now) > 1.5 and acceleration < 0)
 
             # ===================================================================
-            # 4. REGIME (FIXED: Added RANGE, Lowered COMPRESSION)
+            # 4. REGIME
             # ===================================================================
             abs_force = abs(force_now)
 
-            if abs_force < 0.5:  # Was 0.8 (Too high)
+            if abs_force < 0.5:
                 regime = "COMPRESSION"
-            elif abs_force < 1.0:  # New Middle Ground
+            elif abs_force < 1.0:
                 regime = "RANGE"
             elif abs_force > 2.0 and acceleration > 0:
                 regime = "EXPANSION"
@@ -103,7 +102,7 @@ class CryptoQuantEngine:
                 regime = "RANGE"
 
             # ===================================================================
-            # 5. SIGNAL GENERATION (STRICT IMPULSE)
+            # 5. SIGNAL GENERATION
             # ===================================================================
             bias = "HOLD"
             lane = "⚫ HOLD"
@@ -133,6 +132,7 @@ class CryptoQuantEngine:
                 score = 85
                 lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
 
+            # WATCH (COMPRESSION)
             elif regime == "COMPRESSION":
                 bias = "WATCH";
                 score = 60
@@ -189,15 +189,23 @@ class CryptoQuantEngine:
             rr = 2.0
 
         # =======================================================================
-        # 8. DYNAMIC LOGIC VECTORS
+        # 8. DYNAMIC LOGIC VECTORS & COLORS
         # =======================================================================
-        top_features = []
+        # [FIXED] Explicit Color Logic
+        regime_color = "gray"
+        if bias == "LONG":
+            regime_color = "green"
+        elif bias == "SHORT":
+            regime_color = "red"
+        elif bias == "WATCH":
+            regime_color = "violet"  # Triggers the 'else' (Violet Pulse) in UI
+        else:
+            regime_color = "gray"
 
-        # [FIXED] WHALE CALCULATIONS
+        top_features = []
         whale_z = vol_scalar - 1.0
         whale_active = abs(whale_z) > 1.5
 
-        # Create readable label for UI (even if HOLD)
         whale_label = "NORMAL"
         if vol_scalar > 2.5:
             whale_label = "INSTITUTIONAL"
@@ -206,7 +214,6 @@ class CryptoQuantEngine:
         elif vol_scalar < 0.5:
             whale_label = "LOW"
 
-        # --- Helper for mapping ---
         def calc_pct(val, min_v, max_v, target_min=60, target_max=99):
             norm = (abs(val) - min_v) / (max_v - min_v)
             norm = max(0.0, min(1.0, norm))
@@ -239,31 +246,24 @@ class CryptoQuantEngine:
         elif bias == "WATCH":
             comp_imp = 100 - calc_pct(force_now, 0.0, 0.5, 0, 40)
             top_features.append({"desc": "Volatility Compression", "importance": comp_imp})
-
             wait_imp = calc_pct(vol_scalar, 0.5, 2.0, 60, 90)
             top_features.append({"desc": "Awaiting Kinetic Impulse", "importance": wait_imp})
 
         else:  # HOLD
-            # [ADDED] If whale activity is high during HOLD, show it in vectors
             if whale_active:
                 v_imp = calc_pct(vol_scalar, 1.5, 4.0, 75, 95)
                 top_features.append({"desc": "Anomalous Volume (Absorption)", "importance": v_imp})
-
             if is_overstretched_long or is_overstretched_short:
                 stretch_imp = calc_pct(stretch_pct, 0.03, 0.06, 80, 100)
                 top_features.append({"desc": "Price Overextended", "importance": stretch_imp})
-
             elif not valid_long_energy or not valid_short_energy:
                 exh_imp = calc_pct(current_energy, 75, 90, 80, 99)
                 top_features.append({"desc": "Momentum Exhausted", "importance": exh_imp})
-
             elif is_wick_trap:
                 top_features.append({"desc": "Wick Rejection Detected", "importance": 85})
-
             elif is_exhaustion:
                 decel_imp = calc_pct(acceleration, 0.0, 0.5, 75, 95)
                 top_features.append({"desc": "Momentum Deceleration", "importance": decel_imp})
-
             else:
                 top_features.append({"desc": "Market Noise", "importance": 50})
 
@@ -275,8 +275,8 @@ class CryptoQuantEngine:
             entry=price if bias in ["LONG", "SHORT"] else 0.0,
             stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
             rr_ratio=round(rr, 2), risk_pct=round(risk_pct * 100, 2),
-            regime=regime, regime_color="green" if bias != "HOLD" else "gray",
-            # [FIXED] Pass the UI label explicitly
+            regime=regime,
+            regime_color=regime_color,  # [FIXED]
             whale_state="ACTIVE" if whale_active else "BASELINE",
             whale_label=whale_label,
             top_features=top_features,
