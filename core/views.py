@@ -345,13 +345,13 @@ def refresh_journal_entry(request, entry_id):
         hours_elapsed = (timezone.now() - entry.created_at).total_seconds() / 3600
 
         if hours_elapsed >= 4.0:
-            # Mark as Invalid/Expired
-            entry.status = 'INVALID'
+            # CHANGE: Mark as 'EXPIRED' instead of 'INVALID'
+            entry.status = 'EXPIRED'
             entry.save()
 
-            msg_type = "warning"
-            title = "Setup Invalidated"
-            message = "Time limit (4h) exceeded. Trade voided."
+            msg_type = "info"  # Neutral Blue/Gray
+            title = "Signal Expired"
+            message = "4h time limit reached. Setup closed flat."
 
         else:
             # Proceed with Price Check since time is valid
@@ -426,10 +426,15 @@ def refresh_journal_entry(request, entry_id):
             title = "Trade Complete"
             message = "Result: LOSS"
 
-        elif entry.status == 'INVALID':
+        elif entry.status == 'EXPIRED':  # Handle the new status here
             msg_type = "info"
-            title = "Trade Voided"
-            message = "Setup expired (4h limit)."
+            title = "Signal Expired"
+            message = "Trade window closed (4h limit)."
+
+        elif entry.status == 'INVALID':  # Keep for backward compatibility
+            msg_type = "info"
+            title = "Signal Expired"
+            message = "Trade window closed."
 
     # Render response
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
