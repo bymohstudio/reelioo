@@ -645,7 +645,7 @@ def cron_scan_trigger(request, secret_key=None):
                     send_discord_alert(symbol, "SNIPER")
 
                     # B. Marketing Alert (Click-to-Tweet for Admin)
-                    if res.score >= 65:
+                    if res.score >= 75:
                         try:
                             whale_state = getattr(res, 'whale_state', 'BASELINE')
                             send_marketing_prompt(symbol, res.score, whale_state)
