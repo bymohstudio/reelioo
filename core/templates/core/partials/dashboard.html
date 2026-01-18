@@ -18,11 +18,11 @@
                     </span>
                 </div>
 
-                <div class="flex items-baseline gap-4">
+                <div class="flex flex-wrap items-baseline gap-x-4 gap-y-0">
                     <h2 class="text-6xl md:text-7xl font-black tracking-tighter leading-none
                         {% if 'LONG' in res.bias %}text-emerald-400
                         {% elif 'SHORT' in res.bias %}text-red-500
-                        {% elif 'WATCH' in res.bias %}text-orange-400
+                        {% elif 'WATCH' in res.bias %}text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.3)]
                         {% else %}text-slate-500{% endif %}">
                         {% if 'LONG' in res.bias %}BUY
                         {% elif 'SHORT' in res.bias %}SELL
@@ -30,7 +30,7 @@
                         {% else %}HOLD{% endif %}
                     </h2>
 
-                    <span class="text-2xl font-black tracking-widest text-slate-600 select-none">
+                    <span class="text-2xl font-black tracking-widest text-slate-600 select-none whitespace-nowrap">
                         {{ symbol }}<span class="text-slate-600">.P</span>
                     </span>
                 </div>
