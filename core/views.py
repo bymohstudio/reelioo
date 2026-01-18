@@ -338,74 +338,86 @@ def refresh_journal_entry(request, entry_id):
     title = "Synced"
     message = "Trade is already closed."
 
-    # --- CASE 1: TRADE IS ACTIVE (CHECK PRICE) ---
+    # --- CASE 1: TRADE IS ACTIVE (CHECK PRICE & TIME) ---
     if entry.status == 'PENDING':
-        try:
-            df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
-            if df is not None:
-                curr = float(df['close'].iloc[-1])
-                message = f"Current Price: ${curr}"
-                new_status = 'PENDING'
 
-                # Check Outcome
-                if entry.bias == 'LONG':
-                    if curr >= entry.target:
-                        new_status = 'WIN'
-                    elif curr <= entry.stop_loss:
-                        new_status = 'LOSS'
-                else:
-                    if curr <= entry.target:
-                        new_status = 'WIN'
-                    elif curr >= entry.stop_loss:
-                        new_status = 'LOSS'
+        # [NEW LOGIC] CHECK TIME-TO-LIVE (4 HOURS)
+        hours_elapsed = (timezone.now() - entry.created_at).total_seconds() / 3600
 
-                # Update DB if status changed
-                if new_status != 'PENDING':
-                    entry.status = new_status
-                    entry.save()
+        if hours_elapsed >= 4.0:
+            # Mark as Invalid/Expired
+            entry.status = 'INVALID'
+            entry.save()
 
-                    if new_status == 'WIN':
-                        msg_type = "success"
-                        title = "Target Hit!"
-                        message = "Trade closed in profit."
-
-                        # --- TRIGGER ALERT (TRANSITION) ---
-                        if request.user.is_superuser:
-                            try:
-                                duration = (timezone.now() - entry.created_at).total_seconds() / 3600
-                                roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-                                send_win_prompt(entry.symbol, round(roi, 2), duration)
-                            except Exception as e:
-                                print(f"Marketing Error: {e}")
-
-                    elif new_status == 'LOSS':
-                        msg_type = "error"
-                        title = "Stop Loss Hit"
-                        message = "Trade closed in loss."
-                else:
-                    title = "Status: PENDING"
-
-        except Exception as e:
             msg_type = "warning"
-            title = "Sync Error"
-            message = "Could not fetch market data."
+            title = "Setup Invalidated"
+            message = "Time limit (4h) exceeded. Trade voided."
+
+        else:
+            # Proceed with Price Check since time is valid
+            try:
+                df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
+                if df is not None:
+                    curr = float(df['close'].iloc[-1])
+                    message = f"Current Price: ${curr}"
+                    new_status = 'PENDING'
+
+                    # Check Outcome
+                    if entry.bias == 'LONG':
+                        if curr >= entry.target:
+                            new_status = 'WIN'
+                        elif curr <= entry.stop_loss:
+                            new_status = 'LOSS'
+                    else:
+                        if curr <= entry.target:
+                            new_status = 'WIN'
+                        elif curr >= entry.stop_loss:
+                            new_status = 'LOSS'
+
+                    # Update DB if status changed
+                    if new_status != 'PENDING':
+                        entry.status = new_status
+                        entry.save()
+
+                        if new_status == 'WIN':
+                            msg_type = "success"
+                            title = "Target Hit!"
+                            message = "Trade closed in profit."
+
+                            # --- TRIGGER ALERT (TRANSITION) ---
+                            if request.user.is_superuser:
+                                try:
+                                    duration = (timezone.now() - entry.created_at).total_seconds() / 3600
+                                    roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
+                                    send_win_prompt(entry.symbol, round(roi, 2), duration)
+                                except Exception as e:
+                                    print(f"Marketing Error: {e}")
+
+                        elif new_status == 'LOSS':
+                            msg_type = "error"
+                            title = "Stop Loss Hit"
+                            message = "Trade closed in loss."
+                    else:
+                        title = "Status: PENDING"
+
+            except Exception as e:
+                msg_type = "warning"
+                title = "Sync Error"
+                message = "Could not fetch market data."
 
     # --- CASE 2: TRADE IS ALREADY CLOSED ---
     else:
         if entry.status == 'WIN':
             msg_type = "success"
             title = "Trade Complete"
-            message = "Result: WIN (Alert Sent)"  # UI Feedback
+            message = "Result: WIN (Alert Sent)"
 
-            # --- NEW FIX: ALLOW RE-SENDING ALERT FOR EXISTING WINS ---
+            # --- ALLOW RE-SENDING ALERT FOR EXISTING WINS ---
             if request.user.is_superuser:
                 try:
                     duration = (timezone.now() - entry.created_at).total_seconds() / 3600
                     roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-
-                    # Fire the alert again
                     send_win_prompt(entry.symbol, round(roi, 2), duration)
-                    print(f"✅ Re-sent Win Prompt for {entry.symbol}")
                 except Exception as e:
                     print(f"Marketing Error: {e}")
 
@@ -413,6 +425,11 @@ def refresh_journal_entry(request, entry_id):
             msg_type = "error"
             title = "Trade Complete"
             message = "Result: LOSS"
+
+        elif entry.status == 'INVALID':
+            msg_type = "info"
+            title = "Trade Voided"
+            message = "Setup expired (4h limit)."
 
     # Render response
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
