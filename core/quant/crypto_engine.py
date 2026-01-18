@@ -10,14 +10,13 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v32.2 – DYNAMIC VECTORS EDITION
+    REELIOO ENGINE v32.3 – VISIBILITY UPDATE
 
-    UPGRADE:
-    --------
-    Logic Vectors are now MATHEMATICALLY CALCULATED integers, not hardcoded.
-    - Compression % based on inverse Force.
-    - Impulse % based on Volume Scalar.
-    - Wall % based on exact Order Book Imbalance.
+    FIXES:
+    ------
+    1. WHALE LABEL: Added 'whale_label' so UI shows volume status during HOLD.
+    2. REGIME SENSITIVITY: Lowered 'Compression' threshold to 0.5 to prevent
+       it from showing up constantly. Added 'RANGE' for normal activity.
     """
 
     def __init__(self):
@@ -88,16 +87,20 @@ class CryptoQuantEngine:
             is_exhaustion = (abs(force_now) > 1.5 and acceleration < 0)
 
             # ===================================================================
-            # 4. REGIME
+            # 4. REGIME (FIXED: Added RANGE, Lowered COMPRESSION)
             # ===================================================================
-            if abs(force_now) < 0.8:
+            abs_force = abs(force_now)
+
+            if abs_force < 0.5:  # Was 0.8 (Too high)
                 regime = "COMPRESSION"
-            elif abs(force_now) > 2.0 and acceleration > 0:
+            elif abs_force < 1.0:  # New Middle Ground
+                regime = "RANGE"
+            elif abs_force > 2.0 and acceleration > 0:
                 regime = "EXPANSION"
-            elif abs(force_now) > 1.0:
+            elif abs_force > 1.0:
                 regime = "TREND"
             else:
-                regime = "IDLE"
+                regime = "RANGE"
 
             # ===================================================================
             # 5. SIGNAL GENERATION (STRICT IMPULSE)
@@ -186,39 +189,47 @@ class CryptoQuantEngine:
             rr = 2.0
 
         # =======================================================================
-        # 8. DYNAMIC LOGIC VECTORS (REAL MATH)
+        # 8. DYNAMIC LOGIC VECTORS
         # =======================================================================
         top_features = []
-        whale_active = abs(vol_scalar - 1.0) > 1.5
 
-        # --- Helper for mapping ranges to percentages ---
+        # [FIXED] WHALE CALCULATIONS
+        whale_z = vol_scalar - 1.0
+        whale_active = abs(whale_z) > 1.5
+
+        # Create readable label for UI (even if HOLD)
+        whale_label = "NORMAL"
+        if vol_scalar > 2.5:
+            whale_label = "INSTITUTIONAL"
+        elif vol_scalar > 1.5:
+            whale_label = "HIGH"
+        elif vol_scalar < 0.5:
+            whale_label = "LOW"
+
+        # --- Helper for mapping ---
         def calc_pct(val, min_v, max_v, target_min=60, target_max=99):
             norm = (abs(val) - min_v) / (max_v - min_v)
-            norm = max(0.0, min(1.0, norm))  # Clamp 0-1
+            norm = max(0.0, min(1.0, norm))
             return int(target_min + (norm * (target_max - target_min)))
 
         if blocked_by_of:
-            # Wall strength based on OBI score (-1.0 to 1.0)
             wall_strength = calc_pct(obi_score, 0.25, 0.8, 80, 100)
             desc = "Order Book Sell Wall" if obi_score < 0 else "Order Book Buy Wall"
             top_features.append({"desc": desc, "importance": wall_strength})
 
         elif bias in ["LONG", "SHORT"]:
-            # Momentum Importance based on Force (1.2 to 3.0)
             mom_imp = calc_pct(force_now, 1.2, 3.0, 85, 99)
             desc = "High Velocity Impulse" if bias == "LONG" else "High Velocity Dump"
             top_features.append({"desc": desc, "importance": mom_imp})
 
-            # Order Flow Support based on OBI (0.1 to 0.5)
             of_imp = calc_pct(obi_score, 0.1, 0.5, 75, 95)
             if bias == "LONG" and obi_score > 0.1:
                 top_features.append({"desc": "Strong Bid Support", "importance": of_imp})
             elif bias == "SHORT" and obi_score < -0.1:
                 top_features.append({"desc": "Strong Ask Pressure", "importance": of_imp})
             else:
-                top_features.append({"desc": "Clean Market Structure", "importance": 85})  # Baseline
+                top_features.append({"desc": "Clean Market Structure", "importance": 85})
 
-            # Volume Importance based on Scalar (1.0 to 4.0)
             vol_imp = calc_pct(vol_scalar, 1.0, 4.0, 70, 95)
             if whale_active:
                 top_features.append({"desc": "Heavy Institutional Volume", "importance": vol_imp})
@@ -226,31 +237,30 @@ class CryptoQuantEngine:
                 top_features.append({"desc": "Volume Confirmation", "importance": vol_imp})
 
         elif bias == "WATCH":
-            # Compression: Higher if force is closer to 0
-            comp_imp = 100 - calc_pct(force_now, 0.0, 0.8, 0, 40)  # 100 - (0 to 40) = 100 to 60
+            comp_imp = 100 - calc_pct(force_now, 0.0, 0.5, 0, 40)
             top_features.append({"desc": "Volatility Compression", "importance": comp_imp})
 
-            # Kinetic Impulse Waiting: Higher if volume is building
             wait_imp = calc_pct(vol_scalar, 0.5, 2.0, 60, 90)
             top_features.append({"desc": "Awaiting Kinetic Impulse", "importance": wait_imp})
 
-        else:  # HOLD REASONS
+        else:  # HOLD
+            # [ADDED] If whale activity is high during HOLD, show it in vectors
+            if whale_active:
+                v_imp = calc_pct(vol_scalar, 1.5, 4.0, 75, 95)
+                top_features.append({"desc": "Anomalous Volume (Absorption)", "importance": v_imp})
+
             if is_overstretched_long or is_overstretched_short:
-                # Stretch severity (3% to 6%)
                 stretch_imp = calc_pct(stretch_pct, 0.03, 0.06, 80, 100)
                 top_features.append({"desc": "Price Overextended", "importance": stretch_imp})
 
             elif not valid_long_energy or not valid_short_energy:
-                # Energy exhaustion (75 to 90 RSI)
                 exh_imp = calc_pct(current_energy, 75, 90, 80, 99)
                 top_features.append({"desc": "Momentum Exhausted", "importance": exh_imp})
 
             elif is_wick_trap:
-                top_features.append(
-                    {"desc": "Wick Rejection Detected", "importance": 85})  # Wicks are usually significant
+                top_features.append({"desc": "Wick Rejection Detected", "importance": 85})
 
             elif is_exhaustion:
-                # Decel severity
                 decel_imp = calc_pct(acceleration, 0.0, 0.5, 75, 95)
                 top_features.append({"desc": "Momentum Deceleration", "importance": decel_imp})
 
@@ -266,7 +276,9 @@ class CryptoQuantEngine:
             stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
             rr_ratio=round(rr, 2), risk_pct=round(risk_pct * 100, 2),
             regime=regime, regime_color="green" if bias != "HOLD" else "gray",
+            # [FIXED] Pass the UI label explicitly
             whale_state="ACTIVE" if whale_active else "BASELINE",
+            whale_label=whale_label,
             top_features=top_features,
             narrative="Setup Validated" if bias != "HOLD" else "Waiting for optimal alignment.",
             lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
@@ -276,7 +288,8 @@ class CryptoQuantEngine:
         return SimpleNamespace(
             bias="HOLD", lane="⚫ HOLD", score=50, price=price,
             entry=0, stop=0, target1=0, target2=0, target3=0, rr_ratio=0, risk_pct=0,
-            regime="NEUTRAL", regime_color="gray", whale_state="BASELINE",
+            regime="NEUTRAL", regime_color="gray",
+            whale_state="BASELINE", whale_label="---",
             top_features=[{"desc": "Initializing...", "importance": 10}],
             narrative=reason, lifecycle="WAITING"
         )
