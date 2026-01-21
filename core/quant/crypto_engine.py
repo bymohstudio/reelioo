@@ -10,26 +10,27 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v32.4 – COLOR LOGIC FIX
+    REELIOO ENGINE v33 – THE ORACLE (RETAIL FRIENDLY OUTPUT)
 
-    FIXES:
-    ------
-    1. REGIME COLOR BUG: Fixed issue where "WATCH" (Compression) was showing as
-       Green because it wasn't "HOLD". Now explicitly maps Long->Green, Short->Red.
+    CHANGES:
+    --------
+    1. CLEAN OUTPUT: Removed all brackets '()' and technical jargon from UI text.
+    2. SYNTAX FIX: Fixed the indentation of the try/except block.
+    3. RETAIL TERMS: Simplified descriptions (e.g., 'Hidden Buy' -> 'Smart Accumulation').
     """
 
     def __init__(self):
         self.ATR_LEN = 14
         self.MASS_LEN = 20
-        self.STRUCT_LEN = 50
+        self.STRUCT_LEN = 200  # Ironclad Trend Filter
         self.BASE_RISK = 0.015
-        self.MAX_STRETCH = 0.03
+        self.MAX_STRETCH = 0.04
 
     def analyze(self, df: pd.DataFrame, trade_style="INTRADAY", market_context=None, symbol=None):
         price = 0.0
 
         try:
-            if len(df) < 60: return self._neutral(0, "Insufficient History")
+            if len(df) < 210: return self._neutral(0, "Initializing Data...")
 
             df = df.copy()
             close = df["close"]
@@ -50,239 +51,183 @@ class CryptoQuantEngine:
             vol_mean = volume.rolling(self.MASS_LEN).mean()
             mass = volume / (vol_mean + 1e-9)
 
-            force = (mass * velocity).rolling(2).mean()
+            # Weighted Force: Recent data matters more
+            force = (mass * velocity).ewm(span=3).mean()
             force_now = float(force.iloc[-1])
-            acceleration = force.diff(2).iloc[-1]
+            acceleration = force.diff().iloc[-1]
 
             # ===================================================================
-            # 2. ENERGY & ELASTICITY
+            # 2. STRUCTURAL BIAS (The 200 EMA "King")
             # ===================================================================
-            delta = close.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-            rs = gain / (loss + 1e-9)
-            energy_reserve = 100 - (100 / (1 + rs))
-            current_energy = float(energy_reserve.iloc[-1])
-
             eq = close.ewm(span=self.STRUCT_LEN).mean().iloc[-1]
             stretch_pct = (price - eq) / eq
 
-            is_overstretched_long = stretch_pct > self.MAX_STRETCH
-            is_overstretched_short = stretch_pct < -self.MAX_STRETCH
             bull_struct = price > eq
             bear_struct = price < eq
 
             # ===================================================================
-            # 3. TRAP DETECTION
+            # 3. PREDICTIVE LAYERS (THE "FUTURE" CHECK)
             # ===================================================================
-            body = abs(close.iloc[-1] - open_p.iloc[-1])
-            wick_upper = high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])
-            wick_lower = min(close.iloc[-1], open_p.iloc[-1]) - low.iloc[-1]
 
-            is_wick_trap = False
-            if force_now > 0 and wick_upper > (body * 1.2): is_wick_trap = True
-            if force_now < 0 and wick_lower > (body * 1.2): is_wick_trap = True
+            # A. PREDICTIVE DIVERGENCE (CVD Proxy)
+            price_change = close.diff(5).iloc[-1]
+            force_change = force.diff(5).iloc[-1]
 
-            is_exhaustion = (abs(force_now) > 1.5 and acceleration < 0)
+            bullish_divergence = price_change < 0 and force_change > 0  # Whales buying the dip
+            bearish_divergence = price_change > 0 and force_change < 0  # Whales selling the rip
 
-            # ===================================================================
-            # 4. REGIME
-            # ===================================================================
-            abs_force = abs(force_now)
-
-            if abs_force < 0.5:
-                regime = "COMPRESSION"
-            elif abs_force < 1.0:
-                regime = "RANGE"
-            elif abs_force > 2.0 and acceleration > 0:
-                regime = "EXPANSION"
-            elif abs_force > 1.0:
-                regime = "TREND"
-            else:
-                regime = "RANGE"
-
-            # ===================================================================
-            # 5. SIGNAL GENERATION
-            # ===================================================================
-            bias = "HOLD"
-            lane = "⚫ HOLD"
-            score = 50
-
-            vol_scalar = float(mass.iloc[-1])
-            valid_long_energy = current_energy < 75
-            valid_short_energy = current_energy > 25
-            valid_vol = vol_scalar > 1.0
-
-            MIN_FORCE = 1.2
-            MIN_ACCEL = 0.05
-
-            # LONG
-            if (regime in ["TREND", "EXPANSION"] and force_now > MIN_FORCE and acceleration > MIN_ACCEL and
-                    bull_struct and not is_overstretched_long and valid_long_energy and valid_vol and
-                    not is_wick_trap and not is_exhaustion):
-                bias = "LONG";
-                score = 85
-                lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
-
-            # SHORT
-            elif (regime in ["TREND", "EXPANSION"] and force_now < -MIN_FORCE and acceleration < -MIN_ACCEL and
-                  bear_struct and not is_overstretched_short and valid_short_energy and valid_vol and
-                  not is_wick_trap and not is_exhaustion):
-                bias = "SHORT";
-                score = 85
-                lane = "🟢 SNIPER" if regime == "TREND" else "🚀 BREAKOUT"
-
-            # WATCH (COMPRESSION)
-            elif regime == "COMPRESSION":
-                bias = "WATCH";
-                score = 60
-                lane = "🟠 BUILDING"
-
-            # ===================================================================
-            # 6. ORDER FLOW CHECK
-            # ===================================================================
+            # B. ORDER BOOK INTENT (The "Oracle")
             obi_score = 0.0
-            blocked_by_of = False
+            smart_money_bias = "NEUTRAL"
 
-            if bias in ["LONG", "SHORT"] and symbol:
+            if symbol:
                 try:
                     data = MarketService.get_order_book_snapshot(symbol)
                     if data:
                         bids = np.array(data['bids'], dtype=float)
                         asks = np.array(data['asks'], dtype=float)
-                        bid_vol = np.sum(bids[:, 1])
-                        ask_vol = np.sum(asks[:, 1])
+                        # Look deeper (top 20 levels) for "True Intent"
+                        bid_vol = np.sum(bids[:20, 1])
+                        ask_vol = np.sum(asks[:20, 1])
                         obi_score = (bid_vol - ask_vol) / (bid_vol + ask_vol)
 
-                        if bias == "LONG" and obi_score < -0.25:
-                            bias = "HOLD";
-                            lane = "⚫ BLOCKED";
-                            blocked_by_of = True;
-                            score = 50
-                        elif bias == "SHORT" and obi_score > 0.25:
-                            bias = "HOLD";
-                            lane = "⚫ BLOCKED";
-                            blocked_by_of = True;
-                            score = 50
+                        if obi_score > 0.15:
+                            smart_money_bias = "BULLISH"
+                        elif obi_score < -0.15:
+                            smart_money_bias = "BEARISH"
                 except:
                     pass
+
+            # ===================================================================
+            # 4. TRAP & WICK PROTECTION
+            # ===================================================================
+            candle_range = high.iloc[-1] - low.iloc[-1]
+            wick_ratio_u = (high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])) / (candle_range + 1e-9)
+            wick_ratio_l = (min(close.iloc[-1], open_p.iloc[-1]) - low.iloc[-1]) / (candle_range + 1e-9)
+
+            is_trap = False
+            if wick_ratio_u > 0.35: is_trap = True  # Rejection from top
+            if wick_ratio_l > 0.35: is_trap = True  # Rejection from bottom
+
+            # ===================================================================
+            # 5. SIGNAL GENERATION (PREDICTIVE MODE)
+            # ===================================================================
+            bias = "HOLD"
+            lane = "⚫ HOLD"
+            score = 50
+
+            MIN_FORCE = 1.2
+
+            # LONG SCENARIO
+            if ((bull_struct or bullish_divergence) and
+                    force_now > MIN_FORCE and
+                    smart_money_bias == "BULLISH" and
+                    not is_trap):
+
+                bias = "LONG"
+                score = 90 if bullish_divergence else 80
+                lane = "🔮 PREDICTION" if bullish_divergence else "🚀 MOMENTUM"
+
+            # SHORT SCENARIO
+            elif ((bear_struct or bearish_divergence) and
+                  force_now < -MIN_FORCE and
+                  smart_money_bias == "BEARISH" and
+                  not is_trap):
+
+                bias = "SHORT"
+                score = 90 if bearish_divergence else 80
+                lane = "🔮 PREDICTION" if bearish_divergence else "🚀 MOMENTUM"
+
+            # COMPRESSION (Watch mode)
+            elif abs(force_now) < 0.5:
+                bias = "WATCH"
+                score = 60
+                lane = "🟠 CHARGING"
+
+            # =======================================================================
+            # 6. OUTPUTS
+            # =======================================================================
+            stop = t1 = t2 = t3 = 0.0
+            rr = 0.0
+            risk_pct = 0.0
+
+            if bias in ["LONG", "SHORT"]:
+                direction = 1 if bias == "LONG" else -1
+                stop_dist = current_sigma * 1.5
+                stop = price - (direction * stop_dist)
+                t1 = price + (direction * stop_dist * 2.0)
+                t2 = price + (direction * stop_dist * 4.0)
+                t3 = price + (direction * stop_dist * 8.0)
+                risk_pct = self.BASE_RISK * 1.5
+                rr = 2.0
+
+            # =======================================================================
+            # 7. VECTORS (Clean Retail Friendly Text)
+            # =======================================================================
+            regime = "RANGE"
+            if abs(force_now) > 1.0: regime = "TREND"
+            if abs(force_now) < 0.5: regime = "COMPRESSION"
+
+            regime_color = "gray"
+            if bias == "LONG":
+                regime_color = "green"
+            elif bias == "SHORT":
+                regime_color = "red"
+            elif bias == "WATCH":
+                regime_color = "violet"
+
+            top_features = []
+
+            def calc_pct(val, min_v, max_v, target_min=60, target_max=99):
+                norm = (abs(val) - min_v) / (max_v - min_v)
+                norm = max(0.0, min(1.0, norm))
+                return int(target_min + (norm * (target_max - target_min)))
+
+            # 1. Order Book Vector (The Predictor)
+            if smart_money_bias != "NEUTRAL":
+                desc = "Institutional Buy Walls" if smart_money_bias == "BULLISH" else "Institutional Sell Walls"
+                val = calc_pct(obi_score, 0.15, 0.5, 80, 99)
+                top_features.append({"desc": desc, "importance": val})
+
+            # 2. Divergence Vector (The Hidden Move)
+            if bullish_divergence:
+                # REMOVED BRACKETS: "Hidden Buy" -> "Smart Accumulation"
+                top_features.append({"desc": "Bullish Divergence Smart Accumulation", "importance": 95})
+            elif bearish_divergence:
+                # REMOVED BRACKETS: "Hidden Sell" -> "Smart Distribution"
+                top_features.append({"desc": "Bearish Divergence Smart Distribution", "importance": 95})
+
+            # 3. Momentum Vector (The Force)
+            if abs(force_now) > 1.0:
+                desc = "High Velocity Impulse" if force_now > 0 else "High Velocity Dump"
+                val = calc_pct(force_now, 1.0, 3.0, 70, 90)
+                top_features.append({"desc": desc, "importance": val})
+
+            if not top_features:
+                top_features.append({"desc": "Awaiting Smart Money", "importance": 50})
+
+            top_features = top_features[:3]
+
+            vol_scalar = float(mass.iloc[-1])
+            whale_label = "NORMAL"
+            if vol_scalar > 2.0: whale_label = "HIGH"
+
+            return SimpleNamespace(
+                bias=bias, lane=lane, score=score, price=price,
+                entry=price if bias in ["LONG", "SHORT"] else 0.0,
+                stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
+                rr_ratio=round(rr, 2), risk_pct=round(risk_pct * 100, 2),
+                regime=regime, regime_color=regime_color,
+                whale_state="ACTIVE" if vol_scalar > 1.5 else "BASELINE",
+                whale_label=whale_label,
+                top_features=top_features,
+                narrative="Predictive Setup Validated" if bias != "HOLD" else "Scanning Order Flow...",
+                lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
+            )
 
         except Exception as e:
             log.error(f"Engine Crash: {e}")
             return self._neutral(price, "System Error")
-
-        # =======================================================================
-        # 7. OUTPUTS
-        # =======================================================================
-        stop = t1 = t2 = t3 = 0.0
-        rr = 0.0
-        risk_pct = 0.0
-
-        if bias in ["LONG", "SHORT"]:
-            direction = 1 if bias == "LONG" else -1
-            stop_dist = current_sigma * 1.2
-            stop = price - (direction * stop_dist)
-            t1 = price + (direction * stop_dist * 2.0)
-            t2 = price + (direction * stop_dist * 4.0)
-            t3 = price + (direction * stop_dist * 8.0)
-            risk_pct = self.BASE_RISK * min(1.5, abs(force_now))
-            rr = 2.0
-
-        # =======================================================================
-        # 8. DYNAMIC LOGIC VECTORS & COLORS
-        # =======================================================================
-        # [FIXED] Explicit Color Logic
-        regime_color = "gray"
-        if bias == "LONG":
-            regime_color = "green"
-        elif bias == "SHORT":
-            regime_color = "red"
-        elif bias == "WATCH":
-            regime_color = "violet"  # Triggers the 'else' (Violet Pulse) in UI
-        else:
-            regime_color = "gray"
-
-        top_features = []
-        whale_z = vol_scalar - 1.0
-        whale_active = abs(whale_z) > 1.5
-
-        whale_label = "NORMAL"
-        if vol_scalar > 2.5:
-            whale_label = "INSTITUTIONAL"
-        elif vol_scalar > 1.5:
-            whale_label = "HIGH"
-        elif vol_scalar < 0.5:
-            whale_label = "LOW"
-
-        def calc_pct(val, min_v, max_v, target_min=60, target_max=99):
-            norm = (abs(val) - min_v) / (max_v - min_v)
-            norm = max(0.0, min(1.0, norm))
-            return int(target_min + (norm * (target_max - target_min)))
-
-        if blocked_by_of:
-            wall_strength = calc_pct(obi_score, 0.25, 0.8, 80, 100)
-            desc = "Order Book Sell Wall" if obi_score < 0 else "Order Book Buy Wall"
-            top_features.append({"desc": desc, "importance": wall_strength})
-
-        elif bias in ["LONG", "SHORT"]:
-            mom_imp = calc_pct(force_now, 1.2, 3.0, 85, 99)
-            desc = "High Velocity Impulse" if bias == "LONG" else "High Velocity Dump"
-            top_features.append({"desc": desc, "importance": mom_imp})
-
-            of_imp = calc_pct(obi_score, 0.1, 0.5, 75, 95)
-            if bias == "LONG" and obi_score > 0.1:
-                top_features.append({"desc": "Strong Bid Support", "importance": of_imp})
-            elif bias == "SHORT" and obi_score < -0.1:
-                top_features.append({"desc": "Strong Ask Pressure", "importance": of_imp})
-            else:
-                top_features.append({"desc": "Clean Market Structure", "importance": 85})
-
-            vol_imp = calc_pct(vol_scalar, 1.0, 4.0, 70, 95)
-            if whale_active:
-                top_features.append({"desc": "Heavy Institutional Volume", "importance": vol_imp})
-            else:
-                top_features.append({"desc": "Volume Confirmation", "importance": vol_imp})
-
-        elif bias == "WATCH":
-            comp_imp = 100 - calc_pct(force_now, 0.0, 0.5, 0, 40)
-            top_features.append({"desc": "Volatility Compression", "importance": comp_imp})
-            wait_imp = calc_pct(vol_scalar, 0.5, 2.0, 60, 90)
-            top_features.append({"desc": "Awaiting Kinetic Impulse", "importance": wait_imp})
-
-        else:  # HOLD
-            if whale_active:
-                v_imp = calc_pct(vol_scalar, 1.5, 4.0, 75, 95)
-                top_features.append({"desc": "Anomalous Volume (Absorption)", "importance": v_imp})
-            if is_overstretched_long or is_overstretched_short:
-                stretch_imp = calc_pct(stretch_pct, 0.03, 0.06, 80, 100)
-                top_features.append({"desc": "Price Overextended", "importance": stretch_imp})
-            elif not valid_long_energy or not valid_short_energy:
-                exh_imp = calc_pct(current_energy, 75, 90, 80, 99)
-                top_features.append({"desc": "Momentum Exhausted", "importance": exh_imp})
-            elif is_wick_trap:
-                top_features.append({"desc": "Wick Rejection Detected", "importance": 85})
-            elif is_exhaustion:
-                decel_imp = calc_pct(acceleration, 0.0, 0.5, 75, 95)
-                top_features.append({"desc": "Momentum Deceleration", "importance": decel_imp})
-            else:
-                top_features.append({"desc": "Market Noise", "importance": 50})
-
-        if not top_features: top_features.append({"desc": "Analyzing Data", "importance": 0})
-        top_features = top_features[:3]
-
-        return SimpleNamespace(
-            bias=bias, lane=lane, score=score, price=price,
-            entry=price if bias in ["LONG", "SHORT"] else 0.0,
-            stop=round(stop, 4), target1=round(t1, 4), target2=round(t2, 4), target3=round(t3, 4),
-            rr_ratio=round(rr, 2), risk_pct=round(risk_pct * 100, 2),
-            regime=regime,
-            regime_color=regime_color,  # [FIXED]
-            whale_state="ACTIVE" if whale_active else "BASELINE",
-            whale_label=whale_label,
-            top_features=top_features,
-            narrative="Setup Validated" if bias != "HOLD" else "Waiting for optimal alignment.",
-            lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
-        )
 
     def _neutral(self, price, reason):
         return SimpleNamespace(

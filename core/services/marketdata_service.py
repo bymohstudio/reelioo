@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 import logging
 from django.core.cache import cache
-from reelioo import settings
+from django.conf import settings  # Standard Django Import
 
 log = logging.getLogger(__name__)
 
@@ -17,10 +17,9 @@ class MarketService:
     # =====================================================================
     @staticmethod
     def _load_exchange_info():
-        cache_key = "exchange_info_v30"
+        cache_key = "exchange_info_v33"  # Bumped version
         cached = cache.get(cache_key)
         if cached:
-            log.info("🧠 [EXCHANGE] Loaded symbols from cache")
             return cached
 
         results = []
@@ -35,26 +34,24 @@ class MarketService:
             return []
 
         # 2. Fetch 24hr Ticker Stats (The Volume) - SINGLE REQUEST
-        # This prevents the "Death Loop" of 300+ requests
         ticker_map = {}
         try:
             ticker_resp = requests.get(f"{MarketService.BASE_FUT}/ticker/24hr", timeout=5)
             ticker_data = ticker_resp.json()
-            # Map symbol -> quoteVolume (USDT Value)
             for t in ticker_data:
                 ticker_map[t['symbol']] = float(t.get('quoteVolume', 0))
         except Exception as e:
             log.error(f"❌ [EXCHANGE] Ticker fetch failed: {e}")
 
         # 3. Filter & Merge
-        # Minimum 5 Million USDT daily volume to ensure liquidity
+        # Minimum 5 Million USDT daily volume to ensure liquidity for Whale Logic
         MIN_USDT_VOL = 5_000_000
 
         for s in symbols_raw:
             if s["status"] != "TRADING": continue
             if s["quoteAsset"] != "USDT": continue
 
-            # Use mapped volume (Fast)
+            # Use mapped volume
             vol_usdt = ticker_map.get(s["symbol"], 0)
 
             if vol_usdt < MIN_USDT_VOL:
@@ -70,7 +67,7 @@ class MarketService:
         # Sort by Volume (Highest first) -> Prioritizes Liquid Markets
         results.sort(key=lambda x: x['vol_24h'], reverse=True)
 
-        log.info(f"🌐 [EXCHANGE] Loaded {len(results)} valid symbols (Top Vol: {results[0]['symbol']})")
+        log.info(f"🌐 [EXCHANGE] Loaded {len(results)} valid symbols")
 
         # Cache for 6 hours
         cache.set(cache_key, results, timeout=21600)
@@ -84,7 +81,7 @@ class MarketService:
         return [s for s in symbols if query in s["symbol"] or query in s["name"]][:10]
 
     # =====================================================================
-    # 2. HISTORICAL DATA (ROBUST FETCH)
+    # 2. HISTORICAL DATA (ROBUST FETCH FOR EMA 200)
     # =====================================================================
     @staticmethod
     def get_historical_data(symbol_input, market_type="PERP", trade_style="INTRADAY"):
@@ -92,7 +89,8 @@ class MarketService:
         if isinstance(symbol_input, dict):
             symbol = symbol_input.get("symbol")
         else:
-            raw = str(symbol_input).upper().replace("/", "").replace("-", "")
+            # Aggressive Cleaning
+            raw = str(symbol_input).upper().replace("/", "").replace("-", "").replace(".P", "")
             symbol = raw if raw.endswith("USDT") else f"{raw}USDT"
 
         # Interval Map
@@ -105,8 +103,8 @@ class MarketService:
         interval = interval_map.get(trade_style, "15m")
 
         # Cache Check
-        cache_key = f"kline_v30:{symbol}:{interval}:{market_type}"
-        MIN_ROWS = 2000  # Need deeper history for EMA 50 / Mass Index
+        cache_key = f"kline_v33:{symbol}:{interval}:{market_type}"
+        MIN_ROWS = 250  # We need at least 210 for EMA 200
 
         df = cache.get(cache_key)
         if df is not None and len(df) >= MIN_ROWS:
@@ -114,13 +112,11 @@ class MarketService:
 
         # API Setup
         base_url = MarketService.BASE_FUT if market_type in ["PERP", "FUTURES"] else MarketService.BASE_SPOT
-
-        # [FIX] Spot limit is 1000, Futures is 1500
         limit = 1500 if "fapi" in base_url else 1000
 
         klines = []
         start_ts = None
-        max_rows = 4500  # Optimized for Railway RAM
+        max_rows = 4500  # Deep history for reliable backtests
 
         try:
             while len(klines) < max_rows:
@@ -138,10 +134,10 @@ class MarketService:
                 batch = r.json()
                 if not batch: break
 
-                klines = batch + klines  # Prepend older data
-                start_ts = batch[0][0] - 1  # Move cursor back
+                klines = batch + klines  # Prepend
+                start_ts = batch[0][0] - 1
 
-                if len(batch) < limit: break  # Reached beginning of time
+                if len(batch) < limit: break
 
             if not klines: return pd.DataFrame()
 
@@ -157,7 +153,7 @@ class MarketService:
             cols = ["open", "high", "low", "close", "volume", "quote_volume"]
             df = df[cols].astype(float)
 
-            # [FIX] Data Validation (Flat Candle Check)
+            # Data Validation
             if df["close"].std() == 0 or len(df) < 200:
                 log.warning(f"⚠️ [DATA] Bad data for {symbol}")
                 return pd.DataFrame()
@@ -166,12 +162,11 @@ class MarketService:
             if len(df) >= MIN_ROWS:
                 cache.set(cache_key, df, timeout=300)
 
-            # Live Injection (Optional but recommended)
+            # Live Price Injection (Crucial for realtime accuracy)
             try:
                 ticker_url = f"{base_url}/ticker/price"
                 r = requests.get(ticker_url, params={"symbol": symbol}, timeout=2)
                 live_price = float(r.json().get("price"))
-                # Update last close to live price for real-time signal
                 df.iloc[-1, df.columns.get_loc("close")] = live_price
             except:
                 pass
@@ -183,19 +178,26 @@ class MarketService:
             return pd.DataFrame()
 
     # =====================================================================
-    # 3. ORDER FLOW SNAPSHOT (NEW FOR v32 ENGINE)
+    # 3. ORDER FLOW SNAPSHOT (ALIGNED FOR v33 ENGINE)
     # =====================================================================
     @staticmethod
     def get_order_book_snapshot(symbol):
         """
         Fetches Level 2 Depth for OBI (Order Book Imbalance) Calculation.
-        Used by v32 Engine to block trades into walls.
+        Used by v33 Oracle Engine to detect Institutional Intent.
         """
+        # [SAFETY] Ensure symbol is clean for Futures API
+        clean_sym = str(symbol).upper().replace("/", "").replace("-", "").replace(".P", "")
+
         try:
             url = f"{MarketService.BASE_FUT}/depth"
-            # Limit 50 is enough for "Immediate Walls" and is lighter on API
-            r = requests.get(url, params={"symbol": symbol, "limit": 50}, timeout=2)
+            # Limit 50 is sufficient for "Immediate Walls" (Levels 1-20 used by engine)
+            r = requests.get(url, params={"symbol": clean_sym, "limit": 50}, timeout=2)
+
             if r.status_code != 200: return None
+
+            # Returns { "bids": [[price, qty], ...], "asks": ... }
             return r.json()
+
         except Exception:
             return None
