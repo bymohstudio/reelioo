@@ -10,13 +10,15 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v33 – THE ORACLE (RETAIL FRIENDLY OUTPUT)
+    REELIOO ENGINE v33.1 – PROFESSIONAL CALIBRATION
 
     CHANGES:
     --------
-    1. CLEAN OUTPUT: Removed all brackets '()' and technical jargon from UI text.
-    2. SYNTAX FIX: Fixed the indentation of the try/except block.
-    3. RETAIL TERMS: Simplified descriptions (e.g., 'Hidden Buy' -> 'Smart Accumulation').
+    1. TERMINOLOGY UPDATE: Removed 'Physics/AI' terms.
+       - 'Velocity' -> 'Momentum'
+       - 'Prediction' -> 'Prime Setup'
+       - 'Walls' -> 'Major Levels'
+    2. RETAIL ALIGNMENT: Uses standard technical analysis terms users trust.
     """
 
     def __init__(self):
@@ -41,23 +43,24 @@ class CryptoQuantEngine:
             price = float(close.iloc[-1])
 
             # ===================================================================
-            # 1. PHYSICS VECTORS
+            # 1. MARKET VECTORS (FORMERLY PHYSICS)
             # ===================================================================
             tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
             sigma = tr.rolling(self.ATR_LEN).mean()
             current_sigma = float(sigma.iloc[-1])
 
+            # Calculate Momentum (Velocity) & Volume Weight (Mass)
             velocity = close.diff() / (sigma + 1e-9)
             vol_mean = volume.rolling(self.MASS_LEN).mean()
             mass = volume / (vol_mean + 1e-9)
 
-            # Weighted Force: Recent data matters more
-            force = (mass * velocity).ewm(span=3).mean()
-            force_now = float(force.iloc[-1])
-            acceleration = force.diff().iloc[-1]
+            # Trend Strength (Force)
+            trend_strength = (mass * velocity).ewm(span=3).mean()
+            strength_now = float(trend_strength.iloc[-1])
+            momentum_change = trend_strength.diff().iloc[-1] # Acceleration
 
             # ===================================================================
-            # 2. STRUCTURAL BIAS (The 200 EMA "King")
+            # 2. STRUCTURAL BIAS (The 200 EMA Baseline)
             # ===================================================================
             eq = close.ewm(span=self.STRUCT_LEN).mean().iloc[-1]
             stretch_pct = (price - eq) / eq
@@ -66,17 +69,17 @@ class CryptoQuantEngine:
             bear_struct = price < eq
 
             # ===================================================================
-            # 3. PREDICTIVE LAYERS (THE "FUTURE" CHECK)
+            # 3. ADVANCED CONFLUENCE (The "Edge")
             # ===================================================================
 
-            # A. PREDICTIVE DIVERGENCE (CVD Proxy)
+            # A. VOLUME/PRICE DIVERGENCE (Leading Indicator)
             price_change = close.diff(5).iloc[-1]
-            force_change = force.diff(5).iloc[-1]
+            strength_change = trend_strength.diff(5).iloc[-1]
 
-            bullish_divergence = price_change < 0 and force_change > 0  # Whales buying the dip
-            bearish_divergence = price_change > 0 and force_change < 0  # Whales selling the rip
+            bullish_divergence = price_change < 0 and strength_change > 0  # Price down, Volume up
+            bearish_divergence = price_change > 0 and strength_change < 0  # Price up, Volume down
 
-            # B. ORDER BOOK INTENT (The "Oracle")
+            # B. ORDER BOOK FLOW (OBI)
             obi_score = 0.0
             smart_money_bias = "NEUTRAL"
 
@@ -86,7 +89,7 @@ class CryptoQuantEngine:
                     if data:
                         bids = np.array(data['bids'], dtype=float)
                         asks = np.array(data['asks'], dtype=float)
-                        # Look deeper (top 20 levels) for "True Intent"
+                        # Analyzing Top 20 Levels of Depth
                         bid_vol = np.sum(bids[:20, 1])
                         ask_vol = np.sum(asks[:20, 1])
                         obi_score = (bid_vol - ask_vol) / (bid_vol + ask_vol)
@@ -99,53 +102,53 @@ class CryptoQuantEngine:
                     pass
 
             # ===================================================================
-            # 4. TRAP & WICK PROTECTION
+            # 4. RISK MANAGEMENT (Trap & Wick Protection)
             # ===================================================================
             candle_range = high.iloc[-1] - low.iloc[-1]
             wick_ratio_u = (high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])) / (candle_range + 1e-9)
             wick_ratio_l = (min(close.iloc[-1], open_p.iloc[-1]) - low.iloc[-1]) / (candle_range + 1e-9)
 
             is_trap = False
-            if wick_ratio_u > 0.35: is_trap = True  # Rejection from top
-            if wick_ratio_l > 0.35: is_trap = True  # Rejection from bottom
+            if wick_ratio_u > 0.35: is_trap = True  # Selling pressure from top
+            if wick_ratio_l > 0.35: is_trap = True  # Buying pressure from bottom
 
             # ===================================================================
-            # 5. SIGNAL GENERATION (PREDICTIVE MODE)
+            # 5. SIGNAL GENERATION
             # ===================================================================
             bias = "HOLD"
-            lane = "⚫ HOLD"
+            lane = "⚫ FLAT"
             score = 50
 
-            MIN_FORCE = 1.2
+            MIN_STRENGTH = 1.2
 
-            # LONG SCENARIO
+            # LONG SETUP
             if ((bull_struct or bullish_divergence) and
-                    force_now > MIN_FORCE and
+                    strength_now > MIN_STRENGTH and
                     smart_money_bias == "BULLISH" and
                     not is_trap):
 
                 bias = "LONG"
                 score = 90 if bullish_divergence else 80
-                lane = "🔮 PREDICTION" if bullish_divergence else "🚀 MOMENTUM"
+                lane = "⚡ PRIME SETUP" if bullish_divergence else "🔥 TREND FOLLOWING"
 
-            # SHORT SCENARIO
+            # SHORT SETUP
             elif ((bear_struct or bearish_divergence) and
-                  force_now < -MIN_FORCE and
+                  strength_now < -MIN_STRENGTH and
                   smart_money_bias == "BEARISH" and
                   not is_trap):
 
                 bias = "SHORT"
                 score = 90 if bearish_divergence else 80
-                lane = "🔮 PREDICTION" if bearish_divergence else "🚀 MOMENTUM"
+                lane = "⚡ PRIME SETUP" if bearish_divergence else "🔥 TREND FOLLOWING"
 
-            # COMPRESSION (Watch mode)
-            elif abs(force_now) < 0.5:
+            # CONSOLIDATION (Watch)
+            elif abs(strength_now) < 0.5:
                 bias = "WATCH"
                 score = 60
-                lane = "🟠 CHARGING"
+                lane = "👀 MONITORING"
 
             # =======================================================================
-            # 6. OUTPUTS
+            # 6. TARGETS & STOPS
             # =======================================================================
             stop = t1 = t2 = t3 = 0.0
             rr = 0.0
@@ -162,11 +165,11 @@ class CryptoQuantEngine:
                 rr = 2.0
 
             # =======================================================================
-            # 7. VECTORS (Clean Retail Friendly Text)
+            # 7. LOGIC VECTORS (PROFESSIONAL TERMS)
             # =======================================================================
             regime = "RANGE"
-            if abs(force_now) > 1.0: regime = "TREND"
-            if abs(force_now) < 0.5: regime = "COMPRESSION"
+            if abs(strength_now) > 1.0: regime = "TREND"
+            if abs(strength_now) < 0.5: regime = "CONSOLIDATION"
 
             regime_color = "gray"
             if bias == "LONG":
@@ -183,28 +186,26 @@ class CryptoQuantEngine:
                 norm = max(0.0, min(1.0, norm))
                 return int(target_min + (norm * (target_max - target_min)))
 
-            # 1. Order Book Vector (The Predictor)
+            # 1. Order Book Vector
             if smart_money_bias != "NEUTRAL":
-                desc = "Institutional Buy Walls" if smart_money_bias == "BULLISH" else "Institutional Sell Walls"
+                desc = "Major Order Book Support" if smart_money_bias == "BULLISH" else "Major Order Book Resistance"
                 val = calc_pct(obi_score, 0.15, 0.5, 80, 99)
                 top_features.append({"desc": desc, "importance": val})
 
-            # 2. Divergence Vector (The Hidden Move)
+            # 2. Divergence Vector
             if bullish_divergence:
-                # REMOVED BRACKETS: "Hidden Buy" -> "Smart Accumulation"
-                top_features.append({"desc": "Bullish Divergence Smart Accumulation", "importance": 95})
+                top_features.append({"desc": "Bullish Volume Divergence", "importance": 95})
             elif bearish_divergence:
-                # REMOVED BRACKETS: "Hidden Sell" -> "Smart Distribution"
-                top_features.append({"desc": "Bearish Divergence Smart Distribution", "importance": 95})
+                top_features.append({"desc": "Bearish Volume Divergence", "importance": 95})
 
-            # 3. Momentum Vector (The Force)
-            if abs(force_now) > 1.0:
-                desc = "High Velocity Impulse" if force_now > 0 else "High Velocity Dump"
-                val = calc_pct(force_now, 1.0, 3.0, 70, 90)
+            # 3. Momentum Vector
+            if abs(strength_now) > 1.0:
+                desc = "Strong Upside Momentum" if strength_now > 0 else "Strong Downside Momentum"
+                val = calc_pct(strength_now, 1.0, 3.0, 70, 90)
                 top_features.append({"desc": desc, "importance": val})
 
             if not top_features:
-                top_features.append({"desc": "Awaiting Smart Money", "importance": 50})
+                top_features.append({"desc": "Awaiting Order Flow", "importance": 50})
 
             top_features = top_features[:3]
 
@@ -221,7 +222,7 @@ class CryptoQuantEngine:
                 whale_state="ACTIVE" if vol_scalar > 1.5 else "BASELINE",
                 whale_label=whale_label,
                 top_features=top_features,
-                narrative="Predictive Setup Validated" if bias != "HOLD" else "Scanning Order Flow...",
+                narrative="High Probability Setup Detected" if bias != "HOLD" else "Analyzing Market Depth...",
                 lifecycle="ACTIVE" if bias != "HOLD" else "WAITING"
             )
 
@@ -231,7 +232,7 @@ class CryptoQuantEngine:
 
     def _neutral(self, price, reason):
         return SimpleNamespace(
-            bias="HOLD", lane="⚫ HOLD", score=50, price=price,
+            bias="HOLD", lane="⚫ FLAT", score=50, price=price,
             entry=0, stop=0, target1=0, target2=0, target3=0, rr_ratio=0, risk_pct=0,
             regime="NEUTRAL", regime_color="gray",
             whale_state="BASELINE", whale_label="---",
