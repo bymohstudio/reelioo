@@ -113,15 +113,23 @@ class CryptoQuantEngine:
             if wick_ratio_l > 0.35: is_trap = True  # Buying pressure from bottom
 
             # ===================================================================
-            # 5. SIGNAL GENERATION
+            # 5. SIGNAL GENERATION (SAAS TUNED)
             # ===================================================================
             bias = "HOLD"
             lane = "⚫ FLAT"
             score = 50
 
-            MIN_STRENGTH = 1.2
+            # ADJUSTMENT 1: Relaxed Trade Threshold (1.2 -> 1.1)
+            # 1.1 is still statistically significant (1.1 standard deviations)
+            MIN_STRENGTH = 1.1
 
-            # LONG SETUP
+            # ADJUSTMENT 2: Define "Watch" Threshold (0.6)
+            # Any momentum above 0.6 is "Interesting" enough to show the user.
+            WATCH_STRENGTH = 0.6
+
+            # --- LOGIC GATES ---
+
+            # LONG TRADE
             if ((bull_struct or bullish_divergence) and
                     strength_now > MIN_STRENGTH and
                     smart_money_bias == "BULLISH" and
@@ -131,7 +139,7 @@ class CryptoQuantEngine:
                 score = 90 if bullish_divergence else 80
                 lane = "⚡ PRIME SETUP" if bullish_divergence else "🔥 TREND FOLLOWING"
 
-            # SHORT SETUP
+            # SHORT TRADE
             elif ((bear_struct or bearish_divergence) and
                   strength_now < -MIN_STRENGTH and
                   smart_money_bias == "BEARISH" and
@@ -141,11 +149,25 @@ class CryptoQuantEngine:
                 score = 90 if bearish_divergence else 80
                 lane = "⚡ PRIME SETUP" if bearish_divergence else "🔥 TREND FOLLOWING"
 
-            # CONSOLIDATION (Watch)
-            elif abs(strength_now) < 0.5:
+            # --- THE NEW "SMART WATCH" LOGIC ---
+
+            # Scenario A: Momentum is high, but blocked by EMA 200 (Safety)
+            elif abs(strength_now) > MIN_STRENGTH:
+                bias = "WATCH"
+                score = 65
+                lane = "⚠️ BLOCKED BY TREND"
+                # This shows the user: "I see the move, but it's unsafe."
+
+            # Scenario B: Momentum is building (0.6 to 1.1)
+            elif abs(strength_now) > WATCH_STRENGTH:
                 bias = "WATCH"
                 score = 60
-                lane = "👀 MONITORING"
+                lane = "👀 MOMENTUM BUILDING"
+
+            # Scenario C: Dead Market (0.0 to 0.6)
+            else:
+                bias = "HOLD"
+                lane = "⚫ CONSOLIDATION"
 
             # =======================================================================
             # 6. TARGETS & STOPS
