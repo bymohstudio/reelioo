@@ -236,32 +236,64 @@ def hx_backtest(request):
 @login_required
 @require_http_methods(["GET"])
 def hx_alpha_scan(request):
-    """VIP Alpha Scanner"""
+    """
+    THE HUNTER: Automatically scans the Top 30 Liquid Assets.
+    Finds opportunities even when BTC is dead.
+    """
     if not has_access(request.user): return HttpResponse("DENIED")
 
-    vip_assets = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT", "LINKUSDT",
-                  "WIFUSDT", "SUIUSDT", "NEARUSDT", "APTUSDT", "INJUSDT"]
+    # 1. DYNAMIC ASSET LOADING (No more hardcoded lists)
+    # We fetch the top 30 coins by Volume from your MarketService
+    all_assets = MarketService._load_exchange_info()
+
+    # Take Top 30 Liquid Assets (Skip stablecoins if not filtered in Service)
+    scan_list = [a['symbol'] for a in all_assets[:30]]
+
     engine = CryptoQuantEngine()
     results = []
 
     def scan(sym):
         try:
-            df = MarketService.get_historical_data(sym, "PERP", "INTRADAY")
-            if df.empty: return None
-            res = engine.analyze(df, "INTRADAY")
+            # FORCE 'SCALP' MODE
+            # We use SCALP because it catches the pumps (KAIA, SUI) that SWING misses
+            df = MarketService.get_historical_data(sym, "PERP", "SCALP")
+
+            if df is None or df.empty: return None
+
+            # Analyze using v34 Dual Core
+            res = engine.analyze(df, trade_style="SCALP", symbol=sym)
+
+            # Filter: Only show distinct "Long/Short" signals (Ignore Watch/Hold)
             if res.bias in ["LONG", "SHORT"] and res.score >= 70:
-                return {'symbol': sym, 'bias': res.bias, 'score': res.score, 'entry': res.entry,
-                        'stop': res.stop, 'target': res.target1, 'explanation': getattr(res, 'narrative', '')}
+                return {
+                    'symbol': sym,
+                    'bias': res.bias,
+                    'score': res.score,
+                    'lane': res.lane,  # Show "SCALP ENTRY" or "TREND"
+                    'entry': res.entry,
+                    'stop': res.stop,
+                    'target': res.target1,
+                    'explanation': getattr(res, 'narrative', 'Setup Detected')
+                }
         except:
             return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        for r in executor.map(scan, vip_assets):
+    # 2. PARALLEL EXECUTION (Speed is key for UX)
+    # Scans 30 coins in ~2 seconds using threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        for r in executor.map(scan, scan_list):
             if r: results.append(r)
 
-    if not results: return render(request, 'core/partials/alpha_result.html', {'res': {'found': False}})
+    # 3. RANKING
+    # Sort by Confidence Score (Highest first)
+    if not results:
+        return render(request, 'core/partials/alpha_result.html', {'res': {'found': False}})
+
     results.sort(key=lambda x: x['score'], reverse=True)
-    return render(request, 'core/partials/alpha_result.html', {'res': {'found': True, **results[0]}})
+
+    # Return the Single Best Setup (or loop in template to show Top 3)
+    best_setup = results[0]
+    return render(request, 'core/partials/alpha_result.html', {'res': {'found': True, **best_setup}})
 
 
 @login_required

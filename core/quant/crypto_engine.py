@@ -10,28 +10,28 @@ log = logging.getLogger(__name__)
 
 class CryptoQuantEngine:
     """
-    REELIOO ENGINE v33.1 – PROFESSIONAL CALIBRATION
+    REELIOO ENGINE v34 – DUAL CORE (SAFE FOR CRON)
 
-    CHANGES:
-    --------
-    1. TERMINOLOGY UPDATE: Removed 'Physics/AI' terms.
-       - 'Velocity' -> 'Momentum'
-       - 'Prediction' -> 'Prime Setup'
-       - 'Walls' -> 'Major Levels'
-    2. RETAIL ALIGNMENT: Uses standard technical analysis terms users trust.
+    MODES:
+    ------
+    1. SWING (Default/Cron): Uses EMA 200. Strict. Catches major trends only.
+    2. SCALP (Manual/Hunter): Uses EMA 50. Fast. Catches pumps & reversals.
+
+    This ensures your Discord alerts remain high-quality (Swing),
+    while allowing you to hunt volatility in the dashboard (Scalp).
     """
 
     def __init__(self):
         self.ATR_LEN = 14
         self.MASS_LEN = 20
-        self.STRUCT_LEN = 200  # Ironclad Trend Filter
         self.BASE_RISK = 0.015
-        self.MAX_STRETCH = 0.04
+        self.MAX_STRETCH = 0.05
 
     def analyze(self, df: pd.DataFrame, trade_style="INTRADAY", market_context=None, symbol=None):
         price = 0.0
 
         try:
+            # Need history for EMA calculation
             if len(df) < 210: return self._neutral(0, "Initializing Data...")
 
             df = df.copy()
@@ -43,43 +43,54 @@ class CryptoQuantEngine:
             price = float(close.iloc[-1])
 
             # ===================================================================
-            # 1. MARKET VECTORS (FORMERLY PHYSICS)
+            # 1. DYNAMIC CONFIGURATION
+            # ===================================================================
+            # CRON/SWING Defaults (Strict EMA 200)
+            struct_len = 200
+            min_strength = 1.1
+            watch_strength = 0.6
+
+            # SCALP Override (Fast EMA 50)
+            if trade_style == "SCALP":
+                struct_len = 50
+                min_strength = 0.85
+                watch_strength = 0.5
+
+            # ===================================================================
+            # 2. MARKET MOMENTUM (RETAIL FRIENDLY)
             # ===================================================================
             tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
             sigma = tr.rolling(self.ATR_LEN).mean()
             current_sigma = float(sigma.iloc[-1])
 
-            # Calculate Momentum (Velocity) & Volume Weight (Mass)
+            # Velocity & Mass -> Strength
             velocity = close.diff() / (sigma + 1e-9)
-            vol_mean = volume.rolling(self.MASS_LEN).mean()
-            mass = volume / (vol_mean + 1e-9)
+            mass = volume / (volume.rolling(self.MASS_LEN).mean() + 1e-9)
 
-            # Trend Strength (Force)
             trend_strength = (mass * velocity).ewm(span=3).mean()
             strength_now = float(trend_strength.iloc[-1])
-            momentum_change = trend_strength.diff().iloc[-1] # Acceleration
 
             # ===================================================================
-            # 2. STRUCTURAL BIAS (The 200 EMA Baseline)
+            # 3. STRUCTURAL BIAS (DYNAMIC)
             # ===================================================================
-            eq = close.ewm(span=self.STRUCT_LEN).mean().iloc[-1]
+            eq = close.ewm(span=struct_len).mean().iloc[-1]
             stretch_pct = (price - eq) / eq
 
             bull_struct = price > eq
             bear_struct = price < eq
 
             # ===================================================================
-            # 3. ADVANCED CONFLUENCE (The "Edge")
+            # 4. ADVANCED CONFLUENCE
             # ===================================================================
 
-            # A. VOLUME/PRICE DIVERGENCE (Leading Indicator)
+            # A. DIVERGENCE (Leading Indicator)
             price_change = close.diff(5).iloc[-1]
             strength_change = trend_strength.diff(5).iloc[-1]
 
-            bullish_divergence = price_change < 0 and strength_change > 0  # Price down, Volume up
-            bearish_divergence = price_change > 0 and strength_change < 0  # Price up, Volume down
+            bullish_divergence = price_change < 0 and strength_change > 0
+            bearish_divergence = price_change > 0 and strength_change < 0
 
-            # B. ORDER BOOK FLOW (OBI)
+            # B. ORDER BOOK FLOW
             obi_score = 0.0
             smart_money_bias = "NEUTRAL"
 
@@ -89,7 +100,6 @@ class CryptoQuantEngine:
                     if data:
                         bids = np.array(data['bids'], dtype=float)
                         asks = np.array(data['asks'], dtype=float)
-                        # Analyzing Top 20 Levels of Depth
                         bid_vol = np.sum(bids[:20, 1])
                         ask_vol = np.sum(asks[:20, 1])
                         obi_score = (bid_vol - ask_vol) / (bid_vol + ask_vol)
@@ -102,75 +112,61 @@ class CryptoQuantEngine:
                     pass
 
             # ===================================================================
-            # 4. RISK MANAGEMENT (Trap & Wick Protection)
+            # 5. RISK MANAGEMENT
             # ===================================================================
             candle_range = high.iloc[-1] - low.iloc[-1]
             wick_ratio_u = (high.iloc[-1] - max(close.iloc[-1], open_p.iloc[-1])) / (candle_range + 1e-9)
             wick_ratio_l = (min(close.iloc[-1], open_p.iloc[-1]) - low.iloc[-1]) / (candle_range + 1e-9)
 
             is_trap = False
-            if wick_ratio_u > 0.35: is_trap = True  # Selling pressure from top
-            if wick_ratio_l > 0.35: is_trap = True  # Buying pressure from bottom
+            trap_limit = 0.40 if trade_style == "SCALP" else 0.35
+
+            if wick_ratio_u > trap_limit: is_trap = True
+            if wick_ratio_l > trap_limit: is_trap = True
 
             # ===================================================================
-            # 5. SIGNAL GENERATION (SAAS TUNED)
+            # 6. SIGNAL GENERATION (DUAL CORE)
             # ===================================================================
             bias = "HOLD"
             lane = "⚫ FLAT"
             score = 50
 
-            # ADJUSTMENT 1: Relaxed Trade Threshold (1.2 -> 1.1)
-            # 1.1 is still statistically significant (1.1 standard deviations)
-            MIN_STRENGTH = 1.1
-
-            # ADJUSTMENT 2: Define "Watch" Threshold (0.6)
-            # Any momentum above 0.6 is "Interesting" enough to show the user.
-            WATCH_STRENGTH = 0.6
-
-            # --- LOGIC GATES ---
-
-            # LONG TRADE
+            # LONG SETUP
             if ((bull_struct or bullish_divergence) and
-                    strength_now > MIN_STRENGTH and
+                    strength_now > min_strength and
                     smart_money_bias == "BULLISH" and
                     not is_trap):
 
                 bias = "LONG"
                 score = 90 if bullish_divergence else 80
-                lane = "⚡ PRIME SETUP" if bullish_divergence else "🔥 TREND FOLLOWING"
+                lane = "⚡ SCALP ENTRY" if trade_style == "SCALP" else "🔥 TREND FOLLOWING"
 
-            # SHORT TRADE
+            # SHORT SETUP
             elif ((bear_struct or bearish_divergence) and
-                  strength_now < -MIN_STRENGTH and
+                  strength_now < -min_strength and
                   smart_money_bias == "BEARISH" and
                   not is_trap):
 
                 bias = "SHORT"
                 score = 90 if bearish_divergence else 80
-                lane = "⚡ PRIME SETUP" if bearish_divergence else "🔥 TREND FOLLOWING"
+                lane = "⚡ SCALP ENTRY" if trade_style == "SCALP" else "🔥 TREND FOLLOWING"
 
-            # --- THE NEW "SMART WATCH" LOGIC ---
-
-            # Scenario A: Momentum is high, but blocked by EMA 200 (Safety)
-            elif abs(strength_now) > MIN_STRENGTH:
+            # WATCH LOGIC (Visual Activity for Users)
+            elif abs(strength_now) > watch_strength:
                 bias = "WATCH"
                 score = 65
-                lane = "⚠️ BLOCKED BY TREND"
-                # This shows the user: "I see the move, but it's unsafe."
+                # If momentum is high but structure failed (e.g. Pump below EMA 200 in Swing Mode)
+                if abs(strength_now) > min_strength and not (bull_struct or bear_struct):
+                    lane = "⚠️ BLOCKED BY TREND"
+                else:
+                    lane = "👀 MOMENTUM BUILDING"
 
-            # Scenario B: Momentum is building (0.6 to 1.1)
-            elif abs(strength_now) > WATCH_STRENGTH:
-                bias = "WATCH"
-                score = 60
-                lane = "👀 MOMENTUM BUILDING"
-
-            # Scenario C: Dead Market (0.0 to 0.6)
             else:
                 bias = "HOLD"
                 lane = "⚫ CONSOLIDATION"
 
             # =======================================================================
-            # 6. TARGETS & STOPS
+            # 7. TARGETS & OUTPUTS
             # =======================================================================
             stop = t1 = t2 = t3 = 0.0
             rr = 0.0
@@ -178,7 +174,9 @@ class CryptoQuantEngine:
 
             if bias in ["LONG", "SHORT"]:
                 direction = 1 if bias == "LONG" else -1
-                stop_dist = current_sigma * 1.5
+                stop_mult = 1.0 if trade_style == "SCALP" else 1.5
+
+                stop_dist = current_sigma * stop_mult
                 stop = price - (direction * stop_dist)
                 t1 = price + (direction * stop_dist * 2.0)
                 t2 = price + (direction * stop_dist * 4.0)
@@ -187,7 +185,7 @@ class CryptoQuantEngine:
                 rr = 2.0
 
             # =======================================================================
-            # 7. LOGIC VECTORS (PROFESSIONAL TERMS)
+            # 8. VECTORS (Clean Retail Terms)
             # =======================================================================
             regime = "RANGE"
             if abs(strength_now) > 1.0: regime = "TREND"
@@ -208,23 +206,23 @@ class CryptoQuantEngine:
                 norm = max(0.0, min(1.0, norm))
                 return int(target_min + (norm * (target_max - target_min)))
 
-            # 1. Order Book Vector
             if smart_money_bias != "NEUTRAL":
                 desc = "Major Order Book Support" if smart_money_bias == "BULLISH" else "Major Order Book Resistance"
                 val = calc_pct(obi_score, 0.15, 0.5, 80, 99)
                 top_features.append({"desc": desc, "importance": val})
 
-            # 2. Divergence Vector
             if bullish_divergence:
                 top_features.append({"desc": "Bullish Volume Divergence", "importance": 95})
             elif bearish_divergence:
                 top_features.append({"desc": "Bearish Volume Divergence", "importance": 95})
 
-            # 3. Momentum Vector
-            if abs(strength_now) > 1.0:
+            if abs(strength_now) > 0.8:
                 desc = "Strong Upside Momentum" if strength_now > 0 else "Strong Downside Momentum"
-                val = calc_pct(strength_now, 1.0, 3.0, 70, 90)
+                val = calc_pct(strength_now, 0.8, 3.0, 70, 90)
                 top_features.append({"desc": desc, "importance": val})
+
+            if not (bull_struct or bear_struct) and abs(strength_now) > min_strength:
+                top_features.append({"desc": "Counter Trend Risk", "importance": 90})
 
             if not top_features:
                 top_features.append({"desc": "Awaiting Order Flow", "importance": 50})
