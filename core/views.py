@@ -4,22 +4,15 @@ import json
 import logging
 import requests
 import concurrent.futures
-from dateutil import parser
-from datetime import datetime, timedelta
-
+from datetime import datetime
 from django.core.paginator import Paginator
-from django.db.models import Q
 from django.http import JsonResponse, HttpResponse
-from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.html import strip_tags
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.core.mail import send_mail
 from django.conf import settings
 
 from .quant.crypto_engine import CryptoQuantEngine
@@ -237,63 +230,118 @@ def hx_backtest(request):
 @require_http_methods(["GET"])
 def hx_alpha_scan(request):
     """
-    THE HUNTER: Automatically scans the Top 30 Liquid Assets.
-    Finds opportunities even when BTC is dead.
+    REELIOO ALPHA SCAN v2 – STABLE HUNTER MODE
+
+    Fixes:
+    - Removes weak/borderline signals
+    - Prevents scan vs terminal mismatch
+    - Adds stability confirmation
     """
-    if not has_access(request.user): return HttpResponse("DENIED")
 
-    # 1. DYNAMIC ASSET LOADING (No more hardcoded lists)
-    # We fetch the top 30 coins by Volume from your MarketService
+    if not has_access(request.user):
+        return HttpResponse("DENIED")
+
+    # ==========================================================
+    # 1. LOAD TOP ASSETS
+    # ==========================================================
     all_assets = MarketService._load_exchange_info()
-
-    # Take Top 30 Liquid Assets (Skip stablecoins if not filtered in Service)
     scan_list = [a['symbol'] for a in all_assets[:30]]
 
     engine = CryptoQuantEngine()
     results = []
 
+    # ==========================================================
+    # 2. SCAN FUNCTION (IMPROVED)
+    # ==========================================================
     def scan(sym):
         try:
-            # FORCE 'SCALP' MODE
-            # We use SCALP because it catches the pumps (KAIA, SUI) that SWING misses
             df = MarketService.get_historical_data(sym, "PERP", "SCALP")
 
-            if df is None or df.empty: return None
+            if df is None or df.empty or len(df) < 210:
+                return None
 
-            # Analyze using v34 Dual Core
+            # =========================
+            # PRIMARY ANALYSIS
+            # =========================
             res = engine.analyze(df, trade_style="SCALP", symbol=sym)
 
-            # Filter: Only show distinct "Long/Short" signals (Ignore Watch/Hold)
-            if res.bias in ["LONG", "SHORT"] and res.score >= 70:
-                return {
-                    'symbol': sym,
-                    'bias': res.bias,
-                    'score': res.score,
-                    'lane': res.lane,  # Show "SCALP ENTRY" or "TREND"
-                    'entry': res.entry,
-                    'stop': res.stop,
-                    'target': res.target1,
-                    'explanation': getattr(res, 'narrative', 'Setup Detected')
-                }
-        except:
+            # =========================
+            # HARD FILTER 1: ONLY STRONG SIGNALS
+            # =========================
+            if res.bias not in ["LONG", "SHORT"]:
+                return None
+
+            # Stronger threshold (prevents WATCH flip later)
+            if res.score < 75:
+                return None
+
+            # =========================
+            # HARD FILTER 2: STABILITY CHECK
+            # Re-run on slightly trimmed data
+            # =========================
+            df_prev = df.iloc[:-1]  # remove last candle
+            res_prev = engine.analyze(df_prev, trade_style="SCALP", symbol=sym)
+
+            # If signal changes → unstable → reject
+            if res_prev.bias != res.bias:
+                return None
+
+            # =========================
+            # HARD FILTER 3: MOMENTUM VALIDATION
+            # =========================
+            close = df["close"]
+            momentum = close.diff().rolling(3).mean().iloc[-1]
+
+            if res.bias == "LONG" and momentum <= 0:
+                return None
+
+            if res.bias == "SHORT" and momentum >= 0:
+                return None
+
+            # =========================
+            # FINAL ACCEPT
+            # =========================
+            return {
+                'symbol': sym,
+                'bias': res.bias,
+                'score': res.score,
+                'lane': res.lane,
+                'entry': res.entry,
+                'stop': res.stop,
+                'target': res.target1,
+                'explanation': getattr(res, 'narrative', 'Setup Detected'),
+
+                # Optional future use (sync layer)
+                'timestamp': str(df.index[-1])
+            }
+
+        except Exception:
             return None
 
-    # 2. PARALLEL EXECUTION (Speed is key for UX)
-    # Scans 30 coins in ~2 seconds using threads
+    # ==========================================================
+    # 3. PARALLEL EXECUTION
+    # ==========================================================
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         for r in executor.map(scan, scan_list):
-            if r: results.append(r)
+            if r:
+                results.append(r)
 
-    # 3. RANKING
-    # Sort by Confidence Score (Highest first)
+    # ==========================================================
+    # 4. RESULT HANDLING
+    # ==========================================================
     if not results:
-        return render(request, 'core/partials/alpha_result.html', {'res': {'found': False}})
+        return render(request, 'core/partials/alpha_result.html', {
+            'res': {'found': False}
+        })
 
+    # Sort by strongest score
     results.sort(key=lambda x: x['score'], reverse=True)
 
-    # Return the Single Best Setup (or loop in template to show Top 3)
     best_setup = results[0]
-    return render(request, 'core/partials/alpha_result.html', {'res': {'found': True, **best_setup}})
+
+    return render(request, 'core/partials/alpha_result.html', {
+        'res': {'found': True, **best_setup}
+    })
 
 
 @login_required
