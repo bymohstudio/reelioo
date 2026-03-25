@@ -6,7 +6,7 @@
                 <div class="flex items-center gap-3 mb-4">
 
                     <span class="text-[10px] font-black bg-slate-800/80 px-3 py-1 rounded text-slate-300 uppercase tracking-widest border border-white/5">
-                        {% if mode == 'INTRADAY' %}PERP SWING{% else %}PERP SCALP{% endif %}
+                        {% if mode == 'INTRADAY' %}Swing &middot; 15m{% elif mode == 'SCALP' %}Scalp &middot; 5m{% elif mode == 'SWING' %}Swing &middot; 1h{% else %}Position &middot; 4h{% endif %}
                     </span>
 
                     <span class="text-[10px] px-3 py-1 border rounded uppercase tracking-widest font-black transition-all flex items-center gap-2
@@ -66,7 +66,7 @@
         </div>
         <div class="p-6">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Target</p>
-            <p class="text-xl font-mono font-black text-emerald-400">${{ res.target2 }}</p>
+            <p class="text-xl font-mono font-black text-emerald-400">${{ res.target1 }}</p>
         </div>
         <div class="p-6">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Stop</p>
@@ -100,7 +100,7 @@
                 <input type="hidden" name="bias" value="{{ res.bias }}">
                 <input type="hidden" name="entry" value="{{ res.entry }}">
                 <input type="hidden" name="stop" value="{{ res.stop }}">
-                <input type="hidden" name="target" value="{{ res.target2 }}">
+                <input type="hidden" name="target" value="{{ res.target1 }}">
                 <input type="hidden" name="score" value="{{ res.score }}">
                 <button type="submit" class="w-full px-6 py-4 bg-[#1e293b] hover:bg-[#334155] text-white font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-white/10 transition shadow-lg flex items-center justify-center gap-2 group">
                     <i data-lucide="bookmark" class="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition"></i> Save to Journal

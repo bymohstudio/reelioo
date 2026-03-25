@@ -25,7 +25,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon-16x16.png' %}">
 
     <link rel="stylesheet" href="{% static 'css/dist/styles.css' %}">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.263.1"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -143,6 +143,7 @@
                         <div class="flex flex-col gap-6">
                             <a href="{% url 'terminal' %}" class="flex items-center gap-4 text-xl font-bold text-white group"><i data-lucide="layout-grid" class="w-6 h-6 text-slate-500 group-hover:text-violet-500 transition"></i> Terminal</a>
                             <a href="{% url 'journal' %}" class="flex items-center gap-4 text-xl font-bold text-slate-400 hover:text-white group transition"><i data-lucide="book" class="w-6 h-6 text-slate-500 group-hover:text-emerald-500 transition"></i> Journal</a>
+                            <a href="{% url 'about' %}" class="flex items-center gap-4 text-xl font-bold text-slate-400 hover:text-white group transition"><i data-lucide="book-open" class="w-6 h-6 text-slate-500 group-hover:text-violet-500 transition"></i> How It Works</a>
 
                             <a href="https://discord.gg/csVPpg6mFD" target="_blank" class="flex items-center gap-4 text-xl font-bold text-[#5865F2] group transition">
                                 <div class="w-6 h-6 flex items-center justify-center"><svg class="w-6 h-6 fill-current group-hover:text-white" viewBox="0 0 127 96"><path d="M107.7,8A105,105,0,0,0,81.5,0a72,72,0,0,0-3.4,6.8A97.7,97.7,0,0,0,49,6.8,72.4,72.4,0,0,0,45.6,0,105.9,105.9,0,0,0,19.4,8.1C2.8,32.7-1.7,56.6.5,80.2h0A105.7,105.7,0,0,0,32.7,96.4a77.1,77.1,0,0,0,6.9-11.1,68.4,68.4,0,0,1-10.9-5.2c.9-.7,1.8-1.3,2.7-2a75.6,75.6,0,0,0,64.3,0c.9.7,1.8,1.4,2.7,2a68.7,68.7,0,0,1-10.9,5.2,77,77,0,0,0,6.9,11.1A105.9,105.9,0,0,0,126.6,80.2C129,55.8,121.2,32.5,107.7,8ZM42.5,65.7c-6.3,0-11.4-5.7-11.4-12.7s5-12.7,11.4-12.7S54,46,53.9,53,48.8,65.7,42.5,65.7Zm42.2,0c-6.3,0-11.4-5.7-11.4-12.7s5-12.7,11.4-12.7S96.2,46,96.1,53,91.1,65.7,84.7,65.7Z"/></svg></div> Alerts
@@ -220,7 +221,7 @@
                 </div>
             </div>
             <div class="border-t border-white/5 pt-8 text-[10px] text-slate-600 text-center flex flex-col gap-2">
-                <p>&copy; 2025 REELIOO. All rights reserved.</p>
+                <p>&copy; {% now "Y" %} REELIOO. All rights reserved.</p>
                 <p class="text-[9px] text-slate-300/90 max-w-xl mx-auto px-4 leading-relaxed font-medium"><strong>⚠️ RISK DISCLOSURE:</strong> Reelioo is a data analytics tool, not a financial advisor. Content is for educational purposes only.</p>
             </div>
         </div>

@@ -50,12 +50,12 @@
                             <button @click="mode='INTRADAY'; $dispatch('mode-change', 'INTRADAY')"
                                     :class="mode==='INTRADAY' ? 'bg-[#1e293b] text-white shadow-lg' : 'text-slate-500 hover:text-white'"
                                     class="flex-1 md:flex-none px-5 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all duration-200">
-                                PERP SWING
+                                Swing &middot; 15m
                             </button>
                             <button @click="mode='SCALP'; $dispatch('mode-change', 'SCALP')"
                                     :class="mode==='SCALP' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/30' : 'text-slate-500 hover:text-white'"
                                     class="flex-1 md:flex-none px-5 py-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all duration-200">
-                                PERP SCALP
+                                Scalp &middot; 5m
                             </button>
                         </div>
 
@@ -152,9 +152,16 @@
                     <div class="lg:col-span-8 min-h-[600px] bg-[#020617] rounded-2xl border border-slate-800 relative overflow-hidden flex flex-col shadow-inner">
 
                         <div id="results-view" class="h-full">
-                            <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
-                                <i data-lucide="activity" class="w-20 h-20 opacity-60 mb-6"></i>
-                                <p class="text-xs font-black tracking-[0.3em] opacity-70 uppercase">System Ready</p>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 px-8">
+                                <i data-lucide="activity" class="w-16 h-16 opacity-40 mb-6"></i>
+                                <p class="text-xs font-black tracking-[0.3em] opacity-70 uppercase mb-4">System Ready</p>
+                                <p class="text-[11px] text-slate-500 text-center max-w-xs leading-relaxed">
+                                    Type a coin symbol above (e.g. <strong class="text-slate-300">BTC</strong>) and hit <strong class="text-violet-400">Run Reelioo Scan</strong> to get your first analysis.
+                                </p>
+                                <div class="flex items-center gap-2 mt-6 text-[10px] text-slate-600 uppercase tracking-widest">
+                                    <i data-lucide="arrow-up-left" class="w-4 h-4"></i>
+                                    <span>Or pick from Market Radar below</span>
+                                </div>
                             </div>
                         </div>
 

@@ -1,159 +1,154 @@
 {% extends "core/base.html" %}
-{% block title %}Methodology: Kinetic Market Theory | Reelioo{% endblock %}
+{% block title %}How It Works: The Confluence Engine | Reelioo{% endblock %}
 
 {% block content %}
-<style>
-    /* Technical Typography Setup */
-    .font-mono-tech { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.05em; }
-    .font-serif-academic { font-family: 'Times New Roman', Times, serif; line-height: 1.8; }
-
-    /* Paper Layout Elements */
-    .paper-section { border-left: 1px solid rgba(124, 58, 237, 0.2); padding-left: 2rem; margin-bottom: 4rem; position: relative; }
-    .paper-section::before { content: ''; position: absolute; left: -1px; top: 0; height: 20px; width: 1px; background: #7c3aed; }
-
-    /* Animations */
-    @keyframes revealText { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-text { animation: revealText 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
-    .delay-100 { animation-delay: 0.1s; }
-    .delay-200 { animation-delay: 0.2s; }
-    .delay-300 { animation-delay: 0.3s; }
-</style>
-
 <div class="min-h-screen bg-[#020617] text-slate-300 font-sans selection:bg-violet-500/30 overflow-x-hidden pt-24 pb-20">
 
-    <header class="max-w-4xl mx-auto px-6 mb-20 animate-text">
+    <header class="max-w-4xl mx-auto px-6 mb-20">
         <div class="flex items-center gap-4 mb-6 border-b border-white/10 pb-6">
-            <span class="text-[10px] font-mono-tech text-violet-500 uppercase tracking-widest">Doc_Ref: R-2026-VECT</span>
-            <span class="text-[10px] font-mono-tech text-slate-600 uppercase tracking-widest">Status: Declassified</span>
+            <span class="text-[10px] font-mono text-violet-500 uppercase tracking-widest">Engine v36</span>
+            <span class="text-[10px] font-mono text-slate-600 uppercase tracking-widest">7-Layer Confluence</span>
         </div>
 
         <h1 class="text-4xl md:text-6xl font-black text-white tracking-tight leading-[1.1] mb-6">
-            Kinetic Market Theory:<br>
-            <span class="text-violet-500">Deterministic Order Flow.</span>
+            How Reelioo<br>
+            <span class="text-violet-500">Actually Works.</span>
         </h1>
 
         <p class="text-lg md:text-xl text-slate-400 max-w-2xl leading-relaxed">
-            Markets are not random. They are physical systems governed by <strong>Force</strong>, <strong>Mass</strong>, and <strong>Friction</strong>. Reelioo is the engine that measures these forces.
+            No black boxes. No mystery AI. Here's every layer of the engine, explained plainly. If you understand moving averages and volume, you'll understand everything we do.
         </p>
     </header>
 
-    <section class="max-w-4xl mx-auto px-6 paper-section animate-text delay-100">
-        <span class="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4 block">01. The Abstract</span>
-        <div class="prose prose-invert prose-lg max-w-none text-slate-300 font-serif-academic">
-            <p>
-                Retail traders lose because they focus on <strong>Geometry</strong> (Patterns, Triangles, Flags). Institutions win because they focus on <strong>Physics</strong> (Liquidity, Velocity, Volume).
-            </p>
-            <p>
-                A "Bull Flag" is just a drawing. It has no predictive power unless you know the <strong>Mass</strong> (Volume) of the buyers inside it. Reelioo ignores the drawing. We measure the energy required to move the price.
-            </p>
-        </div>
-    </section>
-
-    <section class="max-w-5xl mx-auto px-6 mb-32 animate-text delay-200">
-        <div class="grid md:grid-cols-3 gap-px bg-white/10 border border-white/10 overflow-hidden rounded-lg">
-
-            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
-                <div class="text-violet-500 font-mono-tech text-xs mb-4">VECTOR A</div>
-                <h3 class="text-xl font-bold text-white mb-2">Mass (m)</h3>
-                <p class="text-xs font-mono text-slate-500 mb-4">PROXY: VOLUME PROFILE</p>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    In physics, F = ma. Price cannot sustain a trend without Mass (Volume). If price moves up on low mass, it is a <strong>hollow move</strong> (Bull Trap). We filter these out instantly.
+    <section class="max-w-4xl mx-auto px-6 mb-16">
+        <div class="border-l border-violet-500/20 pl-8 relative">
+            <div class="absolute left-[-1px] top-0 h-5 w-[1px] bg-violet-500"></div>
+            <span class="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4 block">01. The Core Idea</span>
+            <div class="text-lg text-slate-300 leading-relaxed space-y-6">
+                <p>
+                    One indicator is noisy. Two is contradictory. But when <strong class="text-white">five or more independent signals point the same direction at the same time</strong>, something real is happening. That's confluence.
                 </p>
-            </div>
-
-            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
-                <div class="text-violet-500 font-mono-tech text-xs mb-4">VECTOR B</div>
-                <h3 class="text-xl font-bold text-white mb-2">Velocity (v)</h3>
-                <p class="text-xs font-mono text-slate-500 mb-4">PROXY: ORDER VELOCITY</p>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    How fast are orders hitting the book? High velocity indicates <strong>Market Orders</strong> (Aggression). Low velocity indicates Limit Orders (Passivity). We track the speed of the tape in milliseconds.
-                </p>
-            </div>
-
-            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
-                <div class="text-violet-500 font-mono-tech text-xs mb-4">VECTOR C</div>
-                <h3 class="text-xl font-bold text-white mb-2">Friction (μ)</h3>
-                <p class="text-xs font-mono text-slate-500 mb-4">PROXY: LIMIT WALLS</p>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    Every move faces resistance. Friction is the "thickness" of the order book ahead. We calculate the <strong>Path of Least Resistance</strong>. Price flows where Friction is lowest.
+                <p>
+                    Reelioo runs 7 analysis layers on every scan. Each layer votes independently — bullish, bearish, or neutral. The engine sums the votes into a <strong class="text-white">confluence score</strong>. Only when the score crosses a threshold does it produce a signal.
                 </p>
             </div>
         </div>
     </section>
 
-    <section class="max-w-4xl mx-auto px-6 paper-section animate-text delay-300">
-        <span class="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4 block">02. Deterministic Logic (The White Box)</span>
-        <div class="prose prose-invert prose-lg max-w-none text-slate-300 font-serif-academic">
-            <p>
-                We do not use "Black Box" AI. We do not use Neural Networks that "guess" or "hallucinate" patterns.
-            </p>
-            <p>
-                Reelioo is a <strong>White Box</strong> system. It uses deterministic logic.
-            </p>
-            <ul class="space-y-4 text-base font-sans mt-6">
-                <li class="flex items-center gap-3 p-4 bg-[#0a0a0a] border border-white/5 rounded-lg">
-                    <div class="flex-1">
-                        <span class="text-slate-400">If <strong>Velocity</strong> is High</span>
-                        <span class="text-violet-500 text-xs font-bold mx-2">AND</span>
-                        <span class="text-slate-400"><strong>Friction</strong> is Low</span>
-                    </div>
-                    <i data-lucide="arrow-right" class="w-4 h-4 text-slate-600"></i>
-                    <span class="text-emerald-400 font-bold uppercase tracking-wider text-xs">Breakout Confirmed</span>
-                </li>
+    <section class="max-w-5xl mx-auto px-6 mb-20">
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/10 border border-white/10 overflow-hidden rounded-lg">
 
-                <li class="flex items-center gap-3 p-4 bg-[#0a0a0a] border border-white/5 rounded-lg">
-                    <div class="flex-1">
-                        <span class="text-slate-400">If <strong>Price</strong> is Up</span>
-                        <span class="text-violet-500 text-xs font-bold mx-2">BUT</span>
-                        <span class="text-slate-400"><strong>Mass</strong> is Zero</span>
-                    </div>
-                    <i data-lucide="arrow-right" class="w-4 h-4 text-slate-600"></i>
-                    <span class="text-red-400 font-bold uppercase tracking-wider text-xs">Fake Out (Reject)</span>
-                </li>
-            </ul>
-            <p class="mt-6">
-                This means when you see a signal in the terminal, it is not a "prediction." It is a measurement of current reality.
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 1</div>
+                <h3 class="text-lg font-bold text-white mb-2">Trend Structure</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Is price above or below its moving averages? We use a fast EMA (34-period) and slow EMA (100-period). When both align — and price is above both — the structure is bullish.
+                </p>
+            </div>
+
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 2</div>
+                <h3 class="text-lg font-bold text-white mb-2">Momentum</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    We track momentum at two speeds — a fast reactive signal and a slow confirming one. Price-normalized by ATR so it works across any coin. Both must agree for credit.
+                </p>
+            </div>
+
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 3</div>
+                <h3 class="text-lg font-bold text-white mb-2">Volume</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Is volume expanding or contracting? We calculate volume z-scores and flag climax events (2+ standard deviations). A move without volume is a move without conviction.
+                </p>
+            </div>
+
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 4</div>
+                <h3 class="text-lg font-bold text-white mb-2">Divergence</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Price makes new lows but momentum doesn't? Classic bullish divergence. We check this over both 5-bar and 10-bar windows for robustness.
+                </p>
+            </div>
+
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 5</div>
+                <h3 class="text-lg font-bold text-white mb-2">Order Book</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    We pull real-time bid/ask depth from Binance Futures and compute the Order Book Imbalance (OBI). Heavy bids with light asks? Buying pressure is building.
+                </p>
+            </div>
+
+            <div class="bg-[#050a14] p-8 hover:bg-[#0b1121] transition duration-500">
+                <div class="text-violet-500 font-mono text-xs mb-4">LAYER 6</div>
+                <h3 class="text-lg font-bold text-white mb-2">Trend Consistency</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    Are recent candles consistently closing in one direction? 4 out of 5 bars closing up is a stronger signal than one big green candle.
+                </p>
+            </div>
+
+        </div>
+
+        <div class="mt-px bg-[#050a14] border border-white/10 p-8 rounded-b-lg hover:bg-[#0b1121] transition duration-500">
+            <div class="text-red-400 font-mono text-xs mb-4">LAYER 7 &middot; DEFENSE</div>
+            <h3 class="text-lg font-bold text-white mb-2">Trap Detection</h3>
+            <p class="text-sm text-slate-400 leading-relaxed max-w-2xl">
+                Long wicks reveal rejection. If a candle's wick is over 65% of its range, the engine flags it as a potential trap and penalizes the score in that direction. This prevents entering right before a reversal.
             </p>
         </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-6 mb-32 animate-text delay-300">
+    <section class="max-w-4xl mx-auto px-6 mb-20">
+        <div class="border-l border-violet-500/20 pl-8 relative">
+            <div class="absolute left-[-1px] top-0 h-5 w-[1px] bg-violet-500"></div>
+            <span class="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4 block">02. The Scoring System</span>
+            <div class="text-lg text-slate-300 leading-relaxed space-y-6">
+                <p>
+                    Each layer contributes a weighted vote. Structure can give up to 1.0 points. Momentum up to 1.0. Volume up to 0.6. Divergence up to 1.0. And so on. Penalties subtract — a trap candle costs -0.5.
+                </p>
+                <p>
+                    The threshold for an actionable signal is <strong class="text-white">2.0 for intraday</strong> (on 15-minute candles). This means at least 3-4 layers must actively agree. A single indicator spike cannot trigger a signal on its own.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="max-w-6xl mx-auto px-6 mb-20">
         <div class="bg-[#0b1121] border border-violet-500/20 rounded-2xl p-8 md:p-12 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 blur-[80px] rounded-full"></div>
 
             <div class="grid md:grid-cols-2 gap-12 items-center relative z-10">
                 <div>
-                    <h3 class="text-3xl font-black text-white mb-4">The "Silence" Protocol</h3>
+                    <h3 class="text-3xl font-black text-white mb-4">The Silence Protocol</h3>
                     <p class="text-slate-400 leading-relaxed mb-6">
-                        The hardest part of trading is knowing when <strong>NOT</strong> to trade.
+                        When the score is below threshold, the terminal says <strong class="text-white">HOLD</strong>. This isn't a bug — it's the most important feature.
                     </p>
                     <p class="text-slate-400 leading-relaxed">
-                        Reelioo classifies the market into Regimes. If the market is in a "Choppy/High Friction" regime, the terminal goes silent. It will tell you "HOLD" or "NO SIGNAL."
+                        Most signal services push 5-10 signals a day because "more signals = more value." That's wrong. More bad signals = more losses. Reelioo only speaks when the confluence is real.
                     </p>
                     <p class="text-white font-bold mt-4 border-l-2 border-violet-500 pl-4">
-                        The goal is to protect your capital from noise, so you are fully capitalized when the true signal arrives.
+                        Protecting your capital from noise is how you stay solvent for the real setups.
                     </p>
                 </div>
                 <div class="bg-[#020617] border border-white/5 rounded-xl p-6 font-mono text-xs">
                     <div class="flex justify-between border-b border-white/5 pb-2 mb-4">
-                        <span class="text-slate-500">SYSTEM LOG // REGIME_SCAN</span>
+                        <span class="text-slate-500">ENGINE LOG // CONFLUENCE</span>
                         <span class="text-violet-500">LIVE</span>
                     </div>
                     <div class="space-y-3">
                         <div class="flex gap-4">
-                            <span class="text-slate-600">14:00:01</span>
-                            <span class="text-red-400">DETECTED: LOW VOLUME</span>
-                            <span class="text-slate-500">-> ACTION: FILTER</span>
+                            <span class="text-slate-600">14:00</span>
+                            <span class="text-slate-400">Score: 1.3</span>
+                            <span class="text-slate-500">&rarr; HOLD (below 2.0)</span>
                         </div>
                         <div class="flex gap-4">
-                            <span class="text-slate-600">14:05:22</span>
-                            <span class="text-red-400">DETECTED: CHOP</span>
-                            <span class="text-slate-500">-> ACTION: FILTER</span>
+                            <span class="text-slate-600">14:15</span>
+                            <span class="text-slate-400">Score: 1.7</span>
+                            <span class="text-yellow-400">&rarr; WATCH (building)</span>
                         </div>
                         <div class="flex gap-4">
-                            <span class="text-slate-600">14:15:00</span>
-                            <span class="text-emerald-400">DETECTED: WHALE ENTRY</span>
-                            <span class="text-white">-> ACTION: SIGNAL LONG</span>
+                            <span class="text-slate-600">14:30</span>
+                            <span class="text-emerald-400">Score: 2.4</span>
+                            <span class="text-white">&rarr; LONG (5/7 aligned)</span>
                         </div>
                     </div>
                 </div>
@@ -161,9 +156,24 @@
         </div>
     </section>
 
+    <section class="max-w-4xl mx-auto px-6 mb-20">
+        <div class="border-l border-violet-500/20 pl-8 relative">
+            <div class="absolute left-[-1px] top-0 h-5 w-[1px] bg-violet-500"></div>
+            <span class="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4 block">03. What We Don't Do</span>
+            <div class="text-lg text-slate-300 leading-relaxed space-y-6">
+                <p>
+                    We don't use neural networks. We don't predict the future. We don't have access to proprietary exchange data or dark pools. We don't guarantee profits.
+                </p>
+                <p>
+                    Reelioo is a <strong class="text-white">decision-support tool</strong> built on publicly available Binance data. It helps you cut through noise and focus on setups where multiple technical signals agree. The rest is still up to your risk management and discipline.
+                </p>
+            </div>
+        </div>
+    </section>
+
     <div class="text-center pt-20 border-t border-white/5 max-w-2xl mx-auto px-6">
-        <h2 class="text-2xl font-bold text-white mb-6">Align with the Physics of Money.</h2>
-        <p class="text-slate-500 mb-10">Stop guessing the shadow. Start measuring the object.</p>
+        <h2 class="text-2xl font-bold text-white mb-6">See the engine in action.</h2>
+        <p class="text-slate-500 mb-10">Run a scan. Read the score. Make your decision.</p>
 
         {% if user.is_authenticated %}
             <a href="{% url 'terminal' %}" class="px-10 py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-lg transition shadow-lg shadow-violet-900/20 text-xs uppercase tracking-widest">
