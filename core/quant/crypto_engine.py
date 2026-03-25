@@ -343,7 +343,12 @@ class CryptoQuantEngine:
                 score = int(min(60 + (dominant / threshold) * 10, 74))
 
             # ==========================================================
-            # 11. TARGET SYSTEM (REALISTIC RR)
+            # 11. TARGET SYSTEM (v36: TIME-AWARE TARGETS)
+            # ==========================================================
+            # v35 bug: T1 at 1.8x ATR was unreachable in 4hr window
+            # v36 fix: T1 is the "realistic first target" that price
+            #          actually reaches in the signal's time window.
+            #          Tighter T1 = fewer zombies, better track record.
             # ==========================================================
             stop = t1 = t2 = t3 = 0.0
             rr = 0.0
@@ -355,11 +360,29 @@ class CryptoQuantEngine:
                 stop_dist = current_sigma * stop_mult
 
                 stop = price - (direction * stop_dist)
-                t1 = price + (direction * stop_dist * 1.8)
-                t2 = price + (direction * stop_dist * 3.0)
-                t3 = price + (direction * stop_dist * 5.5)
 
-                rr = 2.0
+                # v36: Scale targets to what's ACHIEVABLE per style
+                # T1 should be hit ~60-70% of the time when direction is correct
+                # T2 is the "good trade" target (~40%)
+                # T3 is the "runner" target (~15-20%)
+                if trade_style == "SCALP":
+                    t1 = price + (direction * stop_dist * 1.2)
+                    t2 = price + (direction * stop_dist * 2.0)
+                    t3 = price + (direction * stop_dist * 3.0)
+                elif trade_style == "SWING":
+                    t1 = price + (direction * stop_dist * 1.8)
+                    t2 = price + (direction * stop_dist * 3.2)
+                    t3 = price + (direction * stop_dist * 5.0)
+                elif trade_style == "POSITION":
+                    t1 = price + (direction * stop_dist * 2.0)
+                    t2 = price + (direction * stop_dist * 4.0)
+                    t3 = price + (direction * stop_dist * 7.0)
+                else:  # INTRADAY
+                    t1 = price + (direction * stop_dist * 1.3)
+                    t2 = price + (direction * stop_dist * 2.2)
+                    t3 = price + (direction * stop_dist * 3.8)
+
+                rr = round(abs(t1 - price) / (stop_dist + 1e-9), 2)
                 risk_pct = self.BASE_RISK
 
             # ==========================================================

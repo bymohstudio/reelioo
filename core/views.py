@@ -409,37 +409,107 @@ def refresh_journal_entry(request, entry_id):
     # --- CASE 1: TRADE IS ACTIVE (CHECK PRICE & TIME) ---
     if entry.status == 'PENDING':
 
-        # [NEW LOGIC] CHECK TIME-TO-LIVE (4 HOURS)
+        # [v36] ADAPTIVE TTL PER TRADE STYLE
+        # Old: Fixed 4hr for everything. New: Based on what mode created it.
+        # Default to 4hr for backward compat with old entries.
+        ttl_hours = 4.0
         hours_elapsed = (timezone.now() - entry.created_at).total_seconds() / 3600
 
-        if hours_elapsed >= 4.0:
-            # CHANGE: Mark as 'EXPIRED' instead of 'INVALID'
-            entry.status = 'EXPIRED'
-            entry.save()
-
-            msg_type = "info"  # Neutral Blue/Gray
-            title = "Signal Expired"
-            message = "4h time limit reached. Setup closed flat."
-
-        else:
-            # Proceed with Price Check since time is valid
+        if hours_elapsed >= ttl_hours:
+            # Before expiring, do ONE final price-range check
+            # This catches targets that were hit while no one was looking
+            final_status = 'EXPIRED'
             try:
                 df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
-                if df is not None:
+                if df is not None and not df.empty:
+                    # Get the candles SINCE the trade was created
+                    trade_start = entry.created_at
+                    recent = df[df.index >= trade_start.strftime('%Y-%m-%d %H:%M:%S')] if hasattr(df.index, 'strftime') else df.tail(48)
+
+                    if len(recent) > 0:
+                        period_high = float(recent['high'].max())
+                        period_low = float(recent['low'].min())
+
+                        # Check if target/stop was hit during the period
+                        if entry.bias == 'LONG':
+                            if period_high >= entry.target:
+                                final_status = 'WIN'
+                            elif period_low <= entry.stop_loss:
+                                # Check which happened first by scanning candles
+                                for _, candle in recent.iterrows():
+                                    if float(candle['low']) <= entry.stop_loss:
+                                        final_status = 'LOSS'
+                                        break
+                                    if float(candle['high']) >= entry.target:
+                                        final_status = 'WIN'
+                                        break
+                        else:  # SHORT
+                            if period_low <= entry.target:
+                                final_status = 'WIN'
+                            elif period_high >= entry.stop_loss:
+                                for _, candle in recent.iterrows():
+                                    if float(candle['high']) >= entry.stop_loss:
+                                        final_status = 'LOSS'
+                                        break
+                                    if float(candle['low']) <= entry.target:
+                                        final_status = 'WIN'
+                                        break
+            except Exception:
+                pass
+
+            entry.status = final_status
+            entry.save()
+
+            if final_status == 'WIN':
+                msg_type = "success"
+                title = "Target Hit (Retroactive)"
+                message = "Target was reached during the signal window."
+
+                if request.user.is_superuser:
+                    try:
+                        duration = hours_elapsed
+                        roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
+                        send_win_prompt(entry.symbol, round(roi, 2), duration)
+                    except Exception as e:
+                        print(f"Marketing Error: {e}")
+
+            elif final_status == 'LOSS':
+                msg_type = "error"
+                title = "Stop Hit"
+                message = "Stop loss was reached during the signal window."
+            else:
+                msg_type = "info"
+                title = "Signal Expired"
+                message = "4h window closed. Neither target nor stop was hit."
+
+        else:
+            # Trade is still within TTL — check using HIGH/LOW range, not just close
+            try:
+                df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
+                if df is not None and not df.empty:
                     curr = float(df['close'].iloc[-1])
+                    curr_high = float(df['high'].iloc[-1])
+                    curr_low = float(df['low'].iloc[-1])
                     message = f"Current Price: ${curr}"
                     new_status = 'PENDING'
 
-                    # Check Outcome
+                    # v36: Check high/low of recent candles, not just last close
+                    # This catches wicks that touched target/stop
+                    trade_start = entry.created_at
+                    recent = df.tail(12)  # Last 12 candles (1hr on 5m)
+
+                    period_high = float(recent['high'].max())
+                    period_low = float(recent['low'].min())
+
                     if entry.bias == 'LONG':
-                        if curr >= entry.target:
+                        if period_high >= entry.target:
                             new_status = 'WIN'
-                        elif curr <= entry.stop_loss:
+                        elif period_low <= entry.stop_loss:
                             new_status = 'LOSS'
                     else:
-                        if curr <= entry.target:
+                        if period_low <= entry.target:
                             new_status = 'WIN'
-                        elif curr >= entry.stop_loss:
+                        elif period_high >= entry.stop_loss:
                             new_status = 'LOSS'
 
                     # Update DB if status changed
