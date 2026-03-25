@@ -266,13 +266,13 @@ def hx_alpha_scan(request):
             res = engine.analyze(df, trade_style="SCALP", symbol=sym)
 
             # =========================
-            # HARD FILTER 1: ONLY STRONG SIGNALS
+            # HARD FILTER 1: ONLY ACTIONABLE SIGNALS
             # =========================
             if res.bias not in ["LONG", "SHORT"]:
                 return None
 
-            # Stronger threshold (prevents WATCH flip later)
-            if res.score < 75:
+            # v36: Lowered from 75 → 70 (engine now produces calibrated scores)
+            if res.score < 70:
                 return None
 
             # =========================
@@ -284,18 +284,6 @@ def hx_alpha_scan(request):
 
             # If signal changes → unstable → reject
             if res_prev.bias != res.bias:
-                return None
-
-            # =========================
-            # HARD FILTER 3: MOMENTUM VALIDATION
-            # =========================
-            close = df["close"]
-            momentum = close.diff().rolling(3).mean().iloc[-1]
-
-            if res.bias == "LONG" and momentum <= 0:
-                return None
-
-            if res.bias == "SHORT" and momentum >= 0:
                 return None
 
             # =========================

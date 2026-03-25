@@ -1,28 +1,30 @@
 import pandas as pd
 import numpy as np
 
-# These features match v31 TITANIUM logic
+# These features match v36 REBALANCED logic
 PHYSICS_FEATURES = [
     "force",
     "acceleration",
     "mass",
     "velocity",
-    "energy_reserve",  # Hidden RSI
-    "stretch_pct",  # Elasticity
-    "structure_state",  # EMA 50 Alignment
-    "is_trap"
+    "energy_reserve",   # Hidden RSI
+    "stretch_pct",      # Elasticity
+    "structure_state",  # EMA alignment
+    "is_trap",
+    "vol_z_score",      # v36: Volume z-score
+    "trend_consistency", # v36: Directional consistency
 ]
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    v31 TITANIUM Feature Generator.
-    Aligned with Anti-Lag, Elasticity, and Acceleration logic.
+    v36 Feature Generator.
+    Aligned with Rebalanced Confluence Engine.
+    Adds: volume z-score, trend consistency, dual EMA structure.
     """
     if df.empty:
         return df
 
-    # Optimization: Avoid deep copy if not needed, but safe to keep for data integrity
     df = df.copy()
 
     close = df["close"]
@@ -31,9 +33,8 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     volume = df["volume"]
 
     # -------------------------
-    # 1. PHYSICS VECTORS (v31 Anti-Lag)
+    # 1. PHYSICS VECTORS (Anti-Lag)
     # -------------------------
-    # True Range & Sigma
     tr = pd.concat([
         high - low,
         (high - close.shift()).abs(),
@@ -65,23 +66,31 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     gain = (delta.where(delta > 0, 0)).rolling(14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
     rs = gain / (loss + 1e-9)
-    # 0-100 Scale
     df["energy_reserve"] = 100 - (100 / (1 + rs))
 
     # -------------------------
     # 3. STRUCTURE & ELASTICITY
     # -------------------------
-    # Equilibrium (EMA 50)
-    eq = close.ewm(span=50, adjust=False).mean()
+    # Dual EMA structure for v36
+    eq_fast = close.ewm(span=34, adjust=False).mean()
+    eq_slow = close.ewm(span=100, adjust=False).mean()
 
-    # Elasticity (Stretch from Mean)
-    df["stretch_pct"] = (close - eq) / eq
+    # Elasticity (Stretch from fast EMA)
+    df["stretch_pct"] = (close - eq_fast) / eq_fast
 
-    # Structure State (Bullish/Bearish based on EMA)
+    # Structure State (v36: considers both EMAs)
     df["structure_state"] = np.where(
-        close > eq,
-        "BULLISH_STRUCT",
-        "BEARISH_STRUCT"
+        (close > eq_fast) & (eq_fast > eq_slow),
+        "BULLISH_ALIGNED",
+        np.where(
+            (close < eq_fast) & (eq_fast < eq_slow),
+            "BEARISH_ALIGNED",
+            np.where(
+                close > eq_fast,
+                "BULLISH_STRUCT",
+                "BEARISH_STRUCT"
+            )
+        )
     )
 
     # -------------------------
@@ -92,10 +101,22 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     upper_wick = high - pd.concat([close, open_p], axis=1).max(axis=1)
     lower_wick = pd.concat([close, open_p], axis=1).min(axis=1) - low
 
-    # Trap Logic: High Force vs Big Wick
     bull_trap = (df["force"] > 0) & (upper_wick > (body * 1.2))
     bear_trap = (df["force"] < 0) & (lower_wick > (body * 1.2))
 
     df["is_trap"] = bull_trap | bear_trap
+
+    # -------------------------
+    # 5. VOLUME Z-SCORE (v36 New)
+    # -------------------------
+    vol_std = volume.rolling(20).std()
+    df["vol_z_score"] = (volume - vol_mean) / (vol_std + 1e-9)
+
+    # -------------------------
+    # 6. TREND CONSISTENCY (v36 New)
+    # -------------------------
+    # Rolling count of positive closes over last 6 bars
+    pos_changes = (close.diff() > 0).astype(int)
+    df["trend_consistency"] = pos_changes.rolling(6).sum()
 
     return df.fillna(0)
