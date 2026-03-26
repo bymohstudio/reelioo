@@ -255,7 +255,13 @@ def hx_alpha_scan(request):
     # ==========================================================
     def scan(sym):
         try:
-            df = MarketService.get_historical_data(sym, "PERP", "SCALP")
+            # v37 FIX: Use INTRADAY mode for alpha scan (15m candles, wider stops)
+            # SCALP mode (5m) has stops too tight for altcoins/memecoins
+            # The old code used SCALP which gave 0.8x ATR stops — noise-level
+            # for anything outside BTC/ETH
+            scan_mode = "INTRADAY"
+
+            df = MarketService.get_historical_data(sym, "PERP", scan_mode)
 
             if df is None or df.empty or len(df) < 210:
                 return None
@@ -263,7 +269,7 @@ def hx_alpha_scan(request):
             # =========================
             # PRIMARY ANALYSIS
             # =========================
-            res = engine.analyze(df, trade_style="SCALP", symbol=sym)
+            res = engine.analyze(df, trade_style=scan_mode, symbol=sym)
 
             # =========================
             # HARD FILTER 1: ONLY ACTIONABLE SIGNALS
@@ -271,18 +277,16 @@ def hx_alpha_scan(request):
             if res.bias not in ["LONG", "SHORT"]:
                 return None
 
-            # v36: Lowered from 75 → 70 (engine now produces calibrated scores)
-            if res.score < 70:
+            if res.score < 75:
                 return None
 
             # =========================
             # HARD FILTER 2: STABILITY CHECK
             # Re-run on slightly trimmed data
             # =========================
-            df_prev = df.iloc[:-1]  # remove last candle
-            res_prev = engine.analyze(df_prev, trade_style="SCALP", symbol=sym)
+            df_prev = df.iloc[:-1]
+            res_prev = engine.analyze(df_prev, trade_style=scan_mode, symbol=sym)
 
-            # If signal changes → unstable → reject
             if res_prev.bias != res.bias:
                 return None
 
@@ -298,8 +302,6 @@ def hx_alpha_scan(request):
                 'stop': res.stop,
                 'target': res.target1,
                 'explanation': getattr(res, 'narrative', 'Setup Detected'),
-
-                # Optional future use (sync layer)
                 'timestamp': str(df.index[-1])
             }
 
@@ -483,34 +485,56 @@ def refresh_journal_entry(request, entry_id):
                 message = "4h window closed. Neither target nor stop was hit."
 
         else:
-            # Trade is still within TTL — check using HIGH/LOW range, not just close
+            # Trade is still within TTL — check price SINCE trade was created
             try:
                 df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
                 if df is not None and not df.empty:
                     curr = float(df['close'].iloc[-1])
-                    curr_high = float(df['high'].iloc[-1])
-                    curr_low = float(df['low'].iloc[-1])
                     message = f"Current Price: ${curr}"
                     new_status = 'PENDING'
 
-                    # v36: Check high/low of recent candles, not just last close
-                    # This catches wicks that touched target/stop
-                    trade_start = entry.created_at
-                    recent = df.tail(12)  # Last 12 candles (1hr on 5m)
+                    # v37 FIX: Only check candles AFTER the trade was created
+                    # The old code checked df.tail(12) which looked 1 hour BACK
+                    # and found historical lows that triggered instant LOSS
+                    trade_time = entry.created_at
+                    try:
+                        # Filter to only candles after trade creation
+                        if hasattr(df.index, 'tz_localize'):
+                            trade_ts = pd.Timestamp(trade_time).tz_localize(None)
+                        else:
+                            trade_ts = pd.Timestamp(trade_time)
+                        recent = df[df.index >= trade_ts]
+                    except Exception:
+                        # Fallback: use last 2 candles only (10min on 5m)
+                        recent = df.tail(2)
 
-                    period_high = float(recent['high'].max())
-                    period_low = float(recent['low'].min())
-
-                    if entry.bias == 'LONG':
-                        if period_high >= entry.target:
-                            new_status = 'WIN'
-                        elif period_low <= entry.stop_loss:
-                            new_status = 'LOSS'
+                    if len(recent) == 0:
+                        # Trade was just created, no candles to check yet
+                        # Only check current price
+                        if entry.bias == 'LONG':
+                            if curr >= entry.target:
+                                new_status = 'WIN'
+                            elif curr <= entry.stop_loss:
+                                new_status = 'LOSS'
+                        else:
+                            if curr <= entry.target:
+                                new_status = 'WIN'
+                            elif curr >= entry.stop_loss:
+                                new_status = 'LOSS'
                     else:
-                        if period_low <= entry.target:
-                            new_status = 'WIN'
-                        elif period_high >= entry.stop_loss:
-                            new_status = 'LOSS'
+                        period_high = float(recent['high'].max())
+                        period_low = float(recent['low'].min())
+
+                        if entry.bias == 'LONG':
+                            if period_high >= entry.target:
+                                new_status = 'WIN'
+                            elif period_low <= entry.stop_loss:
+                                new_status = 'LOSS'
+                        else:
+                            if period_low <= entry.target:
+                                new_status = 'WIN'
+                            elif period_high >= entry.stop_loss:
+                                new_status = 'LOSS'
 
                     # Update DB if status changed
                     if new_status != 'PENDING':
