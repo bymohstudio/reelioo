@@ -66,15 +66,15 @@
         </div>
         <div class="p-6">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Target</p>
-            <p class="text-xl font-mono font-black text-emerald-400">${{ res.target1 }}</p>
+            <p class="text-xl font-mono font-black text-emerald-400">${{ res.target }}</p>
         </div>
         <div class="p-6">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Stop</p>
             <p class="text-xl font-mono font-black text-red-400">${{ res.stop }}</p>
         </div>
         <div class="p-6">
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Whale Activity</p>
-            <p class="text-lg font-black text-white">{{ res.whale_label }}</p>
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Risk : Reward</p>
+            <p class="text-lg font-black {% if res.rr_ratio >= 2.5 %}text-emerald-400{% elif res.rr_ratio >= 2 %}text-yellow-400{% else %}text-slate-400{% endif %}">1 : {{ res.rr_ratio }}</p>
         </div>
     </div>
 
@@ -100,7 +100,7 @@
                 <input type="hidden" name="bias" value="{{ res.bias }}">
                 <input type="hidden" name="entry" value="{{ res.entry }}">
                 <input type="hidden" name="stop" value="{{ res.stop }}">
-                <input type="hidden" name="target" value="{{ res.target1 }}">
+                <input type="hidden" name="target" value="{{ res.target }}">
                 <input type="hidden" name="score" value="{{ res.score }}">
                 <button type="submit" class="w-full px-6 py-4 bg-[#1e293b] hover:bg-[#334155] text-white font-black rounded-xl text-xs uppercase tracking-[0.15em] border border-white/10 transition shadow-lg flex items-center justify-center gap-2 group">
                     <i data-lucide="bookmark" class="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition"></i> Save to Journal

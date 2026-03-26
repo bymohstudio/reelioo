@@ -340,9 +340,20 @@ class CryptoQuantEngine:
                 score = int(min(60 + (dominant / threshold) * 8, 74))
 
             # ==========================================================
-            # 13. TARGET SYSTEM
+            # 13. TARGET SYSTEM (v37.1: ONE TARGET, POSITIVE EXPECTANCY)
             # ==========================================================
-            stop = t1 = t2 = t3 = 0.0
+            # The math: at 35% win rate you need 2.5:1 RR to be profitable
+            # (0.35 * 2.5) - (0.65 * 1.0) = +0.225R per trade
+            #
+            # Old system: T1=1.3x, T2=2.2x, T3=3.8x — confusing, and
+            # journal used T1 which gave ~1.08:1 RR = guaranteed loss
+            #
+            # New system: ONE target at 2.5x stop distance. Period.
+            # The user sees one number. The journal tracks one number.
+            # Wins are 2.5x bigger than losses.
+            # ==========================================================
+            stop = 0.0
+            target = 0.0
             rr = 0.0
             risk_pct = 0.0
 
@@ -352,25 +363,25 @@ class CryptoQuantEngine:
 
                 stop = price - (direction * stop_dist)
 
+                # Single target: 2.5x the stop distance
+                # This means every WIN recovers 2.5 LOSSES
+                target_mult = 2.5
                 if trade_style == "SCALP":
-                    t1 = price + (direction * stop_dist * 1.2)
-                    t2 = price + (direction * stop_dist * 2.0)
-                    t3 = price + (direction * stop_dist * 3.0)
+                    target_mult = 2.0   # Scalp: tighter but still positive expectancy at 40%+ WR
                 elif trade_style == "SWING":
-                    t1 = price + (direction * stop_dist * 1.8)
-                    t2 = price + (direction * stop_dist * 3.2)
-                    t3 = price + (direction * stop_dist * 5.0)
+                    target_mult = 3.0   # Swing: wider, catch bigger moves
                 elif trade_style == "POSITION":
-                    t1 = price + (direction * stop_dist * 2.0)
-                    t2 = price + (direction * stop_dist * 4.0)
-                    t3 = price + (direction * stop_dist * 7.0)
-                else:
-                    t1 = price + (direction * stop_dist * 1.3)
-                    t2 = price + (direction * stop_dist * 2.2)
-                    t3 = price + (direction * stop_dist * 3.8)
+                    target_mult = 3.5   # Position: let runners run
 
-                rr = round(abs(t1 - price) / (stop_dist + 1e-9), 2)
+                target = price + (direction * stop_dist * target_mult)
+                rr = round(target_mult, 2)
                 risk_pct = self.BASE_RISK
+
+            # Legacy compatibility: set t1/t2/t3 to same value
+            # so any old code referencing them doesn't break
+            t1 = target
+            t2 = target
+            t3 = target
 
             # ==========================================================
             # 14. MARKET REGIME
@@ -449,6 +460,7 @@ class CryptoQuantEngine:
                 price=price,
                 entry=price if bias in ["LONG", "SHORT"] else 0.0,
                 stop=round(stop, 4),
+                target=round(target, 4),
                 target1=round(t1, 4),
                 target2=round(t2, 4),
                 target3=round(t3, 4),
@@ -475,6 +487,7 @@ class CryptoQuantEngine:
             price=price,
             entry=0,
             stop=0,
+            target=0,
             target1=0,
             target2=0,
             target3=0,

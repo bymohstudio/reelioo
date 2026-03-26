@@ -300,7 +300,7 @@ def hx_alpha_scan(request):
                 'lane': res.lane,
                 'entry': res.entry,
                 'stop': res.stop,
-                'target': res.target1,
+                'target': res.target,
                 'explanation': getattr(res, 'narrative', 'Setup Detected'),
                 'timestamp': str(df.index[-1])
             }
@@ -823,7 +823,7 @@ def cron_scan_trigger(request, secret_key=None):
                                 bias=res.bias,
                                 entry_price=res.entry,
                                 stop_loss=res.stop,
-                                target=res.target1,
+                                target=res.target,
                                 confidence=res.score,
                                 status='PENDING'
                             )
