@@ -113,13 +113,20 @@ class CryptoQuantEngine:
             strength_now = fast_now * 0.6 + slow_now * 0.4
 
             # ==========================================================
-            # 3. SHORT-TERM PRICE ACTION (v37 NEW — the key fix)
+            # 3. SHORT-TERM PRICE ACTION (v37.2 FIX)
             # ==========================================================
+            # v37 bug: st_bearish triggered on any 0.3 ATR pullback,
+            # which happens constantly in bull markets. This gated out
+            # all LONG scoring and opened all SHORT scoring = 80% short bias.
+            #
+            # v37.2 fix: Higher threshold (0.6 ATR) and no longer used
+            # as a gate on structure layers. Only used for momentum
+            # agreement and counter-trend penalty.
             short_term_change = float(close.diff(short_term_bars).iloc[-1])
             short_term_direction = short_term_change / (current_sigma + 1e-9)
 
-            st_bullish = short_term_direction > 0.3
-            st_bearish = short_term_direction < -0.3
+            st_bullish = short_term_direction > 0.6    # Was 0.3 — too sensitive
+            st_bearish = short_term_direction < -0.6   # Was -0.3 — too sensitive
             st_neutral = not st_bullish and not st_bearish
 
             # ==========================================================
@@ -143,6 +150,10 @@ class CryptoQuantEngine:
 
             overstretched = abs(stretch_pct) > self.MAX_STRETCH
 
+            # Macro trend (v37.2: used for counter-trend penalty)
+            macro_bullish = ema_aligned_bull and bull_slow
+            macro_bearish = ema_aligned_bear and bear_slow
+
             typical_price = (high + low + close) / 3
             vwap_proxy = (typical_price * volume).rolling(struct_len).sum() / (volume.rolling(struct_len).sum() + 1e-9)
             vwap_val = float(vwap_proxy.iloc[-1])
@@ -156,13 +167,18 @@ class CryptoQuantEngine:
             price_chg_10 = close.diff(10).iloc[-1]
             strength_chg_10 = trend_fast.diff(10).iloc[-1]
 
+            # v37.2 FIX: Divergence was too loose with OR logic.
+            # Bearish div fired on every consolidation in a bull market.
+            # Now requires BOTH timeframes to agree AND minimum magnitude.
+            min_div_price_move = current_sigma * 0.5  # Price must move meaningfully
+
             bullish_div = (
-                (price_chg_5 < 0 and strength_chg_5 > 0) or
-                (price_chg_10 < 0 and strength_chg_10 > 0)
+                price_chg_5 < -min_div_price_move and strength_chg_5 > 0 and
+                price_chg_10 < -min_div_price_move and strength_chg_10 > 0
             )
             bearish_div = (
-                (price_chg_5 > 0 and strength_chg_5 < 0) or
-                (price_chg_10 > 0 and strength_chg_10 < 0)
+                price_chg_5 > min_div_price_move and strength_chg_5 < 0 and
+                price_chg_10 > min_div_price_move and strength_chg_10 < 0
             )
 
             # ==========================================================
@@ -226,8 +242,16 @@ class CryptoQuantEngine:
             is_consolidation = atr_ratio < 0.8 and abs(strength_now) < 0.3
 
             # ==========================================================
-            # 11. CONFLUENCE ENGINE (v37 QUALITY-FOCUSED)
+            # 11. CONFLUENCE ENGINE (v37.2 BALANCED)
             # ==========================================================
+            # v37 bug: Every layer required st_bullish/st_bearish gate,
+            # which meant LONG could never score during normal pullbacks
+            # in a bull market, but SHORT always could. 80% short bias.
+            #
+            # v37.2 fix: Structure layers score based on EMA position
+            # (no short-term gate). Momentum requires agreement between
+            # fast and slow. Counter-trend penalty applied at the END
+            # based on macro trend, not per-layer.
             long_score = 0.0
             short_score = 0.0
 
@@ -235,22 +259,24 @@ class CryptoQuantEngine:
                 pass
             else:
                 # --- Layer 1: Structure (0.8 max) ---
-                if bull_fast and st_bullish:
+                # No st_bullish/st_bearish gate — structure is about position, not direction
+                if bull_fast:
                     long_score += 0.4
-                if bear_fast and st_bearish:
+                if bear_fast:
                     short_score += 0.4
 
-                if bull_slow and bull_fast and st_bullish:
+                if bull_slow and bull_fast:
                     long_score += 0.2
-                if bear_slow and bear_fast and st_bearish:
+                if bear_slow and bear_fast:
                     short_score += 0.2
 
-                if ema_aligned_bull and st_bullish:
+                if ema_aligned_bull:
                     long_score += 0.2
-                if ema_aligned_bear and st_bearish:
+                if ema_aligned_bear:
                     short_score += 0.2
 
                 # --- Layer 2: Momentum (1.0 max) ---
+                # Both fast AND slow must agree (unchanged, this is good)
                 if strength_now > min_strength and fast_now > 0 and slow_now > 0:
                     long_score += 0.7
                     if strength_now > min_strength * 2.0:
@@ -273,22 +299,22 @@ class CryptoQuantEngine:
                         short_score += 0.25
 
                 # --- Layer 4: Trend Consistency (0.4 max) ---
-                if trend_consistent_bull and st_bullish:
+                if trend_consistent_bull:
                     long_score += 0.4
-                if trend_consistent_bear and st_bearish:
+                if trend_consistent_bear:
                     short_score += 0.4
 
                 # --- Layer 5: VWAP Position (0.2 max) ---
-                if price_above_vwap and bull_fast and st_bullish:
+                if price_above_vwap and bull_fast:
                     long_score += 0.2
-                elif not price_above_vwap and bear_fast and st_bearish:
+                elif not price_above_vwap and bear_fast:
                     short_score += 0.2
 
-                # --- Layer 6: Divergence (0.8 max) ---
-                if bullish_div and st_bullish:
-                    long_score += 0.8
-                if bearish_div and st_bearish:
-                    short_score += 0.8
+                # --- Layer 6: Divergence (0.6 max — reduced, now harder to trigger) ---
+                if bullish_div:
+                    long_score += 0.6
+                if bearish_div:
+                    short_score += 0.6
 
                 # --- Layer 7: Order Flow (0.4 max) ---
                 if smart_money_bias == "BULLISH" and strength_now > 0:
@@ -310,11 +336,21 @@ class CryptoQuantEngine:
                     if wick_l > 0.65:
                         short_score -= 0.6
 
-                # v37: Counter-trend penalty
-                if st_bearish and long_score > 0:
-                    long_score *= 0.5
-                if st_bullish and short_score > 0:
-                    short_score *= 0.5
+                # v37.2: MACRO TREND PENALTY (replaces the old st_bearish/st_bullish halving)
+                # In a confirmed bull market, shorting requires MORE confluence
+                # In a confirmed bear market, longing requires MORE confluence
+                # This is the key balance fix — trend-following is rewarded, counter-trend is penalized
+                if macro_bullish and short_score > 0:
+                    short_score *= 0.6   # 40% penalty for shorting a bull market
+                if macro_bearish and long_score > 0:
+                    long_score *= 0.6    # 40% penalty for longing a bear market
+
+                # Short-term direction penalty (softer than v37's 50% nuke)
+                # Only applies in STRONG counter-trend moves, not normal noise
+                if st_bearish and long_score > 0 and not macro_bearish:
+                    long_score *= 0.8    # Mild penalty, not 0.5
+                if st_bullish and short_score > 0 and not macro_bullish:
+                    short_score *= 0.8
 
             # ==========================================================
             # 12. DECISION LOGIC (v37: TIGHTER)
