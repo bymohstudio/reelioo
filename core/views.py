@@ -5,6 +5,8 @@ import logging
 import requests
 import concurrent.futures
 from datetime import datetime
+
+from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
@@ -63,14 +65,23 @@ def verify_subscription_status(user):
     Helper to check Gumroad status periodically.
     Used in terminal_view and get_access_view.
     """
-    if not hasattr(user, 'profile'): return
+
+    if not hasattr(user, 'profile'):
+        return
 
     profile = user.profile
 
-    # Skip check for superusers
-    if user.is_superuser: return
+    # 🚀 1. SUPERUSER BYPASS
+    if user.is_superuser:
+        profile.is_premium = True
+        return
 
-    # Only check if 24 hours passed since last check
+    # 🚀 2. BETA ACCESS BYPASS
+    if getattr(profile, "is_beta", False):
+        profile.is_premium = True
+        return
+
+    # ⏱ 3. NORMAL VERIFICATION FLOW
     if profile.needs_verification():
         is_valid, msg = verify_gumroad_license(profile.gumroad_license_key)
 
@@ -93,7 +104,9 @@ def get_access_view(request):
     User enters Username + Key.
     - If user exists -> Login.
     - If new -> Create + Login.
+    - Special case: beta-access key gives full access.
     """
+
     if request.user.is_authenticated:
         return redirect('terminal')
 
@@ -105,7 +118,18 @@ def get_access_view(request):
             messages.error(request, "Username and License Key are required.")
             return render(request, 'core/auth/get_access.html')
 
-        # This triggers LicenseKeyBackend.authenticate
+        # 🚀 BETA ACCESS LOGIC
+        if key == "beta-access":
+            user, created = User.objects.get_or_create(username=username)
+
+            # Optional: mark user as beta
+            user.profile.is_beta = True  # if you have profile model
+            user.save()
+
+            login(request, user)
+            return redirect('terminal')
+
+        # 🔒 Normal License Flow
         user = authenticate(request, username=username, license_key=key)
 
         if user:
