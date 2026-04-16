@@ -9,8 +9,6 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
@@ -18,23 +16,12 @@ from django.conf import settings
 from .quant.crypto_engine import CryptoQuantEngine
 from .backtest.backtest_engine import CryptoBacktestEngine
 from .services.marketdata_service import MarketService
-from .models import JournalEntry, UserProfile
-from .services.gumroad_service import verify_gumroad_license
+from .models import JournalEntry
 
 log = logging.getLogger(__name__)
 
 
-# =========================================================
-#  HELPERS
-# =========================================================
-
-def has_access(user):
-    """Checks if user has premium access via Profile Property"""
-    return user.profile.is_access_granted()
-
-
 def generate_market_narrative(res):
-    """Generates 'Trader Speak' based on math vectors."""
     vectors = [f.get('desc', '').lower() for f in res.top_features]
     vector_str = " ".join(vectors)
     bias, score = res.bias, res.score
@@ -58,112 +45,20 @@ def generate_market_narrative(res):
     return "Liquidity is thin and direction is unclear. Expect stop-hunts."
 
 
-def verify_subscription_status(user):
-    """
-    Helper to check Gumroad status periodically.
-    Used in terminal_view and get_access_view.
-    """
-    if not hasattr(user, 'profile'): return
-
-    profile = user.profile
-
-    # Skip check for superusers
-    if user.is_superuser: return
-
-    # Only check if 24 hours passed since last check
-    if profile.needs_verification():
-        is_valid, msg = verify_gumroad_license(profile.gumroad_license_key)
-
-        if is_valid:
-            profile.is_premium = True
-            profile.last_verified_at = timezone.now()
-        else:
-            profile.is_premium = False  # Revoke access
-
-        profile.save()
-
-
-# =========================================================
-#  AUTH (UNIFIED GUMROAD FLOW)
-# =========================================================
-
-def get_access_view(request):
-    """
-    The Single Entry Point.
-    User enters Username + Key.
-    - If user exists -> Login.
-    - If new -> Create + Login.
-    """
-    if request.user.is_authenticated:
-        return redirect('terminal')
-
-    if request.method == 'POST':
-        username = request.POST.get('username', '').strip()
-        key = request.POST.get('license_key', '').strip()
-
-        if not username or not key:
-            messages.error(request, "Username and License Key are required.")
-            return render(request, 'core/auth/get_access.html')
-
-        # This triggers LicenseKeyBackend.authenticate
-        user = authenticate(request, username=username, license_key=key)
-
-        if user:
-            login(request, user)
-            # Check status immediately on fresh login
-            verify_subscription_status(user)
-            return redirect('terminal')
-        else:
-            messages.error(request, "Access Denied. Invalid Key or Username mismatch.")
-
-    return render(request, 'core/auth/get_access.html')
-
-
-def logout_view(request):
-    logout(request)
-    return redirect('landing')
-
-
 def landing_view(request):
-    if request.user.is_authenticated: return redirect('terminal')
     return render(request, 'core/landing.html')
 
 
-# =========================================================
-#  TERMINAL
-# =========================================================
-
-@login_required
 def terminal_view(request):
-    # 1. Periodically verify license (e.g. daily)
-    verify_subscription_status(request.user)
-
-    profile = request.user.profile
-    if not profile.is_access_granted():
-        messages.warning(request, "Access Expired. Please Renew.")
-        return redirect('pricing')
-
     return render(request, 'core/terminal.html')
 
 
-# =========================================================
-#  PAYMENT (PRICING ONLY)
-# =========================================================
-
-@login_required
 def pricing_view(request):
-    # Just render the template with the Gumroad link
-    # No API logic needed here anymore
-    return render(request, 'core/pricing.html', {"is_premium": request.user.profile.is_premium})
+    return render(request, 'core/pricing.html', {"is_premium": False})
 
-
-# =========================================================
-#  HTMX PARTIALS
-# =========================================================
 
 @require_http_methods(["GET"])
 def hx_ticker(request):
-    """Top bar live price ticker"""
     symbols = ["BTC", "ETH", "SOL", "BNB", "XRP"]
     data = []
     for s in symbols:
@@ -182,12 +77,8 @@ def hx_ticker(request):
     return render(request, 'core/partials/ticker.html', {'ticker': data * 4})
 
 
-@login_required
 @require_http_methods(["POST"])
 def hx_analyze(request):
-    """Main Terminal Analysis View"""
-    if not has_access(request.user): return HttpResponse('<div class="text-red-500">ACCESS DENIED</div>')
-
     symbol = request.POST.get("symbol", "").upper().strip()
     if not symbol.endswith("USDT"): symbol += "USDT"
     mode = request.POST.get("mode", "INTRADAY")
@@ -197,9 +88,6 @@ def hx_analyze(request):
         if df is None or df.empty: return HttpResponse('<div class="text-red-500">DATA ERROR</div>')
 
         engine = CryptoQuantEngine()
-
-        # [CRITICAL UPDATE] You MUST pass 'symbol=symbol' here!
-        # Without this, the engine cannot fetch the Order Book / Order Flow.
         res = engine.analyze(df, mode, symbol=symbol)
 
         note_tag = "TRENDING" if res.score >= 60 else "CHOPPY"
@@ -212,10 +100,8 @@ def hx_analyze(request):
         return HttpResponse(f'<div class="text-red-500">ERROR: {e}</div>')
 
 
-@login_required
 @require_http_methods(["POST"])
 def hx_backtest(request):
-    """Backtest execution"""
     try:
         symbol = request.POST.get("symbol", "BTCUSDT")
         df = MarketService.get_historical_data(symbol, "PERP", "INTRADAY")
@@ -226,73 +112,33 @@ def hx_backtest(request):
         return HttpResponse(f"Error: {e}")
 
 
-@login_required
 @require_http_methods(["GET"])
 def hx_alpha_scan(request):
-    """
-    REELIOO ALPHA SCAN v2 – STABLE HUNTER MODE
-
-    Fixes:
-    - Removes weak/borderline signals
-    - Prevents scan vs terminal mismatch
-    - Adds stability confirmation
-    """
-
-    if not has_access(request.user):
-        return HttpResponse("DENIED")
-
-    # ==========================================================
-    # 1. LOAD TOP ASSETS
-    # ==========================================================
     all_assets = MarketService._load_exchange_info()
     scan_list = [a['symbol'] for a in all_assets[:30]]
 
     engine = CryptoQuantEngine()
     results = []
 
-    # ==========================================================
-    # 2. SCAN FUNCTION (IMPROVED)
-    # ==========================================================
     def scan(sym):
         try:
-            # v37 FIX: Use INTRADAY mode for alpha scan (15m candles, wider stops)
-            # SCALP mode (5m) has stops too tight for altcoins/memecoins
-            # The old code used SCALP which gave 0.8x ATR stops — noise-level
-            # for anything outside BTC/ETH
             scan_mode = "INTRADAY"
-
             df = MarketService.get_historical_data(sym, "PERP", scan_mode)
 
             if df is None or df.empty or len(df) < 210:
                 return None
 
-            # =========================
-            # PRIMARY ANALYSIS
-            # =========================
             res = engine.analyze(df, trade_style=scan_mode, symbol=sym)
 
-            # =========================
-            # HARD FILTER 1: ONLY ACTIONABLE SIGNALS
-            # =========================
-            if res.bias not in ["LONG", "SHORT"]:
+            if res.bias not in ["LONG", "SHORT"] or res.score < 75:
                 return None
 
-            if res.score < 75:
-                return None
-
-            # =========================
-            # HARD FILTER 2: STABILITY CHECK
-            # Re-run on slightly trimmed data
-            # =========================
             df_prev = df.iloc[:-1]
             res_prev = engine.analyze(df_prev, trade_style=scan_mode, symbol=sym)
 
             if res_prev.bias != res.bias:
                 return None
 
-            # =========================
-            # FINAL ACCEPT
-            # =========================
             return {
                 'symbol': sym,
                 'bias': res.bias,
@@ -304,40 +150,27 @@ def hx_alpha_scan(request):
                 'explanation': getattr(res, 'narrative', 'Setup Detected'),
                 'timestamp': str(df.index[-1])
             }
-
         except Exception:
             return None
 
-    # ==========================================================
-    # 3. PARALLEL EXECUTION
-    # ==========================================================
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         for r in executor.map(scan, scan_list):
             if r:
                 results.append(r)
 
-    # ==========================================================
-    # 4. RESULT HANDLING
-    # ==========================================================
     if not results:
-        return render(request, 'core/partials/alpha_result.html', {
-            'res': {'found': False}
-        })
+        return render(request, 'core/partials/alpha_result.html', {'res': {'found': False}})
 
-    # Sort by strongest score
     results.sort(key=lambda x: x['score'], reverse=True)
-
     best_setup = results[0]
 
-    return render(request, 'core/partials/alpha_result.html', {
-        'res': {'found': True, **best_setup}
-    })
+    return render(request, 'core/partials/alpha_result.html', {'res': {'found': True, **best_setup}})
 
 
-@login_required
 @require_http_methods(["POST"])
 def hx_journal_add(request):
-    """Adds manual trade from Terminal"""
+    if not request.user.is_authenticated:
+        return HttpResponse('<button class="w-full mt-8 bg-red-500/10 text-red-500 p-4 rounded-xl">LOGIN REQUIRED</button>')
     try:
         JournalEntry.objects.create(
             user=request.user, symbol=request.POST.get('symbol'),
@@ -351,25 +184,18 @@ def hx_journal_add(request):
         return HttpResponse('<button class="w-full mt-8 bg-red-500/10 text-red-500 p-4 rounded-xl">ERROR</button>')
 
 
-# =========================================================
-#  JOURNAL & OPS
-# =========================================================
-
-@login_required
 def journal_view(request):
-    profile = request.user.profile
-    if not profile.is_access_granted(): return redirect('pricing')
+    if not request.user.is_authenticated:
+        return redirect('terminal')
 
     entries_list = JournalEntry.objects.filter(user=request.user).order_by('-created_at')
 
-    # Metrics: Percentage Based
     net_roi = 0.0
     gross_profit = 0.0
     gross_loss = 0.0
 
     for trade in entries_list:
         if trade.status in ['WIN', 'LOSS'] and trade.entry_price > 0:
-            # FIX: Use Target/Stop for calc since 'exit_price' doesn't exist in DB
             exit_price = trade.target if trade.status == 'WIN' else trade.stop_loss
 
             if trade.bias == 'LONG':
@@ -395,36 +221,27 @@ def journal_view(request):
     })
 
 
-@login_required
 def refresh_journal_entry(request, entry_id):
-    from .models import JournalEntry
-    # Import Discord Service
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error'}, status=403)
+
     from .services.discord_service import send_win_prompt
 
     entry = get_object_or_404(JournalEntry, id=entry_id, user=request.user)
 
-    # Default vars
     msg_type = "info"
     title = "Synced"
     message = "Trade is already closed."
 
-    # --- CASE 1: TRADE IS ACTIVE (CHECK PRICE & TIME) ---
     if entry.status == 'PENDING':
-
-        # [v36] ADAPTIVE TTL PER TRADE STYLE
-        # Old: Fixed 4hr for everything. New: Based on what mode created it.
-        # Default to 4hr for backward compat with old entries.
         ttl_hours = 4.0
         hours_elapsed = (timezone.now() - entry.created_at).total_seconds() / 3600
 
         if hours_elapsed >= ttl_hours:
-            # Before expiring, do ONE final price-range check
-            # This catches targets that were hit while no one was looking
             final_status = 'EXPIRED'
             try:
                 df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
                 if df is not None and not df.empty:
-                    # Get the candles SINCE the trade was created
                     trade_start = entry.created_at
                     recent = df[df.index >= trade_start.strftime('%Y-%m-%d %H:%M:%S')] if hasattr(df.index, 'strftime') else df.tail(48)
 
@@ -432,12 +249,10 @@ def refresh_journal_entry(request, entry_id):
                         period_high = float(recent['high'].max())
                         period_low = float(recent['low'].min())
 
-                        # Check if target/stop was hit during the period
                         if entry.bias == 'LONG':
                             if period_high >= entry.target:
                                 final_status = 'WIN'
                             elif period_low <= entry.stop_loss:
-                                # Check which happened first by scanning candles
                                 for _, candle in recent.iterrows():
                                     if float(candle['low']) <= entry.stop_loss:
                                         final_status = 'LOSS'
@@ -445,7 +260,7 @@ def refresh_journal_entry(request, entry_id):
                                     if float(candle['high']) >= entry.target:
                                         final_status = 'WIN'
                                         break
-                        else:  # SHORT
+                        else:
                             if period_low <= entry.target:
                                 final_status = 'WIN'
                             elif period_high >= entry.stop_loss:
@@ -469,9 +284,8 @@ def refresh_journal_entry(request, entry_id):
 
                 if request.user.is_superuser:
                     try:
-                        duration = hours_elapsed
                         roi = abs((entry.target - entry.entry_price) / entry.entry_price) * 100
-                        send_win_prompt(entry.symbol, round(roi, 2), duration)
+                        send_win_prompt(entry.symbol, round(roi, 2), hours_elapsed)
                     except Exception as e:
                         print(f"Marketing Error: {e}")
 
@@ -485,7 +299,6 @@ def refresh_journal_entry(request, entry_id):
                 message = "4h window closed. Neither target nor stop was hit."
 
         else:
-            # Trade is still within TTL — check price SINCE trade was created
             try:
                 df = MarketService.get_historical_data(entry.symbol, "PERP", "SCALP")
                 if df is not None and not df.empty:
@@ -493,50 +306,34 @@ def refresh_journal_entry(request, entry_id):
                     message = f"Current Price: ${curr}"
                     new_status = 'PENDING'
 
-                    # v37 FIX: Only check candles AFTER the trade was created
-                    # The old code checked df.tail(12) which looked 1 hour BACK
-                    # and found historical lows that triggered instant LOSS
                     trade_time = entry.created_at
                     try:
-                        # Filter to only candles after trade creation
                         if hasattr(df.index, 'tz_localize'):
                             trade_ts = pd.Timestamp(trade_time).tz_localize(None)
                         else:
                             trade_ts = pd.Timestamp(trade_time)
                         recent = df[df.index >= trade_ts]
                     except Exception:
-                        # Fallback: use last 2 candles only (10min on 5m)
                         recent = df.tail(2)
 
                     if len(recent) == 0:
-                        # Trade was just created, no candles to check yet
-                        # Only check current price
                         if entry.bias == 'LONG':
-                            if curr >= entry.target:
-                                new_status = 'WIN'
-                            elif curr <= entry.stop_loss:
-                                new_status = 'LOSS'
+                            if curr >= entry.target: new_status = 'WIN'
+                            elif curr <= entry.stop_loss: new_status = 'LOSS'
                         else:
-                            if curr <= entry.target:
-                                new_status = 'WIN'
-                            elif curr >= entry.stop_loss:
-                                new_status = 'LOSS'
+                            if curr <= entry.target: new_status = 'WIN'
+                            elif curr >= entry.stop_loss: new_status = 'LOSS'
                     else:
                         period_high = float(recent['high'].max())
                         period_low = float(recent['low'].min())
 
                         if entry.bias == 'LONG':
-                            if period_high >= entry.target:
-                                new_status = 'WIN'
-                            elif period_low <= entry.stop_loss:
-                                new_status = 'LOSS'
+                            if period_high >= entry.target: new_status = 'WIN'
+                            elif period_low <= entry.stop_loss: new_status = 'LOSS'
                         else:
-                            if period_low <= entry.target:
-                                new_status = 'WIN'
-                            elif period_high >= entry.stop_loss:
-                                new_status = 'LOSS'
+                            if period_low <= entry.target: new_status = 'WIN'
+                            elif period_high >= entry.stop_loss: new_status = 'LOSS'
 
-                    # Update DB if status changed
                     if new_status != 'PENDING':
                         entry.status = new_status
                         entry.save()
@@ -546,7 +343,6 @@ def refresh_journal_entry(request, entry_id):
                             title = "Target Hit!"
                             message = "Trade closed in profit."
 
-                            # --- TRIGGER ALERT (TRANSITION) ---
                             if request.user.is_superuser:
                                 try:
                                     duration = (timezone.now() - entry.created_at).total_seconds() / 3600
@@ -562,19 +358,17 @@ def refresh_journal_entry(request, entry_id):
                     else:
                         title = "Status: PENDING"
 
-            except Exception as e:
+            except Exception:
                 msg_type = "warning"
                 title = "Sync Error"
                 message = "Could not fetch market data."
 
-    # --- CASE 2: TRADE IS ALREADY CLOSED ---
     else:
         if entry.status == 'WIN':
             msg_type = "success"
             title = "Trade Complete"
             message = "Result: WIN (Alert Sent)"
 
-            # --- ALLOW RE-SENDING ALERT FOR EXISTING WINS ---
             if request.user.is_superuser:
                 try:
                     duration = (timezone.now() - entry.created_at).total_seconds() / 3600
@@ -588,103 +382,64 @@ def refresh_journal_entry(request, entry_id):
             title = "Trade Complete"
             message = "Result: LOSS"
 
-        elif entry.status == 'EXPIRED':  # Handle the new status here
-            msg_type = "info"
-            title = "Signal Expired"
-            message = "Trade window closed (4h limit)."
-
-        elif entry.status == 'INVALID':  # Keep for backward compatibility
+        elif entry.status in ['EXPIRED', 'INVALID']:
             msg_type = "info"
             title = "Signal Expired"
             message = "Trade window closed."
 
-    # Render response
     response = render(request, 'core/partials/journal_row.html', {'entry': entry})
-    response['HX-Trigger'] = json.dumps({
-        'showToast': {'type': msg_type, 'title': title, 'message': message}
-    })
+    response['HX-Trigger'] = json.dumps({'showToast': {'type': msg_type, 'title': title, 'message': message}})
     return response
 
 
-@login_required
 def delete_journal_entry(request, entry_id):
-    from .models import JournalEntry
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error'}, status=403)
+
     if request.method == "DELETE":
         JournalEntry.objects.filter(id=entry_id, user=request.user).delete()
-
         response = HttpResponse("")
-        # Trigger Success Alert
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {
-                'type': 'success',
-                'title': 'Deleted',
-                'message': 'Journal entry removed.'
-            }
-        })
+        response['HX-Trigger'] = json.dumps({'showToast': {'type': 'success', 'title': 'Deleted', 'message': 'Journal entry removed.'}})
         return response
 
     return JsonResponse({'status': 'error'}, status=400)
 
 
-@login_required
 def add_journal_entry(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error'}, status=403)
     if request.method == "POST":
         return hx_journal_add(request)
     return JsonResponse({'status': 'error'})
 
 
-@login_required
 def ops_dashboard_view(request):
-    # 1. Access Control: Strict Superuser Only
     if not request.user.is_superuser:
         return redirect('terminal')
 
-    # Import inside to avoid circular import errors
     from django.contrib.auth.models import User
     from .models import JournalEntry, UserProfile
 
-    # 2. METRICS
     users = User.objects.count()
-
-    # FIX: Count users where is_premium is True (Correct for Gumroad)
     subs = UserProfile.objects.filter(is_premium=True).count()
-
     signals = JournalEntry.objects.count()
     wins = JournalEntry.objects.filter(status='WIN').count()
-
-    # Avoid DivisionByZero if no signals exist
     win_rate = round((wins / signals * 100), 1) if signals > 0 else 0
-
-    # 3. FEED: Filter out broken records (where user is None) to prevent 500 errors
     feed = JournalEntry.objects.select_related('user').filter(user__isnull=False).order_by('-created_at')[:50]
 
     return render(request, 'core/ops_dashboard.html', {
-        'total_users': users,
-        'active_subs': subs,
-        'total_signals': signals,
-        'win_rate': win_rate,
-        'recent_signals': feed
+        'total_users': users, 'active_subs': subs,
+        'total_signals': signals, 'win_rate': win_rate, 'recent_signals': feed
     })
 
-
-# =========================================================
-#  CRON & ALERTS
-# =========================================================
 
 def send_discord_alert(symbol, alert_type="SNIPER"):
     webhook_url = os.getenv('DISCORD_URL')
     if not webhook_url: return
 
-    # --- 1. GENERATE DEEP LINK ---
-    # This link opens the terminal and auto-scans the specific coin
     terminal_link = f"https://reelioo.app/terminal?ticker={symbol}"
 
-    # --- 2. DESIGN THE TEASER ---
-    # We use neutral colors and generic terms to avoid leaking 'Long' vs 'Short'
-
     if alert_type == "SNIPER":
-        # Purple/Blue gradient feel (Hex: 5865F2 - Discord Blurple)
-        # We don't use Green/Red here so they don't guess the direction.
         color = 5814783
         title = f"🎯 SNIPER TARGET IDENTIFIED: {symbol}"
         description = (
@@ -692,19 +447,16 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
             "Neural engines have locked onto a high-probability setup.\n\n"
             "Analyzing Order Flow, Whale Volume, and Trend Vectors..."
         )
-        thumbnail = "https://cdn-icons-png.flaticon.com/512/3121/3121575.png"  # Target Icon
-
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/3121/3121575.png"
     else:
-        # Orange/Yellow for Warning
         color = 16776960
         title = f"📡 RADAR CONTACT: {symbol}"
         description = (
             "**Volatility Spike Detected.**\n"
             "Abnormal market behavior observed. Risk protocols active."
         )
-        thumbnail = "https://cdn-icons-png.flaticon.com/512/564/564619.png"  # Radar Icon
+        thumbnail = "https://cdn-icons-png.flaticon.com/512/564/564619.png"
 
-    # --- 3. CONSTRUCT PAYLOAD ---
     payload = {
         "username": "Reelioo Intelligence",
         "avatar_url": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
@@ -714,24 +466,12 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
             "color": color,
             "thumbnail": {"url": thumbnail},
             "fields": [
-                {
-                    "name": "Asset",
-                    "value": f"`{symbol}`",
-                    "inline": True
-                },
-                {
-                    "name": "Signal Strength",
-                    "value": "██████▒▒▒▒ **[HIDDEN]**",  # Visual bar to tease
-                    "inline": True
-                },
-                {
-                    "name": "Full Analysis",
-                    "value": f"👉 [**CLICK TO REVEAL DATA**]({terminal_link})",
-                    "inline": False
-                }
+                {"name": "Asset", "value": f"`{symbol}`", "inline": True},
+                {"name": "Signal Strength", "value": "██████▒▒▒▒ **[HIDDEN]**", "inline": True},
+                {"name": "Full Analysis", "value": f"👉 [**CLICK TO REVEAL DATA**]({terminal_link})", "inline": False}
             ],
             "footer": {
-                "text": "🔒 Auth Required • Reelioo Terminal",
+                "text": "🔒 Reelioo Terminal",
                 "icon_url": "https://cdn-icons-png.flaticon.com/512/2913/2913133.png"
             },
             "timestamp": datetime.utcnow().isoformat()
@@ -745,7 +485,6 @@ def send_discord_alert(symbol, alert_type="SNIPER"):
 
 
 def cron_scan_trigger(request, secret_key=None):
-    # 1. Auth Check
     authorized = False
     if secret_key and secret_key == getattr(settings, 'CRON_SECRET', 'super-secret-password-123'):
         authorized = True
@@ -755,7 +494,6 @@ def cron_scan_trigger(request, secret_key=None):
     if not authorized:
         return JsonResponse({'status': 'forbidden'}, status=403)
 
-    # 2. Imports
     from django.contrib.auth.models import User
     from django.db.models import Q
     from django.utils import timezone
@@ -763,21 +501,17 @@ def cron_scan_trigger(request, secret_key=None):
     from .models import JournalEntry
     from .quant.crypto_engine import CryptoQuantEngine
     from .services.marketdata_service import MarketService
-    # REPLACED: TwitterBot with Discord Marketing Prompt
     from .services.discord_service import send_marketing_prompt
 
-    # 3. Cleanup
     try:
         JournalEntry.objects.filter(created_at__lt=timezone.now() - timedelta(days=90)).delete()
     except:
         pass
 
-    # 4. Watchlist
     watchlist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'WIFUSDT']
 
     active_users = User.objects.filter(
-        Q(is_superuser=True) |
-        Q(profile__is_premium=True)  # CHANGED: Now uses is_premium for Gumroad
+        Q(is_superuser=True) | Q(profile__is_premium=True)
     ).distinct()
 
     engine = CryptoQuantEngine()
@@ -796,17 +530,13 @@ def cron_scan_trigger(request, secret_key=None):
 
                 if admin:
                     exists = JournalEntry.objects.filter(
-                        user=admin,
-                        symbol=symbol,
-                        status='PENDING',
+                        user=admin, symbol=symbol, status='PENDING',
                         created_at__gte=timezone.now() - timedelta(hours=4)
                     ).exists()
 
                 if not exists:
-                    # A. Public Alert (Uses your existing function in views.py)
                     send_discord_alert(symbol, "SNIPER")
 
-                    # B. Marketing Alert (Click-to-Tweet for Admin)
                     if res.score >= 75:
                         try:
                             whale_state = getattr(res, 'whale_state', 'BASELINE')
@@ -814,18 +544,12 @@ def cron_scan_trigger(request, secret_key=None):
                         except Exception as e:
                             print(f"Marketing Trigger Error: {e}")
 
-                    # C. Distribute to Users
                     for user in active_users:
                         if not JournalEntry.objects.filter(user=user, symbol=symbol, status='PENDING').exists():
                             JournalEntry.objects.create(
-                                user=user,
-                                symbol=symbol,
-                                bias=res.bias,
-                                entry_price=res.entry,
-                                stop_loss=res.stop,
-                                target=res.target,
-                                confidence=res.score,
-                                status='PENDING'
+                                user=user, symbol=symbol, bias=res.bias,
+                                entry_price=res.entry, stop_loss=res.stop,
+                                target=res.target, confidence=res.score, status='PENDING'
                             )
                     sent += 1
         except Exception as e:
@@ -835,11 +559,6 @@ def cron_scan_trigger(request, secret_key=None):
     return JsonResponse({'status': 'success', 'signals': sent})
 
 
-# =========================================================
-#  STATIC & SEARCH (CSV LOGIC RESTORED)
-# =========================================================
-
-@login_required
 def global_symbols_view(request):
     csv_path = os.path.join(settings.BASE_DIR, 'global_symbols.csv')
     symbols = []
@@ -852,7 +571,6 @@ def global_symbols_view(request):
         except:
             pass
 
-    # Fallback if CSV empty or failed
     if not symbols: symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
     return JsonResponse(symbols, safe=False)
 
@@ -861,28 +579,11 @@ def search_crypto_view(request):
     return JsonResponse(MarketService.search_assets(request.GET.get("q", "")), safe=False)
 
 
-# =========================================================
-#  STATIC
-# =========================================================
 def terms_view(request): return render(request, 'core/legal/terms.html')
-
-
 def about_view(request): return render(request, 'core/why_reelioo.html')
-
-
 def privacy_view(request): return render(request, 'core/legal/privacy.html')
-
-
 def refund_view(request): return render(request, 'core/legal/refund.html')
-
-
 def contact_view(request): return render(request, 'core/legal/contact.html')
-
-
 def pricing_footer_view(request): return render(request, 'core/legal/pricing_footer.html')
-
-
 def robots_view(request): return HttpResponse("User-agent: *\nDisallow:", content_type="text/plain")
-
-
 def sitemap_view(request): return HttpResponse("", content_type="application/xml")
